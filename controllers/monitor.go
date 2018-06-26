@@ -14,6 +14,7 @@ type MonitorController struct {
 }
 
 var waitGroup sync.WaitGroup
+var mutex sync.Mutex
 
 // @Title Get info
 // @Description get info
@@ -73,5 +74,7 @@ func getResult(address string, response *models.Response) {
 
 	wg.Wait()
 
+	mutex.Lock()
 	response.Results = append(response.Results, result)
+	mutex.Unlock()
 }
