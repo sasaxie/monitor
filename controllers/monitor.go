@@ -6,7 +6,6 @@ import (
 	"github.com/sasaxie/monitor/service"
 	"github.com/sasaxie/monitor/models"
 	"sync"
-	"fmt"
 )
 
 // Operations about monitor
@@ -36,7 +35,6 @@ func (m *MonitorController) Info() {
 
 		waitGroup.Wait()
 
-		fmt.Println(len(response.Results))
 		for _, v := range response.Results {
 			if v.LastSolidityBlockNum == 0 {
 				v.Message = "timeout"
