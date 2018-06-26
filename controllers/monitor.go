@@ -70,6 +70,9 @@ func getResult(address string, response *models.Response) {
 	wg.Add(1)
 	go client.GetLastSolidityBlockNum(result, &wg)
 
+	wg.Add(1)
+	go client.GetPing(result, &wg)
+
 	wg.Wait()
 
 	response.Results = append(response.Results, result)

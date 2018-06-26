@@ -94,3 +94,21 @@ func (g *GrpcClient) GetLastSolidityBlockNum(result *models.Result,
 
 	result.LastSolidityBlockNum = dynamicProperties.LastSolidityBlockNum
 }
+
+func (g *GrpcClient) GetPing(result *models.Result, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
+	defer cancel()
+
+	start := time.Now().UnixNano() / 1000000
+	_, err := g.WalletClient.GetNowBlock(ctx, new(api.EmptyMessage))
+	end := time.Now().UnixNano() / 1000000
+
+	if err != nil {
+		log.Printf("get ping error: %v", err)
+		return
+	}
+
+	result.Ping = end - start
+}
