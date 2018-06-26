@@ -2,3 +2,4 @@
 routers/commentsRouter_controllers.go
 monitor
 *.tmp
+monitor.tar.gz

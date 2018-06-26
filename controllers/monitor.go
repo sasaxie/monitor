@@ -3,11 +3,9 @@ package controllers
 import (
 	"encoding/json"
 	"github.com/astaxie/beego"
-	"github.com/sasaxie/monitor/common/hexutil"
 	"github.com/sasaxie/monitor/service"
-	"github.com/sasaxie/monitor/util"
-	"strings"
-	"time"
+	"github.com/sasaxie/monitor/models"
+	"sync"
 )
 
 // Operations about monitor
@@ -15,97 +13,65 @@ type MonitorController struct {
 	beego.Controller
 }
 
-type Request struct {
-	Addresses []string
-}
-
-type Response struct {
-	Results []Result
-}
-
-type Result struct {
-	Address              string
-	NowBlock             Block
-	LastSolidityBlockNum int64
-	Ping                 int64
-	Message              string
-}
-
-type Block struct {
-	Hash   string
-	Number int64
-}
+var waitGroup sync.WaitGroup
 
 // @Title Get info
 // @Description get info
 // @router /info [post]
 func (m *MonitorController) Info() {
-	response := new(Response)
-	response.Results = make([]Result, 0)
+	response := new(models.Response)
+	response.Results = make([]*models.Result, 0)
 
-	var request Request
+	var request models.Request
 	err := json.Unmarshal(m.Ctx.Input.RequestBody, &request)
 
 	if err != nil {
 		m.Data["json"] = err.Error()
 	} else {
 		for _, address := range request.Addresses {
+			waitGroup.Add(1)
 			go getResult(address, response)
 		}
+
+		waitGroup.Wait()
+
+		for _, v := range response.Results {
+			if v.LastSolidityBlockNum == 0 {
+				v.Message = "timeout"
+			} else {
+				v.Message = "success"
+			}
+		}
+
 		m.Data["json"] = response
-	}
-
-	time.Sleep(1000 * time.Millisecond)
-
-	for _, address := range request.Addresses {
-		for i, a := range response.Results {
-			if strings.EqualFold(a.Address, address) {
-				response.Results[i].Message = "success"
-				break
-			}
-		}
-	}
-
-	for _, address := range request.Addresses {
-		isHave := false
-		for _, a := range response.Results {
-			if strings.EqualFold(a.Address, address) {
-				isHave = true
-				break
-			}
-		}
-
-		if !isHave {
-			var res Result
-			res.Message = "timeout"
-			res.Address = address
-			response.Results = append(response.Results, res)
-		}
 	}
 
 	m.ServeJSON()
 }
 
-func getResult(address string, response *Response) {
-	var result Result
+func getResult(address string, response *models.Response) {
+	defer waitGroup.Done()
+
+	var wg sync.WaitGroup
+
+	result := new(models.Result)
 	result.Address = address
-	var nowBlock Block
+	result.NowBlock = new(models.Block)
 
 	client := service.NewGrpcClient(address)
 	client.Start()
 	defer client.Conn.Close()
 
-	start := time.Now().UnixNano() / 1000000
-	block := client.GetNowBlock()
-	result.Ping = time.Now().UnixNano()/1000000 - start
+	wg.Add(1)
+	go client.GetNowBlock(result.NowBlock, &wg)
 
-	if block != nil {
-		nowBlock.Hash = hexutil.Encode(util.GetBlockHash(*block))
-		nowBlock.Number = block.GetBlockHeader().GetRawData().GetNumber()
-		result.NowBlock = nowBlock
+	wg.Add(1)
+	go client.GetLastSolidityBlockNum(result, &wg)
 
-		result.LastSolidityBlockNum = client.GetLastSolidityBlockNum()
+	wg.Add(1)
+	go client.GetPing(result, &wg)
 
-		response.Results = append(response.Results, result)
-	}
+	wg.Wait()
+
+	response.Results = append(response.Results, result)
 }
