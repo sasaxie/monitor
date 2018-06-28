@@ -95,9 +95,7 @@ func (g *GrpcClient) GetLastSolidityBlockNum(result *models.Result,
 	result.LastSolidityBlockNum = dynamicProperties.LastSolidityBlockNum
 }
 
-func (g *GrpcClient) GetPing(result *models.Result, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (g *GrpcClient) GetPing() int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
 	defer cancel()
 
@@ -107,8 +105,8 @@ func (g *GrpcClient) GetPing(result *models.Result, wg *sync.WaitGroup) {
 
 	if err != nil {
 		log.Printf("get ping error: %v", err)
-		return
+		return 0
 	}
 
-	result.Ping = end - start
+	return end - start
 }

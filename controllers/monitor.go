@@ -70,11 +70,20 @@ func getResult(address string, response *models.Response) {
 	go client.GetLastSolidityBlockNum(result, &wg)
 
 	wg.Add(1)
-	go client.GetPing(result, &wg)
+	go GetPing(client, result, &wg)
 
 	wg.Wait()
 
 	mutex.Lock()
 	response.Results = append(response.Results, result)
 	mutex.Unlock()
+}
+
+func GetPing(client *service.GrpcClient, result *models.Result,
+	wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	ping := client.GetPing()
+
+	result.Ping = ping
 }
