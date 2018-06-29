@@ -5,18 +5,14 @@ type Request struct {
 }
 
 type Response struct {
-	Results []*Result
+	Data []*TableData `json:"data"`
 }
 
-type Result struct {
+type TableData struct {
 	Address              string
-	NowBlock             *Block
+	NowBlockNum          int64
+	NowBlockHash         string
 	LastSolidityBlockNum int64
 	Ping                 int64
 	Message              string
-}
-
-type Block struct {
-	Hash   string
-	Number int64
 }

@@ -4,10 +4,9 @@ import (
 	"context"
 	"github.com/sasaxie/monitor/api"
 	"github.com/sasaxie/monitor/common/hexutil"
+	"github.com/sasaxie/monitor/util"
 	"google.golang.org/grpc"
 	"log"
-	"github.com/sasaxie/monitor/util"
-	"github.com/sasaxie/monitor/models"
 	"sync"
 	"time"
 )
@@ -38,7 +37,7 @@ func (g *GrpcClient) Start() {
 	g.DatabaseClient = api.NewDatabaseClient(g.Conn)
 }
 
-func (g *GrpcClient) GetNowBlock(block *models.Block, wg *sync.WaitGroup) {
+func (g *GrpcClient) GetNowBlock(num *int64, hash *string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
@@ -50,8 +49,8 @@ func (g *GrpcClient) GetNowBlock(block *models.Block, wg *sync.WaitGroup) {
 		return
 	}
 
-	block.Hash = hexutil.Encode(util.GetBlockHash(*result))
-	block.Number = result.GetBlockHeader().GetRawData().GetNumber()
+	*hash = hexutil.Encode(util.GetBlockHash(*result))
+	*num = result.GetBlockHeader().GetRawData().GetNumber()
 }
 
 func (g *GrpcClient) GetNextMaintenanceTime() *api.NumberMessage {
@@ -78,7 +77,7 @@ func (g *GrpcClient) TotalTransaction() *api.NumberMessage {
 	return result
 }
 
-func (g *GrpcClient) GetLastSolidityBlockNum(result *models.Result,
+func (g *GrpcClient) GetLastSolidityBlockNum(num *int64,
 	wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -92,7 +91,7 @@ func (g *GrpcClient) GetLastSolidityBlockNum(result *models.Result,
 		return
 	}
 
-	result.LastSolidityBlockNum = dynamicProperties.LastSolidityBlockNum
+	*num = dynamicProperties.LastSolidityBlockNum
 }
 
 func (g *GrpcClient) GetPing() int64 {

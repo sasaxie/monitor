@@ -1,30 +1,52 @@
-var search = new Vue({
-    el: '#search',
-    data: {
-        fullNodesInfo: []
-    },
-
-    mounted: function () {
-        this.submitFullNodes();
-        setInterval(function () {
-            search.submitFullNodes();
-        }, 3000);
-    },
-
-    methods: {
-        submitFullNodes: function () {
-            console.log(1);
-            var fullNodes = ["18.196.99.16:50051", "18.195.254.44:50051", "18.196.78.56:50051", "54.236.37.243:50051", "35.169.107.157:50051", "34.237.220.206:50051", "52.53.189.99:50051", "13.57.246.69:50051", "13.57.41.129:50051", "52.15.93.92:50051", "18.217.144.24:50051", "13.58.203.73:50051", "34.220.77.106:50051", "34.220.59.202:50051", "34.216.106.30:50051", "34.253.187.192:50051", "52.16.167.215:50051", "34.250.7.238:50051", "52.56.56.149:50051", "52.56.115.243:50051", "18.130.99.124:50051", "35.180.51.163:50051", "35.180.22.225:50051", "52.47.117.230:50051", "54.252.224.209:50051", "54.252.238.51:50051", "13.211.164.189:50051", "18.228.15.36:50051", "18.231.118.237:50051", "54.232.225.66:50051", "35.182.37.246:50051", "35.183.101.7:50051", "13.229.128.108:50051", "13.229.135.228:50051", "13.124.62.58:50051", "13.125.249.129:50051", "13.127.47.162:50051", "35.154.40.248:50051"];
-            var addressesObject = new Object();
-            addressesObject["addresses"] = fullNodes;
-
-            var addressesJson = JSON.stringify(addressesObject);
-
-            var apiUrl = "http://127.0.0.1:8080/v1/monitor/info";
-            axios.post(apiUrl, addressesJson).then(function (response) {
-                search.$set(search.$data, "fullNodesInfo", response.data.Results);
-            })
-        },
-    },
-
+$(document).ready(function () {
+    refresh();
 });
+
+function refresh() {
+    $('#showdatatable').DataTable({
+        destroy: true,
+        searching: true,
+        fixedHeader: true,
+        pageLength: 100,
+        autoWidth: false,
+        progress: false,
+        ajax: {
+            url: "http://127.0.0.1:8080/v1/monitor/info",
+            type: "GET",
+            dataSrc: function (response) {
+                if (response == null) {
+                    return "";
+                }
+
+                for (var i = 0; i < response.data.length; ++i) {
+                    var arr = [];
+                    arr[0] = response.data[i].Address;
+
+                    arr[1] = response.data[i].NowBlockNum;
+                    arr[2] = response.data[i].NowBlockHash.substring(0, 4) + "****" + response.data[i].NowBlockHash.substring(response.data[i].NowBlockHash.length - 4, response.data[i].NowBlockHash.length);
+
+                    arr[3] = response.data[i].LastSolidityBlockNum;
+
+                    if (response.data[i].Ping <= 0) {
+                        arr[4] = "--";
+                    } else if (response.data[i].Ping < 100) {
+                        arr[4] = '<p class="green">' + response.data[i].Ping + '</p>';
+                    } else if (response.data[i].Ping < 300) {
+                        arr[4] = '<p class="blue">' + response.data[i].Ping + '</p>';
+                    } else {
+                        arr[4] = '<p style="color: #F39C12;">' + response.data[i].Ping + '</p>';
+                    }
+
+                    if (response.data[i].Message === 'success') {
+                        arr[5] = '<p class="green">' + response.data[i].Message + '</p>';
+                    } else {
+                        arr[5] = '<p class="red">' + response.data[i].Message + '</p>';
+                    }
+
+                    response.data[i] = arr;
+                }
+                return response.data;
+            }
+        }
+    });
+}
