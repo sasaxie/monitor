@@ -1,23 +1,52 @@
-var search = new Vue({
-  el: '#search',
-  data: {
-    fullNodesInfo: []
-  },
+var table = $('#showdatatable').DataTable({
+    destroy: true,
+    searching: true,
+    fixedHeader: true,
+    pageLength: 100,
+    autoWidth: false,
+    progress: false,
+    ajax: {
+        url: "http://127.0.0.1:8080/v1/monitor/info",
+        type: "GET",
+        dataSrc: function (response) {
+            if (response == null) {
+                return "";
+            }
 
-  methods: {
-    submitFullNodes: function () {
-      var fullNodesStr = $("input[id='tags_1']").val();
-      var fullNodes = fullNodesStr.split(",");
-      var addressesObject = new Object();
-      addressesObject["addresses"] = fullNodes;
+            for (var i = 0; i < response.data.length; ++i) {
+                var arr = [];
+                arr[0] = response.data[i].Address;
 
-      var addressesJson = JSON.stringify(addressesObject);
+                arr[1] = response.data[i].NowBlockNum;
+                arr[2] = response.data[i].NowBlockHash.substring(0, 4) + "****" + response.data[i].NowBlockHash.substring(response.data[i].NowBlockHash.length - 4, response.data[i].NowBlockHash.length);
 
-      var apiUrl = "http://127.0.0.1:8080/v1/monitor/info";
-      axios.post(apiUrl, addressesJson).then(function(response) {
-        search.$set(search.$data, "fullNodesInfo", response.data.Results);
-      })
-    },
-  },
+                arr[3] = response.data[i].LastSolidityBlockNum;
 
+                if (response.data[i].Ping <= 0) {
+                    arr[4] = "--";
+                } else if (response.data[i].Ping < 100) {
+                    arr[4] = '<p class="green">' + response.data[i].Ping + '</p>';
+                } else if (response.data[i].Ping < 300) {
+                    arr[4] = '<p class="blue">' + response.data[i].Ping + '</p>';
+                } else {
+                    arr[4] = '<p style="color: #F39C12;">' + response.data[i].Ping + '</p>';
+                }
+
+                if (response.data[i].Message === 'success') {
+                    arr[5] = '<p class="green">' + response.data[i].Message + '</p>';
+                } else {
+                    arr[5] = '<p class="red">' + response.data[i].Message + '</p>';
+                }
+
+                response.data[i] = arr;
+            }
+            return response.data;
+        }
+    }
+});
+
+$(document).ready(function () {
+    setInterval(function () {
+        table.ajax.reload();
+    }, 3000);
 });
