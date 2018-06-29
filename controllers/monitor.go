@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
+	"strings"
 	"sync"
 )
 
@@ -52,7 +54,10 @@ func getResult(address string, response *models.Response) {
 
 	var wg sync.WaitGroup
 	tableData := new(models.TableData)
-	tableData.Address = address
+	adds := strings.Split(address, ".")
+	if len(adds) > 3 {
+		tableData.Address = fmt.Sprintf("%s.*.*.%s", adds[0], adds[3])
+	}
 
 	client := service.NewGrpcClient(address)
 	client.Start()

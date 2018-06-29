@@ -1,8 +1,22 @@
 $(document).ready(function () {
-    refresh();
+    showData();
 });
 
+function recoverRefresh() {
+    $('#refresh').removeAttr("disabled");
+    $('#refresh').attr("onclick", "refresh()");
+}
+
 function refresh() {
+    $('#refresh').attr("disabled", "true");
+    $('#refresh').removeAttr("onclick");
+
+    setTimeout("recoverRefresh()", 3000);
+
+    showData();
+}
+
+function showData() {
     $('#showdatatable').DataTable({
         destroy: true,
         searching: true,
