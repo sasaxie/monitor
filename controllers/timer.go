@@ -3,6 +3,7 @@ package controllers
 import (
 	"bytes"
 	"fmt"
+	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/service"
 	"io/ioutil"
 	"log"
@@ -15,6 +16,7 @@ var mutexPing sync.Mutex
 var swgp sync.WaitGroup
 
 func Timer() {
+	urlString := beego.AppConfig.String("dingdingURl")
 
 	ipAddresses := []string{
 		"18.196.99.16:50051",
@@ -72,7 +74,7 @@ func Timer() {
 	}
 
 	if len(pingNeedMessage) > 0 {
-		TestPost(pingNeedMessage.String())
+		TestPost(pingNeedMessage.String(), urlString)
 	}
 }
 
@@ -101,7 +103,7 @@ func (p PingMsg) String() string {
 	return res
 }
 
-func TestPost(content string) {
+func TestPost(content string, url string) {
 	bodyContent := fmt.Sprintf(`
 		{
 			"msgtype": "text",
@@ -116,7 +118,7 @@ func TestPost(content string) {
 
 	header["Content-Type"] = "application/json"
 
-	body, err := Post(postBody, "https://oapi.dingtalk.com/robot/send?access_token=1a9f984a9ee7b1c59355563e26725c3dd92354160bdc6b7edd788325e04e1416", header)
+	body, err := Post(postBody, url, header)
 
 	if err != nil {
 		log.Println(err.Error())
