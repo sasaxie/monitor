@@ -102,11 +102,21 @@ func Post(postBody []byte, u string, header map[string]string) ([]byte, error) {
 	client := &http.Client{}
 	request, err := http.NewRequest("POST", u, bytes.NewBuffer(postBody))
 
+	if err != nil {
+		log.Println("post dingding error:", err.Error())
+		return []byte(""), err
+	}
+
 	for key, value := range header {
 		request.Header.Set(key, value)
 	}
 
 	response, err := client.Do(request)
+	if err != nil {
+		log.Println("post dingding error:", err.Error())
+		return []byte(""), err
+	}
+
 	defer response.Body.Close()
 
 	if err != nil {

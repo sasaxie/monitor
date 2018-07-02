@@ -5,6 +5,7 @@ import (
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
 	"sync"
+	"time"
 )
 
 // Operations about monitor
@@ -97,5 +98,17 @@ func (m *MonitorController) Tags() {
 // @router /settings [get,post]
 func (m *MonitorController) Settings() {
 	m.Data["json"] = models.ServersConfig.GetSettings()
+	m.ServeJSON()
+}
+
+// @Title Get program info
+// @Description get program info
+// @router /program-info [get,post]
+func (m *MonitorController) ProgramInfo() {
+	now := time.Now().UTC()
+
+	now.Sub(models.Program.Runtime)
+
+	m.Data["json"] = now.Sub(models.Program.Runtime).String()
 	m.ServeJSON()
 }

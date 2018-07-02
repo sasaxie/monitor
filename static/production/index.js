@@ -4,6 +4,7 @@ var tag = "MainNetFullNodes";
 
 var infoUrl = serverHost + "/v1/monitor/info/tag/";
 var settingsUrl = serverHost + "/v1/monitor/settings/";
+var runTimeUrl = serverHost + "/v1/monitor/program-info/";
 
 var table = $('#showdatatable').DataTable({
     destroy: true,
@@ -99,6 +100,14 @@ $(document).ready(function () {
     }).catch(function (error) {
         console.log(error);
     });
+
+    setInterval(function () {
+        axios.get(runTimeUrl).then(function(response) {
+            $("#runTime").text(response.data);
+        }).catch(function (error) {
+            console.log(error);
+        })
+    }, 1000);
 
     setInterval(function () {
         table.ajax.reload();
