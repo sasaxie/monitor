@@ -85,7 +85,7 @@ func (s *Servers) GetTags() []string {
 	return res
 }
 
-func (s *Servers) GetIsMonitor() []*Setting {
+func (s *Servers) GetSettings() []*Setting {
 	res := make([]*Setting, 0)
 
 	for _, server := range s.Servers {
