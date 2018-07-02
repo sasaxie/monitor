@@ -76,7 +76,7 @@ $(document).ready(function () {
 
             if (response.data[i].isOpenMonitor) {
                 radioStr += `
-                <small class="fa fa-bell green">以开启钉钉报警</small>
+                <small class="fa fa-bell green">已开启钉钉报警</small>
                 `
             } else {
                 radioStr += `
