@@ -44,7 +44,7 @@ func Timer() {
 	}
 
 	if len(pingNeedMessage) > 0 {
-		TestPost(pingNeedMessage.String(), urlString)
+		PostDingding(pingNeedMessage.String(), urlString)
 	}
 }
 
@@ -73,7 +73,7 @@ func (p PingMsg) String() string {
 	return res
 }
 
-func TestPost(content string, url string) {
+func PostDingding(content string, url string) {
 	bodyContent := fmt.Sprintf(`
 		{
 			"msgtype": "text",
@@ -133,7 +133,7 @@ func Post(postBody []byte, u string, header map[string]string) ([]byte, error) {
 }
 
 func StartMonitorPing() {
-	StartTicker(10*time.Second, func(now time.Time) {
+	StartTicker(time.Minute, func(now time.Time) {
 		fmt.Println("start monitor:", now)
 		Timer()
 	})
