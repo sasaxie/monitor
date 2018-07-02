@@ -17,6 +17,17 @@ var mutexPing sync.Mutex
 var swgp sync.WaitGroup
 var ipAddresses []string
 
+type AddressMonitor struct {
+	Count         int64
+	StartPostTime time.Time
+}
+
+var addressMonitorMap map[string]*AddressMonitor
+
+func init() {
+	addressMonitorMap = make(map[string]*AddressMonitor)
+}
+
 func Timer() {
 	urlString := beego.AppConfig.String("dingdingURl")
 	settings := models.ServersConfig.GetSettings()
@@ -29,7 +40,8 @@ func Timer() {
 	}
 
 	pingMessage := make(map[string]int64)
-	pingNeedMessage := make(PingMsg)
+	pingTimeoutMessage := make(PingMsg)
+	pingRecoverMessage := make(PingMsg)
 
 	for _, s := range ipAddresses {
 		swgp.Add(1)
@@ -37,14 +49,55 @@ func Timer() {
 	}
 	swgp.Wait()
 
-	for address, _ := range pingMessage {
-		if pingMessage[address] <= 0 {
-			pingNeedMessage[address] = "timeout(>5000ms)"
+	for address, ping := range pingMessage {
+		if ping <= 0 {
+			if v, ok := addressMonitorMap[address]; ok {
+				v.Count = v.Count + 1
+				addressMonitorMap[address] = v
+			} else {
+				addressMonitor := new(AddressMonitor)
+				addressMonitor.Count = 1
+				addressMonitorMap[address] = addressMonitor
+			}
 		}
 	}
 
-	if len(pingNeedMessage) > 0 {
-		PostDingding(pingNeedMessage.String(), urlString)
+	// address 没有遍历到的直接移除，如果次数>=3的，还提示恢复信息并从map中移除
+	addressMonitorMapTmp := make(map[string]*AddressMonitor)
+	for k, v := range addressMonitorMap {
+		addressMonitorMapTmp[k] = v
+	}
+
+	for k, v := range pingMessage {
+		if v <= 0 {
+			delete(addressMonitorMapTmp, k)
+		}
+	}
+
+	for k, v := range addressMonitorMapTmp {
+		delete(addressMonitorMap, k)
+
+		if v.Count >= 3 {
+			pingRecoverMessage[k] = "gRPC接口已恢复正常"
+		}
+	}
+
+	// 如果次数>=3，并且时间不足1小时，则发送报警，并重置时间为当前时间
+	for k, v := range addressMonitorMap {
+		if (v.Count >= 3) && (time.Now().UTC().Unix()-v.StartPostTime.UTC().
+			Unix() >= 3600) {
+			pingTimeoutMessage[k] = fmt.Sprintf("gRPC接口连续%d次超时(>5000ms)",
+				v.Count)
+			addressMonitorMap[k].StartPostTime = time.Now()
+		}
+	}
+
+	if len(pingTimeoutMessage) > 0 {
+		PostDingding(pingTimeoutMessage.String(), urlString)
+	}
+
+	if len(pingRecoverMessage) > 0 {
+		PostDingding(pingRecoverMessage.String(), urlString)
 	}
 }
 
