@@ -1,18 +1,11 @@
 package controllers
 
 import (
-	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
-	"strings"
 	"sync"
 )
-
-var addresses = []string{
-	"18.196.99.16:50051", "18.195.254.44:50051", "18.196.78.56:50051",
-	"54.236.37.243:50051", "35.169.107.157:50051", "34.237.220.206:50051", "52.53.189.99:50051", "13.57.246.69:50051", "13.57.41.129:50051", "52.15.93.92:50051", "18.217.144.24:50051", "13.58.203.73:50051", "34.220.77.106:50051", "34.220.59.202:50051", "34.216.106.30:50051", "34.253.187.192:50051", "52.16.167.215:50051", "34.250.7.238:50051", "52.56.56.149:50051", "52.56.115.243:50051", "18.130.99.124:50051", "35.180.51.163:50051", "35.180.22.225:50051", "52.47.117.230:50051", "54.252.224.209:50051", "54.252.238.51:50051", "13.211.164.189:50051", "18.228.15.36:50051", "18.231.118.237:50051", "54.232.225.66:50051", "35.182.37.246:50051", "35.183.101.7:50051", "13.229.128.108:50051", "13.229.135.228:50051", "13.124.62.58:50051", "13.125.249.129:50051", "13.127.47.162:50051", "35.154.40.248:50051",
-}
 
 // Operations about monitor
 type MonitorController struct {
@@ -24,27 +17,35 @@ var mutex sync.Mutex
 
 // @Title Get info
 // @Description get info
-// @router /info [get,post]
+// @router /info/tag/:tag [get,post]
 func (m *MonitorController) Info() {
-	response := new(models.Response)
-	response.Data = make([]*models.TableData, 0)
+	tag := m.GetString(":tag")
 
-	for _, address := range addresses {
-		waitGroup.Add(1)
-		go getResult(address, response)
-	}
+	if tag == "" && len(tag) == 0 {
+		m.Data["json"] = "not found tag"
+	} else {
+		addresses := models.ServersConfig.GetAddressStringByTag(tag)
 
-	waitGroup.Wait()
+		response := new(models.Response)
+		response.Data = make([]*models.TableData, 0)
 
-	for _, tableData := range response.Data {
-		if tableData.LastSolidityBlockNum == 0 {
-			tableData.Message = "timeout"
-		} else {
-			tableData.Message = "success"
+		for _, address := range addresses {
+			waitGroup.Add(1)
+			go getResult(address, response)
 		}
-	}
 
-	m.Data["json"] = response
+		waitGroup.Wait()
+
+		for _, tableData := range response.Data {
+			if tableData.LastSolidityBlockNum == 0 {
+				tableData.Message = "timeout"
+			} else {
+				tableData.Message = "success"
+			}
+		}
+
+		m.Data["json"] = response
+	}
 
 	m.ServeJSON()
 }
@@ -54,10 +55,7 @@ func getResult(address string, response *models.Response) {
 
 	var wg sync.WaitGroup
 	tableData := new(models.TableData)
-	adds := strings.Split(address, ".")
-	if len(adds) > 3 {
-		tableData.Address = fmt.Sprintf("%s.*.*.%s", adds[0], adds[3])
-	}
+	tableData.Address = address
 
 	client := service.NewGrpcClient(address)
 	client.Start()
@@ -84,4 +82,20 @@ func GetPing(client *service.GrpcClient, ping *int64,
 	defer wg.Done()
 
 	*ping = client.GetPing()
+}
+
+// @Title Get tags
+// @Description get tags
+// @router /tags [get,post]
+func (m *MonitorController) Tags() {
+	m.Data["json"] = models.ServersConfig.GetTags()
+	m.ServeJSON()
+}
+
+// @Title Get settings
+// @Description get settings
+// @router /settings [get,post]
+func (m *MonitorController) Settings() {
+	m.Data["json"] = models.ServersConfig.GetIsMonitor()
+	m.ServeJSON()
 }
