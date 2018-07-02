@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
@@ -105,10 +106,17 @@ func (m *MonitorController) Settings() {
 // @Description get program info
 // @router /program-info [get,post]
 func (m *MonitorController) ProgramInfo() {
-	now := time.Now().UTC()
+	now := time.Now().UTC().Unix()
 
-	now.Sub(models.Program.Runtime)
+	duration := now - models.Program.Runtime.Unix()
 
-	m.Data["json"] = now.Sub(models.Program.Runtime).String()
+	d, err := time.ParseDuration(fmt.Sprintf("%ds", duration))
+
+	if err != nil {
+		m.Data["json"] = err.Error()
+	} else {
+		m.Data["json"] = d.String()
+	}
+
 	m.ServeJSON()
 }
