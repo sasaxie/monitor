@@ -96,6 +96,6 @@ func (m *MonitorController) Tags() {
 // @Description get settings
 // @router /settings [get,post]
 func (m *MonitorController) Settings() {
-	m.Data["json"] = models.ServersConfig.GetIsMonitor()
+	m.Data["json"] = models.ServersConfig.GetSettings()
 	m.ServeJSON()
 }
