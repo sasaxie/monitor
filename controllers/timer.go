@@ -19,7 +19,7 @@ var ipAddresses []string
 
 func Timer() {
 	urlString := beego.AppConfig.String("dingdingURl")
-	settings := models.ServersConfig.GetIsMonitor()
+	settings := models.ServersConfig.GetSettings()
 	for _, value := range settings {
 		if value.IsOpenMonitor {
 			//ipAddresses = models.ServersConfig.GetAddressStringByTag(value.Tag)
