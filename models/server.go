@@ -94,3 +94,40 @@ func (s *Servers) GetSettings() []*Setting {
 
 	return res
 }
+
+func (s *Servers) GetAllAddresses() []string {
+	res := make([]string, 0)
+
+	addresses := make(map[string]bool)
+	for _, server := range s.Servers {
+		for _, address := range server.Addresses {
+			addresses[fmt.Sprintf("%s:%d", address.Ip, address.Port)] = false
+		}
+	}
+
+	for k, _ := range addresses {
+		res = append(res, k)
+	}
+
+	return res
+}
+
+func (s *Servers) GetAllMonitorAddresses() []string {
+	res := make([]string, 0)
+
+	addresses := make(map[string]bool)
+	for _, server := range s.Servers {
+		if server.Setting.IsOpenMonitor {
+			for _, address := range server.Addresses {
+				addresses[fmt.Sprintf("%s:%d", address.Ip,
+					address.Port)] = false
+			}
+		}
+	}
+
+	for k, _ := range addresses {
+		res = append(res, k)
+	}
+
+	return res
+}

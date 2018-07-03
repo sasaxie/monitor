@@ -72,9 +72,7 @@ func getResult(address string, response *models.Response) {
 	tableData := new(models.TableData)
 	tableData.Address = address
 
-	client := service.NewGrpcClient(address)
-	client.Start()
-	defer client.Conn.Close()
+	client := service.GrpcClients[address]
 
 	wg.Add(1)
 	go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)

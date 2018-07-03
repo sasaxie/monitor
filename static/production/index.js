@@ -31,7 +31,7 @@ var table = $('#showdatatable').DataTable({
                 arr[3] = response.data[i].LastSolidityBlockNum;
 
                 if (response.data[i].Ping <= 0) {
-                    arr[4] = '<p>--</p>';
+                    arr[4] = '<p class="red">0</p>';
                 } else if (response.data[i].Ping < 100) {
                     arr[4] = '<p class="green">' + response.data[i].Ping + '</p>';
                 } else if (response.data[i].Ping < 300) {

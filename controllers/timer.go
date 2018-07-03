@@ -16,13 +16,18 @@ import (
 var mutexPing sync.Mutex
 var mutexPingMonitor sync.Mutex
 var swgp sync.WaitGroup
-var ipAddresses []string
 
 var PingMonitor map[string][]int64
 
 type AddressMonitor struct {
 	Count         int64
 	StartPostTime time.Time
+}
+
+var urlString string
+
+func init() {
+	urlString = beego.AppConfig.String("dingdingURl")
 }
 
 var addressMonitorMap map[string]*AddressMonitor
@@ -33,15 +38,7 @@ func init() {
 }
 
 func Timer() {
-	urlString := beego.AppConfig.String("dingdingURl")
-	settings := models.ServersConfig.GetSettings()
-	for _, value := range settings {
-		if value.IsOpenMonitor {
-			//ipAddresses = models.ServersConfig.GetAddressStringByTag(value.Tag)
-			ipAddresses = append(ipAddresses, models.ServersConfig.GetAddressStringByTag(value.Tag)...)
-
-		}
-	}
+	ipAddresses := models.ServersConfig.GetAllMonitorAddresses()
 
 	pingMessage := make(map[string]int64)
 	pingTimeoutMessage := make(PingMsg)
@@ -76,7 +73,7 @@ func Timer() {
 			pingSlice = append(pingSlice, ping)
 
 			if len(pingSlice) > 30 {
-				pingSlice = pingSlice[len(pingSlice)-30 : len(pingSlice)]
+				pingSlice = pingSlice[len(pingSlice)-30:]
 			}
 
 			PingMonitor[address] = pingSlice

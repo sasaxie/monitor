@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/sasaxie/monitor/api"
 	"github.com/sasaxie/monitor/common/hexutil"
+	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/util"
 	"google.golang.org/grpc"
 	"log"
@@ -12,6 +13,20 @@ import (
 )
 
 const GrpcTimeout = 5 * time.Second
+
+var GrpcClients map[string]*GrpcClient
+
+func init() {
+	GrpcClients = make(map[string]*GrpcClient)
+
+	addresses := models.ServersConfig.GetAllAddresses()
+
+	for _, address := range addresses {
+		grcpClient := NewGrpcClient(address)
+		grcpClient.Start()
+		GrpcClients[address] = grcpClient
+	}
+}
 
 type GrpcClient struct {
 	Address        string
