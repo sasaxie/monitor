@@ -40,14 +40,15 @@ var table = $('#showdatatable').DataTable({
                     arr[4] = '<p style="color: #F39C12;">' + response.data[i].Ping + '</p>';
                 }
 
+                arr[5] = "--";
                 if (response.data[i].PingMonitor !== '') {
-                    arr[4] += ' <span class="sparklines_ping">' + response.data[i].PingMonitor + '</span>'
+                    arr[5] = '<span class="sparklines_ping">' + response.data[i].PingMonitor + '</span>'
                 }
 
                 if (response.data[i].Message === 'success') {
-                    arr[5] = '<p class="green">' + response.data[i].Message + '</p>';
+                    arr[6] = '<p class="green">' + response.data[i].Message + '</p>';
                 } else {
-                    arr[5] = '<p class="red">' + response.data[i].Message + '</p>';
+                    arr[6] = '<p class="red">' + response.data[i].Message + '</p>';
                 }
 
                 response.data[i] = arr;
