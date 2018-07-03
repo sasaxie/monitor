@@ -15,4 +15,5 @@ type TableData struct {
 	LastSolidityBlockNum int64
 	Ping                 int64
 	Message              string
+	PingMonitor          string
 }

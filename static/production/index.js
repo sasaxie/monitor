@@ -31,13 +31,17 @@ var table = $('#showdatatable').DataTable({
                 arr[3] = response.data[i].LastSolidityBlockNum;
 
                 if (response.data[i].Ping <= 0) {
-                    arr[4] = "--";
+                    arr[4] = '<p>--</p>';
                 } else if (response.data[i].Ping < 100) {
                     arr[4] = '<p class="green">' + response.data[i].Ping + '</p>';
                 } else if (response.data[i].Ping < 300) {
                     arr[4] = '<p class="blue">' + response.data[i].Ping + '</p>';
                 } else {
                     arr[4] = '<p style="color: #F39C12;">' + response.data[i].Ping + '</p>';
+                }
+
+                if (response.data[i].PingMonitor !== '') {
+                    arr[4] += ' <span class="sparklines_ping">' + response.data[i].PingMonitor + '</span>'
                 }
 
                 if (response.data[i].Message === 'success') {
@@ -55,6 +59,18 @@ var table = $('#showdatatable').DataTable({
 
 // 页面加载后执行
 $(document).ready(function () {
+    initTag();
+
+    initRunTime();
+
+    initTable();
+});
+
+function initPing() {
+    $('.sparklines_ping').sparkline('html', {type: 'bar', zeroColor: '#ff0000', barColor: '#00bf00'});
+}
+
+function initTag() {
     axios.get(settingsUrl).then(function (response) {
 
         if (response == null) {
@@ -70,7 +86,7 @@ $(document).ready(function () {
             <div class="radio">
                 <label>
                     <input type="radio" class="flat" name="serverTags" value="` + response.data[i].tag + `">` +
-                    response.data[i].tag + `
+                response.data[i].tag + `
                 </label>
             `;
 
@@ -95,12 +111,14 @@ $(document).ready(function () {
         $(":radio[name='serverTags']").change(function () {
             tag = this.value;
             table.ajax.url(infoUrl + tag);
-            table.ajax.reload();
+            table.ajax.reload(initPing);
         });
     }).catch(function (error) {
         console.log(error);
     });
+}
 
+function initRunTime() {
     setInterval(function () {
         axios.get(runTimeUrl).then(function(response) {
             $("#runTime").text(response.data);
@@ -108,8 +126,10 @@ $(document).ready(function () {
             console.log(error);
         })
     }, 1000);
+}
 
+function initTable() {
     setInterval(function () {
-        table.ajax.reload();
+        table.ajax.reload(initPing);
     }, 3000);
-});
+}

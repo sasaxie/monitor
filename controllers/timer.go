@@ -14,8 +14,11 @@ import (
 )
 
 var mutexPing sync.Mutex
+var mutexPingMonitor sync.Mutex
 var swgp sync.WaitGroup
 var ipAddresses []string
+
+var PingMonitor map[string][]int64
 
 type AddressMonitor struct {
 	Count         int64
@@ -26,6 +29,7 @@ var addressMonitorMap map[string]*AddressMonitor
 
 func init() {
 	addressMonitorMap = make(map[string]*AddressMonitor)
+	PingMonitor = make(map[string][]int64)
 }
 
 func Timer() {
@@ -53,12 +57,33 @@ func Timer() {
 		if ping <= 0 {
 			if v, ok := addressMonitorMap[address]; ok {
 				v.Count = v.Count + 1
+				mutexPingMonitor.Lock()
 				addressMonitorMap[address] = v
+				mutexPingMonitor.Unlock()
 			} else {
 				addressMonitor := new(AddressMonitor)
 				addressMonitor.Count = 1
+				mutexPingMonitor.Lock()
 				addressMonitorMap[address] = addressMonitor
+				mutexPingMonitor.Unlock()
 			}
+		}
+	}
+
+	// 记录30次ping值
+	for address, ping := range pingMessage {
+		if pingSlice, ok := PingMonitor[address]; ok {
+			pingSlice = append(pingSlice, ping)
+
+			if len(pingSlice) > 30 {
+				pingSlice = pingSlice[len(pingSlice)-30 : len(pingSlice)]
+			}
+
+			PingMonitor[address] = pingSlice
+		} else {
+			newPingSlice := make([]int64, 0)
+			newPingSlice = append(newPingSlice, ping)
+			PingMonitor[address] = newPingSlice
 		}
 	}
 

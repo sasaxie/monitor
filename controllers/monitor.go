@@ -5,6 +5,7 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -39,6 +40,18 @@ func (m *MonitorController) Info() {
 		waitGroup.Wait()
 
 		for _, tableData := range response.Data {
+			tableData.PingMonitor = ""
+
+			if pings, ok := PingMonitor[tableData.Address]; ok {
+				for index, ping := range pings {
+					tableData.PingMonitor += strconv.Itoa(int(ping))
+
+					if index != len(pings)-1 {
+						tableData.PingMonitor += ","
+					}
+				}
+			}
+
 			if tableData.LastSolidityBlockNum == 0 {
 				tableData.Message = "timeout"
 			} else {
