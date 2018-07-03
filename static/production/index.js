@@ -42,8 +42,7 @@ var table = $('#showdatatable').DataTable({
 
                 arr[5] = "--";
                 if (response.data[i].PingMonitor !== '') {
-                    arr[5] = '<span' +
-                        ' class="sparklines_ping">1,2,3,4,5</span>'
+                    arr[5] = '<span class="sparklines_ping">' + response.data[i].PingMonitor + '</span>'
                 }
 
                 if (response.data[i].Message === 'success') {
