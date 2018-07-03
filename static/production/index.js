@@ -42,7 +42,8 @@ var table = $('#showdatatable').DataTable({
 
                 arr[5] = "--";
                 if (response.data[i].PingMonitor !== '') {
-                    arr[5] = '<span class="sparklines_ping">' + response.data[i].PingMonitor + '</span>'
+                    arr[5] = '<span' +
+                        ' class="sparklines_ping">1,2,3,4,5</span>'
                 }
 
                 if (response.data[i].Message === 'success') {
@@ -68,7 +69,16 @@ $(document).ready(function () {
 });
 
 function initPing() {
-    $('.sparklines_ping').sparkline('html', {type: 'bar', zeroColor: '#ff0000', barColor: '#00bf00'});
+    $('.sparklines_ping').sparkline('html', {
+        type: 'bar',
+        zeroColor: '#ff0000',
+        barColor: '#00bf00',
+        colorMap: {
+            '1:99':'#1CBD20',
+            '100:299': '#48A4DF',
+            '300:':'#F39C12'
+        },
+    });
 }
 
 function initTag() {
