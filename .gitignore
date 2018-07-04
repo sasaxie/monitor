@@ -3,3 +3,5 @@ routers/commentsRouter_controllers.go
 monitor
 *.tmp
 monitor.tar.gz
+conf/servers_prod.json
+conf/app_prod.conf

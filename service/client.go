@@ -4,15 +4,29 @@ import (
 	"context"
 	"github.com/sasaxie/monitor/api"
 	"github.com/sasaxie/monitor/common/hexutil"
+	"github.com/sasaxie/monitor/models"
+	"github.com/sasaxie/monitor/util"
 	"google.golang.org/grpc"
 	"log"
-	"github.com/sasaxie/monitor/util"
-	"github.com/sasaxie/monitor/models"
 	"sync"
 	"time"
 )
 
 const GrpcTimeout = 5 * time.Second
+
+var GrpcClients map[string]*GrpcClient
+
+func init() {
+	GrpcClients = make(map[string]*GrpcClient)
+
+	addresses := models.ServersConfig.GetAllAddresses()
+
+	for _, address := range addresses {
+		grcpClient := NewGrpcClient(address)
+		grcpClient.Start()
+		GrpcClients[address] = grcpClient
+	}
+}
 
 type GrpcClient struct {
 	Address        string
@@ -38,7 +52,7 @@ func (g *GrpcClient) Start() {
 	g.DatabaseClient = api.NewDatabaseClient(g.Conn)
 }
 
-func (g *GrpcClient) GetNowBlock(block *models.Block, wg *sync.WaitGroup) {
+func (g *GrpcClient) GetNowBlock(num *int64, hash *string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
@@ -50,8 +64,8 @@ func (g *GrpcClient) GetNowBlock(block *models.Block, wg *sync.WaitGroup) {
 		return
 	}
 
-	block.Hash = hexutil.Encode(util.GetBlockHash(*result))
-	block.Number = result.GetBlockHeader().GetRawData().GetNumber()
+	*hash = hexutil.Encode(util.GetBlockHash(*result))
+	*num = result.GetBlockHeader().GetRawData().GetNumber()
 }
 
 func (g *GrpcClient) GetNextMaintenanceTime() *api.NumberMessage {
@@ -78,7 +92,7 @@ func (g *GrpcClient) TotalTransaction() *api.NumberMessage {
 	return result
 }
 
-func (g *GrpcClient) GetLastSolidityBlockNum(result *models.Result,
+func (g *GrpcClient) GetLastSolidityBlockNum(num *int64,
 	wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -92,12 +106,10 @@ func (g *GrpcClient) GetLastSolidityBlockNum(result *models.Result,
 		return
 	}
 
-	result.LastSolidityBlockNum = dynamicProperties.LastSolidityBlockNum
+	*num = dynamicProperties.LastSolidityBlockNum
 }
 
-func (g *GrpcClient) GetPing(result *models.Result, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (g *GrpcClient) GetPing() int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
 	defer cancel()
 
@@ -107,8 +119,8 @@ func (g *GrpcClient) GetPing(result *models.Result, wg *sync.WaitGroup) {
 
 	if err != nil {
 		log.Printf("get ping error: %v", err)
-		return
+		return 0
 	}
 
-	result.Ping = end - start
+	return end - start
 }

@@ -1,11 +1,13 @@
 package controllers
 
 import (
-	"encoding/json"
+	"fmt"
 	"github.com/astaxie/beego"
-	"github.com/sasaxie/monitor/service"
 	"github.com/sasaxie/monitor/models"
+	"github.com/sasaxie/monitor/service"
+	"strconv"
 	"sync"
+	"time"
 )
 
 // Operations about monitor
@@ -14,32 +16,46 @@ type MonitorController struct {
 }
 
 var waitGroup sync.WaitGroup
+var mutex sync.Mutex
 
 // @Title Get info
 // @Description get info
-// @router /info [post]
+// @router /info/tag/:tag [get,post]
 func (m *MonitorController) Info() {
-	response := new(models.Response)
-	response.Results = make([]*models.Result, 0)
+	tag := m.GetString(":tag")
 
-	var request models.Request
-	err := json.Unmarshal(m.Ctx.Input.RequestBody, &request)
-
-	if err != nil {
-		m.Data["json"] = err.Error()
+	if tag == "" && len(tag) == 0 {
+		m.Data["json"] = "not found tag"
 	} else {
-		for _, address := range request.Addresses {
+		addresses := models.ServersConfig.GetAddressStringByTag(tag)
+
+		response := new(models.Response)
+		response.Data = make([]*models.TableData, 0)
+
+		for _, address := range addresses {
 			waitGroup.Add(1)
 			go getResult(address, response)
 		}
 
 		waitGroup.Wait()
 
-		for _, v := range response.Results {
-			if v.LastSolidityBlockNum == 0 {
-				v.Message = "timeout"
+		for _, tableData := range response.Data {
+			tableData.PingMonitor = ""
+
+			if pings, ok := PingMonitor[tableData.Address]; ok {
+				for index, ping := range pings {
+					tableData.PingMonitor += strconv.Itoa(int(ping))
+
+					if index != len(pings)-1 {
+						tableData.PingMonitor += ","
+					}
+				}
+			}
+
+			if tableData.LastSolidityBlockNum == 0 {
+				tableData.Message = "timeout"
 			} else {
-				v.Message = "success"
+				tableData.Message = "success"
 			}
 		}
 
@@ -53,25 +69,65 @@ func getResult(address string, response *models.Response) {
 	defer waitGroup.Done()
 
 	var wg sync.WaitGroup
+	tableData := new(models.TableData)
+	tableData.Address = address
 
-	result := new(models.Result)
-	result.Address = address
-	result.NowBlock = new(models.Block)
-
-	client := service.NewGrpcClient(address)
-	client.Start()
-	defer client.Conn.Close()
+	client := service.GrpcClients[address]
 
 	wg.Add(1)
-	go client.GetNowBlock(result.NowBlock, &wg)
+	go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
 
 	wg.Add(1)
-	go client.GetLastSolidityBlockNum(result, &wg)
+	go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
 	wg.Add(1)
-	go client.GetPing(result, &wg)
+	go GetPing(client, &tableData.Ping, &wg)
 
 	wg.Wait()
 
-	response.Results = append(response.Results, result)
+	mutex.Lock()
+	response.Data = append(response.Data, tableData)
+	mutex.Unlock()
+}
+
+func GetPing(client *service.GrpcClient, ping *int64,
+	wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	*ping = client.GetPing()
+}
+
+// @Title Get tags
+// @Description get tags
+// @router /tags [get,post]
+func (m *MonitorController) Tags() {
+	m.Data["json"] = models.ServersConfig.GetTags()
+	m.ServeJSON()
+}
+
+// @Title Get settings
+// @Description get settings
+// @router /settings [get,post]
+func (m *MonitorController) Settings() {
+	m.Data["json"] = models.ServersConfig.GetSettings()
+	m.ServeJSON()
+}
+
+// @Title Get program info
+// @Description get program info
+// @router /program-info [get,post]
+func (m *MonitorController) ProgramInfo() {
+	now := time.Now().UTC().Unix()
+
+	duration := now - models.Program.Runtime.Unix()
+
+	d, err := time.ParseDuration(fmt.Sprintf("%ds", duration))
+
+	if err != nil {
+		m.Data["json"] = err.Error()
+	} else {
+		m.Data["json"] = d.String()
+	}
+
+	m.ServeJSON()
 }
