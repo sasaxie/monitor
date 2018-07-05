@@ -1,5 +1,3 @@
-var serverHost = "http://127.0.0.1:8080";
-
 var tag = "MainNetFullNodes";
 
 var infoUrl = serverHost + "/v1/monitor/info/tag/";
@@ -100,7 +98,7 @@ function initTag() {
                 </label>
             `;
 
-            if (response.data[i].isOpenMonitor) {
+            if (response.data[i].isOpenMonitor === "true") {
                 radioStr += `
                 <small class="fa fa-bell green">已开启钉钉报警</small>
                 `

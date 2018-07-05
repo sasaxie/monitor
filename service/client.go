@@ -16,7 +16,7 @@ const GrpcTimeout = 5 * time.Second
 
 var GrpcClients map[string]*GrpcClient
 
-func init() {
+func InitGrpcClients() {
 	GrpcClients = make(map[string]*GrpcClient)
 
 	addresses := models.ServersConfig.GetAllAddresses()
