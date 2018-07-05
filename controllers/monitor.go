@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
@@ -10,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Operations about monitor
@@ -43,14 +41,14 @@ func (m *MonitorController) Info() {
 		waitGroup.Wait()
 
 		for _, tableData := range response.Data {
-			tableData.PingMonitor = ""
+			tableData.GRPCMonitor = ""
 
 			if pings, ok := PingMonitor[tableData.Address]; ok {
 				for index, ping := range pings {
-					tableData.PingMonitor += strconv.Itoa(int(ping))
+					tableData.GRPCMonitor += strconv.Itoa(int(ping))
 
 					if index != len(pings)-1 {
-						tableData.PingMonitor += ","
+						tableData.GRPCMonitor += ","
 					}
 				}
 			}
@@ -84,7 +82,7 @@ func getResult(address string, response *models.Response) {
 	go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
 	wg.Add(1)
-	go GetPing(client, &tableData.Ping, &wg)
+	go GetPing(client, &tableData.GRPC, &wg)
 
 	wg.Wait()
 
@@ -120,17 +118,7 @@ func (m *MonitorController) Settings() {
 // @Description get program info
 // @router /program-info [get,post]
 func (m *MonitorController) ProgramInfo() {
-	now := time.Now().UTC().Unix()
-
-	duration := now - models.Program.Runtime.Unix()
-
-	d, err := time.ParseDuration(fmt.Sprintf("%ds", duration))
-
-	if err != nil {
-		m.Data["json"] = err.Error()
-	} else {
-		m.Data["json"] = d.String()
-	}
+	m.Data["json"] = models.Program.Runtime.Unix()
 
 	m.ServeJSON()
 }

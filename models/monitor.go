@@ -13,7 +13,7 @@ type TableData struct {
 	NowBlockNum          int64
 	NowBlockHash         string
 	LastSolidityBlockNum int64
-	Ping                 int64
+	GRPC                 int64 `json:"gRPC"`
 	Message              string
-	PingMonitor          string
+	GRPCMonitor          string `json:"gRPCMonitor"`
 }
