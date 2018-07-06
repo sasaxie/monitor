@@ -11,3 +11,4 @@ import:
   subpackages:
   - crypto
 - package: github.com/astaxie/beego
+- package: github.com/gorilla/websocket
