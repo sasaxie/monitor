@@ -84,12 +84,12 @@
 
             //这里为用ajax获取用户信息并进行验证，如果账户密码不匹配则登录失败，如不需要验证用户信息，这段可不写
             $.ajax({
-                url: "http://127.0.0.1:8080/v1/user/info/tag/" + accountName + "/" + password,// 获取自己系统后台用户信息接口
+                url: serverHost+"/v1/user/info/tag/" + accountName + "/" + password,// 获取自己系统后台用户信息接口
                 type: "GET",
                 dataType: "json",
                 success: function (data) {
                     if (data == "success") { //判断返回值，这里根据的业务内容可做调整
-                        window.location.href = "http://127.0.0.1:8080/static/production/";//指向登录的页面地址
+                        window.location.href = serverHost+"/static/production/";//指向登录的页面地址
                     } else {
                         showMsg(data.message);//显示登录失败的原因
                         return false;
