@@ -16,6 +16,7 @@ func main() {
 
 	models.InitServerConfig()
 	service.InitGrpcClients()
+	controllers.InitResponseMap()
 
 	controllers.StartMonitorPing()
 

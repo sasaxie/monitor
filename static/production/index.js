@@ -1,7 +1,5 @@
-var tag = "MainNetFullNodes";
-
 var infoUrl = serverHost + "/v1/monitor/info/tag/";
-var wsInfoUrl = wsServerHost + "/v1/wsmonitor/tag/";
+var wsInfoUrl = wsServerHost + "/v1/wsmonitor/tag";
 var settingsUrl = serverHost + "/v1/monitor/settings/";
 var runTimeUrl = serverHost + "/v1/monitor/program-info/";
 
@@ -12,7 +10,7 @@ $(document).ready(function () {
     initRunTime();
 
     if (window.WebSocket != undefined) {
-        var connection = new WebSocket(wsInfoUrl + tag);
+        connection = new WebSocket(wsInfoUrl);
 
         connection.onopen = function (event) {
             console.log("ws on open");
@@ -150,9 +148,9 @@ function initTag() {
         $(":radio[name='serverTags']:first").attr("checked","true");
 
         $(":radio[name='serverTags']").change(function () {
-            tag = this.value;
-            table.ajax.url(infoUrl + tag);
-            table.ajax.reload(initPing);
+            if (connection != undefined) {
+                connection.send(this.value);
+            }
         });
     }).catch(function (error) {
         console.log(error);
