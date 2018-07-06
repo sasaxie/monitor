@@ -1,5 +1,5 @@
-hash: d541b77cfdfdc7ef9fd1c8a2ef893a453958e1c9635a587e628c15abd5f405e3
-updated: 2018-06-17T17:25:47.576522+08:00
+hash: b1132002b939e10c1c317a2f09d4644c157c6249799265897c6cfd94842834c1
+updated: 2018-07-06T15:51:37.628238+08:00
 imports:
 - name: github.com/astaxie/beego
   version: f16688817aa428d10361394015b40d096b680542
@@ -9,24 +9,15 @@ imports:
   - context/param
   - grace
   - logs
+  - plugins/cors
   - session
   - toolbox
   - utils
-- name: github.com/btcsuite/btcd
-  version: 86fed781132ac890ee03e906e4ecd5d6fa180c64
-  subpackages:
-  - btcec
 - name: github.com/ethereum/go-ethereum
   version: ccc0debb63124ee99906c2cfff6125de30e8c62f
   subpackages:
-  - common
-  - common/hexutil
-  - common/math
   - crypto
-  - crypto/secp256k1
-  - crypto/sha3
   - log
-  - rlp
 - name: github.com/go-stack/stack
   version: 259ab82a6cad3992b4e21ff5cac294ccb06474bc
 - name: github.com/golang/protobuf
@@ -34,10 +25,13 @@ imports:
   subpackages:
   - proto
   - protoc-gen-go
+  - protoc-gen-go/descriptor
   - ptypes
   - ptypes/any
   - ptypes/duration
   - ptypes/timestamp
+- name: github.com/gorilla/websocket
+  version: 5ed622c449da6d44c3c8329331ff47a9e5844f71
 - name: github.com/shengdoushi/base58
   version: c2e5dd9cebf91f86ab174cf5fd8bdb66d99c9e22
 - name: golang.org/x/net
