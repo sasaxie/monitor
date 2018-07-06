@@ -9,6 +9,26 @@ $(document).ready(function () {
 
     initRunTime();
 
+    var table = $('#showdatatable').DataTable({
+        destroy: true,
+        searching: true,
+        fixedHeader: true,
+        pageLength: 100,
+        autoWidth: false,
+        progress: false,
+        data: [],
+        "columns": [
+            {"data": "Address"},
+            {"data": "NowBlockNum"},
+            {"data": "NowBlockHash"},
+            {"data": "LastSolidityBlockNum"},
+            {"data": "gRPC"},
+            {"data": "gRPCMonitor"},
+            {"data": "Message"}
+        ],
+
+    });
+
     if (window.WebSocket != undefined) {
         connection = new WebSocket(wsInfoUrl);
 
@@ -69,25 +89,8 @@ $(document).ready(function () {
                 resultData.data[i].Message = arr[6];
             }
 
-            $('#showdatatable').DataTable({
-                destroy: true,
-                searching: true,
-                fixedHeader: true,
-                pageLength: 100,
-                autoWidth: false,
-                progress: false,
-                data: resultData.data,
-                "columns": [
-                    {"data": "Address"},
-                    {"data": "NowBlockNum"},
-                    {"data": "NowBlockHash"},
-                    {"data": "LastSolidityBlockNum"},
-                    {"data": "gRPC"},
-                    {"data": "gRPCMonitor"},
-                    {"data": "Message"}
-                ],
-
-            });
+            table.rows().remove();
+            table.rows.add(resultData.data).draw();
 
             initPing();
         }
