@@ -33,13 +33,13 @@
             <form>
               <h1>Login Form</h1>
               <div>
-                <input type="text" class="form-control" placeholder="Username" required="" />
+                <input type="text" id="accountName" class="form-control" placeholder="Username" required="" />
               </div>
               <div>
-                <input type="password" class="form-control" placeholder="Password" required="" />
+                <input type="password"  id="password" class="form-control" placeholder="Password" required="" />
               </div>
               <div>
-                <a class="btn btn-default submit" href="index.html">Log in</a>
+                <a class="btn btn-default submit" id="submit" href="index.html" onclick="return check(this.form);">Log in</a>
                 <a class="reset_pass" href="#">Lost your password?</a>
               </div>
 
@@ -62,42 +62,68 @@
           </section>
         </div>
 
-        <div id="register" class="animate form registration_form">
-          <section class="login_content">
-            <form>
-              <h1>Create Account</h1>
-              <div>
-                <input type="text" class="form-control" placeholder="Username" required="" />
-              </div>
-              <div>
-                <input type="email" class="form-control" placeholder="Email" required="" />
-              </div>
-              <div>
-                <input type="password" class="form-control" placeholder="Password" required="" />
-              </div>
-              <div>
-                <a class="btn btn-default submit" href="index.html">Submit</a>
-              </div>
-
-              <div class="clearfix"></div>
-
-              <div class="separator">
-                <p class="change_link">Already a member ?
-                  <a href="#signin" class="to_register"> Log in </a>
-                </p>
-
-                <div class="clearfix"></div>
-                <br />
-
-                <div>
-                  <h1><i class="fa fa-paw"></i> Gentelella Alela!</h1>
-                  <p>©2016 All Rights Reserved. Gentelella Alela! is a Bootstrap 3 template. Privacy and Terms</p>
-                </div>
-              </div>
-            </form>
-          </section>
-        </div>
       </div>
     </div>
+    <script>
+        //验证表单是否为空，若为空则将焦点聚焦在input表单上，否则表单通过，登录成功
+        function check(form) {
+            var accountName = $("#accountName");
+            var password = $("#password");
+            accountName = accountName.val();
+            password = password.val();
+            if (!accountName || accountName == "") {
+                showMsg("请输入用户名");
+                form.accountName.focus();
+                return false;
+            }
+            if (!password || password == "") {
+                showMsg("请输入密码");
+                form.password.focus();
+                return false;
+            }
+
+            //这里为用ajax获取用户信息并进行验证，如果账户密码不匹配则登录失败，如不需要验证用户信息，这段可不写
+            $.ajax({
+                url: "http://127.0.0.1:8080/v1/user/info/tag/" + accountName + "/" + password,// 获取自己系统后台用户信息接口
+                type: "GET",
+                dataType: "json",
+                success: function (data) {
+                    if (data == "success") { //判断返回值，这里根据的业务内容可做调整
+                        window.location.href = "http://127.0.0.1:8080/static/production/";//指向登录的页面地址
+                    } else {
+                        showMsg(data.message);//显示登录失败的原因
+                        return false;
+                    }
+                },
+                error: function (data) {
+                    showMsg(data.message);
+                }
+            });
+        }
+
+        //错误信息提醒
+        function showMsg(msg) {
+            $("#CheckMsg").text(msg);
+        }
+
+
+    </script>
+    <script src="../vendors/jquery/dist/jquery.min.js">
+        //监听回车键提交
+        $(function () {
+            document.onkeydown = keyDownSearch;
+
+            function keyDownSearch(e) {
+                // 兼容FF和IE和Opera
+                var theEvent = e || window.event;
+                var code = theEvent.keyCode || theEvent.which || theEvent.charCode;
+                if (code == 13) {
+                    $('#submit').click();//具体处理函数
+                    return false;
+                }
+                return true;
+            }
+        });
+    </script>
   </body>
 </html>

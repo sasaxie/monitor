@@ -17,7 +17,7 @@ var table = $('#showdatatable').DataTable({
         url: infoUrl + tag,
         type: "GET",
         dataSrc: function (response) {
-            if (response == null) {
+            if (response == null || response === "") {
                 return "";
             }
 
@@ -87,6 +87,10 @@ function initTag() {
             return;
         }
 
+        if (response.data === "") {
+            window.location.href = serverHost + "/static/production/login.html"
+        }
+
         if (response.data == null) {
             return;
         }
@@ -131,7 +135,15 @@ function initTag() {
 function initRunTime() {
     setInterval(function () {
         axios.get(runTimeUrl).then(function(response) {
-            $("#runTime").text(response.data);
+            var result = "0s";
+
+            if (response == null || response.data === "") {
+                result = "0s";
+            } else {
+                result = response.data;
+            }
+
+            $("#runTime").text(result);
         }).catch(function (error) {
             console.log(error);
         })

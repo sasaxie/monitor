@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"fmt"
-	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
 	"strconv"
@@ -12,7 +11,7 @@ import (
 
 // Operations about monitor
 type MonitorController struct {
-	beego.Controller
+	BaseController
 }
 
 var waitGroup sync.WaitGroup
