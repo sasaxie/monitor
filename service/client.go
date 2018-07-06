@@ -124,3 +124,14 @@ func (g *GrpcClient) GetPing() int64 {
 
 	return end - start
 }
+
+func (g *GrpcClient) ListWitnesses() *api.WitnessList {
+	witnessList, err := g.WalletClient.ListWitnesses(context.Background(),
+		new(api.EmptyMessage))
+
+	if err != nil {
+		log.Fatalf("get witnesses error: %v\n", err)
+	}
+
+	return witnessList
+}

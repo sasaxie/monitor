@@ -131,6 +131,9 @@ func (w *WsMonitorController) Ws() {
 
 		go func() {
 			for {
+				if c == nil {
+					return
+				}
 				_, p, err := c.ReadMessage()
 				if err != nil {
 					return

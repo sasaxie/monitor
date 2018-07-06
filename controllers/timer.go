@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego"
+	"github.com/sasaxie/monitor/common/hexutil"
+	"github.com/sasaxie/monitor/core"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
 	"io/ioutil"
@@ -16,6 +19,8 @@ import (
 var mutexPing sync.Mutex
 var mutexPingMonitor sync.Mutex
 var swgp sync.WaitGroup
+
+var missBlockMap = make(map[string]int64)
 
 var PingMonitor map[string][]int64
 
@@ -120,6 +125,41 @@ func Timer() {
 
 	if len(pingRecoverMessage) > 0 {
 		PostDingding(pingRecoverMessage.String(), urlString)
+	}
+
+	// 判断超级节点不出块
+	witnessMissMessage := make(map[string]*core.Witness)
+	for k, v := range pingMessage {
+		if v > 0 {
+			witnesses := service.GrpcClients[k].ListWitnesses()
+
+			if witnesses != nil {
+				for _, witness := range witnesses.Witnesses {
+					if witness.IsJobs {
+						key := hexutil.Encode(witness.Address)
+						if oldMissCount, ok := missBlockMap[key]; ok {
+							currentMissCount := witness.TotalMissed
+
+							if currentMissCount > oldMissCount {
+								witnessMissMessage[key] = witness
+							}
+
+							missBlockMap[key] = witness.TotalMissed
+						} else {
+							missBlockMap[key] = witness.TotalMissed
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(witnessMissMessage) > 0 {
+		b, err := json.MarshalIndent(witnessMissMessage, "", "  ")
+
+		if err == nil {
+			PostDingding("超级节点不出块了："+string(b), urlString)
+		}
 	}
 }
 
