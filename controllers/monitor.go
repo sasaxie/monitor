@@ -1,12 +1,14 @@
 package controllers
 
 import (
-	"fmt"
+	"encoding/json"
+	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
-	"time"
 )
 
 // Operations about monitor
@@ -39,14 +41,14 @@ func (m *MonitorController) Info() {
 		waitGroup.Wait()
 
 		for _, tableData := range response.Data {
-			tableData.PingMonitor = ""
+			tableData.GRPCMonitor = ""
 
 			if pings, ok := PingMonitor[tableData.Address]; ok {
 				for index, ping := range pings {
-					tableData.PingMonitor += strconv.Itoa(int(ping))
+					tableData.GRPCMonitor += strconv.Itoa(int(ping))
 
 					if index != len(pings)-1 {
-						tableData.PingMonitor += ","
+						tableData.GRPCMonitor += ","
 					}
 				}
 			}
@@ -80,7 +82,7 @@ func getResult(address string, response *models.Response) {
 	go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
 	wg.Add(1)
-	go GetPing(client, &tableData.Ping, &wg)
+	go GetPing(client, &tableData.GRPC, &wg)
 
 	wg.Wait()
 
@@ -116,17 +118,108 @@ func (m *MonitorController) Settings() {
 // @Description get program info
 // @router /program-info [get,post]
 func (m *MonitorController) ProgramInfo() {
-	now := time.Now().UTC().Unix()
+	m.Data["json"] = models.Program.Runtime.Unix()
 
-	duration := now - models.Program.Runtime.Unix()
+	m.ServeJSON()
+}
 
-	d, err := time.ParseDuration(fmt.Sprintf("%ds", duration))
+// @Title Get server config
+// @Description get server config
+// @router /server-config [get]
+func (m *MonitorController) ServerConfig() {
+	m.Data["json"] = models.ServersConfig
+
+	m.ServeJSON()
+}
+
+// @Title Get server config
+// @Description get server config
+// @router /server-config [post]
+func (m *MonitorController) ServerConfigEdit() {
+
+	server := new(models.Servers)
+	err := json.Unmarshal(m.Ctx.Input.RequestBody, server)
 
 	if err != nil {
 		m.Data["json"] = err.Error()
 	} else {
-		m.Data["json"] = d.String()
+
+		if server.Servers == nil {
+			m.Data["json"] = "error"
+		} else {
+			path := beego.AppConfig.String(models.ServerFilePath)
+			file, err := os.Create(path)
+			defer file.Close()
+
+			if err != nil {
+				m.Data["json"] = err.Error()
+			} else {
+				server.FlushToFile(file)
+
+				oldAddresses := models.ServersConfig.GetAllAddresses()
+
+				models.ServersConfig = server
+
+				newAddresses := models.ServersConfig.GetAllAddresses()
+
+				// 删掉的话，必须close
+				closeOldGrpcClients(oldAddresses, newAddresses)
+
+				// 新增的话，只重新初始化新增的
+				connNewGrpcClients(oldAddresses, newAddresses)
+
+				service.InitGrpcClients()
+				m.Data["json"] = "success"
+			}
+		}
 	}
 
 	m.ServeJSON()
+}
+
+func closeOldGrpcClients(oldAddresses, newAddresses []string) {
+	closeAddresses := make([]string, 0)
+
+	for _, o := range oldAddresses {
+		count := 0
+		for _, n := range newAddresses {
+			count++
+			if strings.EqualFold(o, n) {
+				break
+			}
+		}
+
+		if count == len(newAddresses) {
+			closeAddresses = append(closeAddresses, o)
+		}
+	}
+
+	for _, c := range closeAddresses {
+		if service.GrpcClients[c].Conn != nil {
+			service.GrpcClients[c].Conn.Close()
+		}
+	}
+}
+
+func connNewGrpcClients(oldAddresses, newAddresses []string) {
+	connAddresses := make([]string, 0)
+
+	for _, n := range newAddresses {
+		count := 0
+		for _, o := range oldAddresses {
+			count++
+			if strings.EqualFold(o, n) {
+				break
+			}
+		}
+
+		if count == len(oldAddresses) {
+			connAddresses = append(connAddresses, n)
+		}
+	}
+
+	for _, c := range connAddresses {
+		service.GrpcClients[c] = service.NewGrpcClient(c)
+		service.GrpcClients[c].Start()
+	}
 }
