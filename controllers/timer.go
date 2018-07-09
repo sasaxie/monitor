@@ -1,16 +1,12 @@
 package controllers
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/astaxie/beego"
+	"github.com/sasaxie/monitor/common/alarm"
 	"github.com/sasaxie/monitor/common/hexutil"
 	"github.com/sasaxie/monitor/core"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -26,12 +22,6 @@ var PingMonitor map[string][]int64
 type AddressMonitor struct {
 	Count         int64
 	StartPostTime time.Time
-}
-
-var urlString string
-
-func init() {
-	urlString = beego.AppConfig.String("dingdingURl")
 }
 
 var addressMonitorMap map[string]*AddressMonitor
@@ -128,7 +118,7 @@ func Timer() {
 		}
 		`, pingTimeoutMessage.String())
 
-		PostDingding(bodyContent, urlString)
+		alarm.DingAlarm.Alarm([]byte(bodyContent))
 	}
 
 	if len(pingRecoverMessage) > 0 {
@@ -141,7 +131,7 @@ func Timer() {
 		}
 		`, pingRecoverMessage.String())
 
-		PostDingding(bodyContent, urlString)
+		alarm.DingAlarm.Alarm([]byte(bodyContent))
 	}
 
 	// 判断超级节点不出块
@@ -189,7 +179,7 @@ func Timer() {
 		}
 		`, content)
 
-		PostDingding(bodyContent, urlString)
+		alarm.DingAlarm.Alarm([]byte(bodyContent))
 	}
 }
 
@@ -216,57 +206,6 @@ func (p PingMsg) String() string {
 	}
 
 	return res
-}
-
-func PostDingding(content string, url string) {
-	postBody := []byte(content)
-
-	header := make(map[string]string)
-
-	header["Content-Type"] = "application/json"
-
-	body, err := Post(postBody, url, header)
-
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
-
-	log.Println(string(body))
-}
-
-func Post(postBody []byte, u string, header map[string]string) ([]byte, error) {
-	client := &http.Client{}
-	request, err := http.NewRequest("POST", u, bytes.NewBuffer(postBody))
-
-	if err != nil {
-		log.Println("post dingding error:", err.Error())
-		return []byte(""), err
-	}
-
-	for key, value := range header {
-		request.Header.Set(key, value)
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		log.Println("post dingding error:", err.Error())
-		return []byte(""), err
-	}
-
-	defer response.Body.Close()
-
-	if err != nil {
-		return []byte(""), err
-	}
-
-	data, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		return []byte(""), err
-	}
-
-	return data, nil
 }
 
 func StartMonitorPing() {
