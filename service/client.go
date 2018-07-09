@@ -130,7 +130,7 @@ func (g *GrpcClient) ListWitnesses() *api.WitnessList {
 		new(api.EmptyMessage))
 
 	if err != nil {
-		log.Fatalf("get witnesses error: %v\n", err)
+		log.Printf("get witnesses error: %v\n", err)
 	}
 
 	return witnessList
