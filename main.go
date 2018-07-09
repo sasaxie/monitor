@@ -18,7 +18,7 @@ func main() {
 	service.InitGrpcClients()
 	controllers.InitResponseMap()
 
-	controllers.StartMonitorPing()
+	controllers.StartMonitor()
 
 	beego.Run()
 }

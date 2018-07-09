@@ -53,7 +53,7 @@ func InitResponseMap() {
 					for _, tableData := range response.Data {
 						tableData.GRPCMonitor = ""
 
-						if pings, ok := PingMonitor[tableData.Address]; ok {
+						if pings, ok := TronMonitor.GRPCMonitor.LatestGRPCs[tableData.Address]; ok {
 							for index, ping := range pings {
 								tableData.GRPCMonitor += strconv.Itoa(int(ping))
 
