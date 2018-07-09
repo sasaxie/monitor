@@ -111,6 +111,28 @@ func (w *WsMonitorController) Ws() {
 		v.Increase()
 	}
 
+	go func() {
+		for {
+			if c == nil {
+				return
+			}
+			_, p, err := c.ReadMessage()
+			if err != nil {
+				return
+			}
+
+			if v, ok := responseMap[tag]; ok {
+				v.Reduce()
+			}
+
+			tag = string(p)
+
+			if v, ok := responseMap[tag]; ok {
+				v.Increase()
+			}
+		}
+	}()
+
 	for {
 		response := responseMap[tag].Response
 
@@ -128,28 +150,6 @@ func (w *WsMonitorController) Ws() {
 		}
 
 		time.Sleep(1 * time.Second)
-
-		go func() {
-			for {
-				if c == nil {
-					return
-				}
-				_, p, err := c.ReadMessage()
-				if err != nil {
-					return
-				}
-
-				if v, ok := responseMap[tag]; ok {
-					v.Reduce()
-				}
-
-				tag = string(p)
-
-				if v, ok := responseMap[tag]; ok {
-					v.Increase()
-				}
-			}
-		}()
 	}
 }
 
