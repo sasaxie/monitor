@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/common/hexutil"
@@ -120,11 +119,29 @@ func Timer() {
 	}
 
 	if len(pingTimeoutMessage) > 0 {
-		PostDingding(pingTimeoutMessage.String(), urlString)
+		bodyContent := fmt.Sprintf(`
+		{
+			"msgtype": "text",
+			"text": {
+				"content": "%s"
+			}
+		}
+		`, pingTimeoutMessage.String())
+
+		PostDingding(bodyContent, urlString)
 	}
 
 	if len(pingRecoverMessage) > 0 {
-		PostDingding(pingRecoverMessage.String(), urlString)
+		bodyContent := fmt.Sprintf(`
+		{
+			"msgtype": "text",
+			"text": {
+				"content": "%s"
+			}
+		}
+		`, pingRecoverMessage.String())
+
+		PostDingding(bodyContent, urlString)
 	}
 
 	// 判断超级节点不出块
@@ -151,15 +168,28 @@ func Timer() {
 					}
 				}
 			}
+
+			break
 		}
 	}
 
 	if len(witnessMissMessage) > 0 {
-		b, err := json.MarshalIndent(witnessMissMessage, "", "  ")
-
-		if err == nil {
-			PostDingding("超级节点不出块了："+string(b), urlString)
+		content := ""
+		for _, v := range witnessMissMessage {
+			content += fmt.Sprintf("[url：%s，当前的totalMissed"+
+				"：%d] ", v.Url, v.TotalMissed)
 		}
+
+		bodyContent := fmt.Sprintf(`
+		{
+			"msgtype": "text",
+			"text": {
+				"content": "超级节点不出块了，一直警告直到恢复正常：%s"
+			}
+		}
+		`, content)
+
+		PostDingding(bodyContent, urlString)
 	}
 }
 
@@ -189,15 +219,7 @@ func (p PingMsg) String() string {
 }
 
 func PostDingding(content string, url string) {
-	bodyContent := fmt.Sprintf(`
-		{
-			"msgtype": "text",
-			"text": {
-				"content": "%s"
-			}
-		}
-		`, content)
-	postBody := []byte(bodyContent)
+	postBody := []byte(content)
 
 	header := make(map[string]string)
 
