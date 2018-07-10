@@ -17,7 +17,7 @@ func InitResponseMap() {
 	responseMap = make(map[string]*models.Responses, 0)
 
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(10 * time.Second)
 
 		for {
 			select {
@@ -149,7 +149,7 @@ func (w *WsMonitorController) Ws() {
 			break
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
