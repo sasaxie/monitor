@@ -157,3 +157,18 @@ func (g *GrpcClient) ListWitnesses() *api.WitnessList {
 
 	return witnessList
 }
+
+func (g *GrpcClient) ListNodes() *api.NodeList {
+	if g.Conn == nil {
+		return new(api.NodeList)
+	}
+
+	nodeList, err := g.WalletClient.ListNodes(context.Background(),
+		new(api.EmptyMessage))
+
+	if err != nil {
+		log.Printf("get nodes error: %v\n", err)
+	}
+
+	return nodeList
+}
