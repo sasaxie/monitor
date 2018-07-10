@@ -73,18 +73,18 @@ func getResult(address string, response *models.Response) {
 	tableData := new(models.TableData)
 	tableData.Address = address
 
-	client := service.GrpcClients[address]
+	if client, ok := service.GrpcClients[address]; ok {
+		wg.Add(1)
+		go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
 
-	wg.Add(1)
-	go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
+		wg.Add(1)
+		go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
-	wg.Add(1)
-	go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
+		wg.Add(1)
+		go GetPing(client, &tableData.GRPC, &wg)
 
-	wg.Add(1)
-	go GetPing(client, &tableData.GRPC, &wg)
-
-	wg.Wait()
+		wg.Wait()
+	}
 
 	mutex.Lock()
 	response.Data = append(response.Data, tableData)
