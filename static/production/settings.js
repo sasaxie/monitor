@@ -11,8 +11,14 @@ function saveServerConfig() {
     var serverConfigJson = editor.getValue();
 
     axios.post(serverConfigUrl, serverConfigJson).then(function (response) {
-        console.log(response);
-        if (response == null || response.data !== "success") {
+        if (response == null ) {
+            return
+        }
+        if (response.data === "redirect") {
+            window.location.href = serverHost + "/static/production/login.html"
+        }
+
+        if (response.data !== "success") {
             new PNotify({
                 title: '保存失败',
                 type: 'error',
@@ -101,6 +107,11 @@ function initServerConfig() {
         if (response == null || response.data ==="") {
             return;
         }
+
+        if (response.data === "redirect") {
+            window.location.href = serverHost + "/static/production/login.html"
+        }
+
         var json = response.data;
 
         editor.setValue(json);

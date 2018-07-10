@@ -13,7 +13,7 @@ import (
 
 // Operations about monitor
 type MonitorController struct {
-	beego.Controller
+	BaseController
 }
 
 var waitGroup sync.WaitGroup

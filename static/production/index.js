@@ -1,4 +1,3 @@
-var infoUrl = serverHost + "/v1/monitor/info/tag/";
 var wsInfoUrl = wsServerHost + "/v1/wsmonitor/tag";
 var settingsUrl = serverHost + "/v1/monitor/settings/";
 var runTimeUrl = serverHost + "/v1/monitor/program-info/";
@@ -119,65 +118,85 @@ function initPing() {
 }
 
 function initTag() {
-    axios.get(settingsUrl).then(function (response) {
+    $.ajax({
+        url: settingsUrl,// 获取自己系统后台用户信息接口
+        type: "GET",
+        dataType: "json",
+        success: function (response) {
+            if (response == null) {
+                return;
+            }
 
-        if (response == null) {
-            return;
-        }
+            if (response === "redirect") {
+                window.location.href = serverHost + "/static/production/login.html"
+            }
 
-        if (response.data == null) {
-            return;
-        }
-
-        for (var i = 0; i < response.data.length; ++i) {
-            var radioStr = `
+            for (var i = 0; i < response.length; ++i) {
+                var radioStr = `
             <div class="radio">
                 <label>
-                    <input type="radio" class="flat" name="serverTags" value="` + response.data[i].tag + `">` +
-                response.data[i].tag + `
+                    <input type="radio" class="flat" name="serverTags" value="` + response[i].tag + `">` +
+                    response[i].tag + `
                 </label>
             `;
 
-            if (response.data[i].isOpenMonitor === "true") {
-                radioStr += `
+                if (response[i].isOpenMonitor === "true") {
+                    radioStr += `
                 <small class="fa fa-bell green">已开启钉钉报警</small>
                 `
-            } else {
-                radioStr += `
+                } else {
+                    radioStr += `
                 <small class="fa fa-bell">未开启钉钉报警</small>
                 `
-            }
+                }
 
-            radioStr += `
+                radioStr += `
              </div>
             `;
-            $("#serverRadios").append(radioStr);
+                $("#serverRadios").append(radioStr);
+            }
+            $(":radio[name='serverTags']:first").attr("checked","true");
+
+            $(":radio[name='serverTags']").change(function () {
+                if (connection != undefined) {
+                    connection.send(this.value);
+                }
+            });
         }
 
-        $(":radio[name='serverTags']:first").attr("checked","true");
+        ,
+        error: function (response) {
+            console.log(response);
 
-        $(":radio[name='serverTags']").change(function () {
-            if (connection != undefined) {
-                connection.send(this.value);
-            }
-        });
-    }).catch(function (error) {
-        console.log(error);
+        }
     });
+
 }
 
 function initRunTime() {
-    var timestamp = new Date();
-    axios.get(runTimeUrl).then(function(response) {
-        timestamp.setTime(response.data * 1000);
+    $.ajax({
+        url: runTimeUrl,
+        type: "GET",
+        dataType: "json",
+        success: function (response) {
+            if (response === "redirect") {
+                window.location.href = serverHost + "/static/production/login.html"
+            }
 
-        setInterval(function () {
-            var currentData = new Date();
-            $("#runTime").text(getTime(parseInt((currentData - timestamp) / 1000)));
-        }, 1000);
-    }).catch(function (error) {
-        console.log(error);
+            var timestamp = new Date();
+            timestamp.setTime(response * 1000);
+            setInterval(function () {
+                var currentData = new Date();
+                var timeText = getTime(parseInt((currentData - timestamp) / 1000));
+                $("#runTime").text(timeText);
+            }, 1000);
+        }
+        ,
+        error: function (response) {
+            console.log(response);
+        }
     });
+
 }
 
 function getTime(seconds) {
@@ -212,7 +231,7 @@ var table = $('#showdatatable').DataTable({
         url: infoUrl + tag,
         type: "GET",
         dataSrc: function (response) {
-            if (response == null) {
+            if (response == null || response === "") {
                 return "";
             }
 
@@ -282,6 +301,10 @@ function initTag() {
             return;
         }
 
+        if (response.data === "") {
+            window.location.href = serverHost + "/static/production/login.html"
+        }
+
         if (response.data == null) {
             return;
         }
@@ -326,7 +349,15 @@ function initTag() {
 function initRunTime() {
     setInterval(function () {
         axios.get(runTimeUrl).then(function(response) {
-            $("#runTime").text(response.data);
+            var result = "0s";
+
+            if (response == null || response.data === "") {
+                result = "0s";
+            } else {
+                result = response.data;
+            }
+
+            $("#runTime").text(result);
         }).catch(function (error) {
             console.log(error);
         })
@@ -339,3 +370,34 @@ function initTable() {
     }, 3000);
 }
 */
+function logout(form) {
+    $.ajax({
+        url: serverHost+"/v1/user/info/tag/logout",// 获取自己系统后台用户信息接口
+        type: "GET",
+        dataType: "json",
+        success: function (data) {
+            if (data === "success") { //判断返回值，这里根据的业务内容可做调整
+                showMsg('登出成功','success');
+
+                window.location.href = serverHost+"/static/production/login.html";//指向登录的页面地址
+            } else {
+                showMsg('登出失败','error');
+
+                return false;
+            }
+        },
+        error: function (data) {
+            showMsg('登出失败','error');
+
+        }
+    });
+}
+
+//错误信息提醒
+function showMsg(title, type) {
+    new PNotify({
+        title: title,
+        type: type,
+        styling: 'bootstrap3'
+    });
+}
