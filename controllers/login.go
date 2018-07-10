@@ -3,7 +3,6 @@ package controllers
 import (
 	"fmt"
 	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/logs"
 	"strings"
 )
 
@@ -19,11 +18,8 @@ var (
 // @router /info/tag/:UserName/:Password [get,post]
 func (c *UserInfoController) Login() {
 
-	fmt.Println(2)
 	userName := c.GetString(":UserName", "")
 	password := c.GetString(":Password", "")
-
-	fmt.Println(1, userName, password)
 
 	if strings.EqualFold(userNameValidate, userName) && strings.EqualFold(passwordValidate, password) {
 		c.SetSession("Validate", userName)
@@ -35,18 +31,27 @@ func (c *UserInfoController) Login() {
 	c.ServeJSON()
 }
 
-//登录
+// @router /info/tag/logout [get,post]
 func (c *UserInfoController) Logout() {
 	//获得id
 	//设置返回对象。
-	if c.CruSession == nil {
-		c.StartSession()
-	}
-	sessionId := c.CruSession.SessionID()
-	logs.Info("==sessionId %s ==", sessionId)
-	//设置 SessionDomain 名称。
+	//if c.CruSession == nil {
+	//	c.StartSession()
+	//}
+	//sessionId := c.CruSession.SessionID()
+	//logs.Info("==sessionId %s ==", sessionId)
+	////设置 SessionDomain 名称。
+	//c.DestroySession()
+	////设置返回对象。
+	//c.Ctx.Redirect(302, "/auth/login")
+
+	c.DelSession("Validate")
 	c.DestroySession()
-	//设置返回对象。
-	c.Ctx.Redirect(302, "/auth/login")
-	return
+	fmt.Println(c.GetSession("Validate"))
+	if c.GetSession("Validate") == nil {
+		fmt.Println("返回为nil")
+		c.Data["json"] = "success"
+	}
+	c.ServeJSON()
+
 }

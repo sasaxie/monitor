@@ -11,7 +11,8 @@ type BaseController struct {
 func (b *BaseController) Prepare() {
 	v := b.GetSession("Validate")
 	if v == nil {
-		b.Data["json"] = ""
+
+		b.Data["json"] = "redirect"
 		b.ServeJSON()
 	}
 }
