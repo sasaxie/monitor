@@ -73,7 +73,11 @@ func getResult(address string, response *models.Response) {
 	tableData := new(models.TableData)
 	tableData.Address = address
 
-	if client, ok := service.GrpcClients[address]; ok {
+	mutex.Lock()
+	client := service.GrpcClients[address]
+	mutex.Unlock()
+
+	if client != nil {
 		wg.Add(1)
 		go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
 
