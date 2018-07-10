@@ -3,7 +3,9 @@ package main
 import (
 	"github.com/astaxie/beego"
 	"github.com/sasaxie/monitor/controllers"
+	"github.com/sasaxie/monitor/models"
 	_ "github.com/sasaxie/monitor/routers"
+	"github.com/sasaxie/monitor/service"
 )
 
 func main() {
@@ -12,7 +14,11 @@ func main() {
 		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
 	}
 
-	controllers.StartMonitorPing()
+	models.InitServerConfig()
+	service.InitGrpcClients()
+	controllers.InitResponseMap()
+
+	controllers.StartMonitor()
 
 	beego.Run()
 }
