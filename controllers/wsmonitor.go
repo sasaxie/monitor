@@ -130,6 +130,21 @@ func (w *WsMonitorController) Ws() {
 			if v, ok := responseMap[tag]; ok {
 				v.Increase()
 			}
+
+			response := responseMap[tag].Response
+
+			b, err := json.Marshal(response)
+
+			if err != nil {
+				continue
+			}
+
+			err = c.WriteMessage(websocket.TextMessage, b)
+
+			if err != nil {
+				log.Error(err.Error())
+				break
+			}
 		}
 	}()
 
