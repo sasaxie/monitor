@@ -37,6 +37,12 @@ $(document).ready(function () {
 
         connection.onclose = function () {
             console.log("ws on close");
+            new PNotify({
+                title: '断开连接',
+                text: '请刷新浏览器重试...',
+                hide: false,
+                styling: 'bootstrap3'
+            });
         };
 
         connection.onmessage = function (event) {

@@ -43,7 +43,7 @@ func (m *MonitorController) Info() {
 		for _, tableData := range response.Data {
 			tableData.GRPCMonitor = ""
 
-			if pings, ok := PingMonitor[tableData.Address]; ok {
+			if pings, ok := TronMonitor.GRPCMonitor.LatestGRPCs[tableData.Address]; ok {
 				for index, ping := range pings {
 					tableData.GRPCMonitor += strconv.Itoa(int(ping))
 
@@ -73,18 +73,22 @@ func getResult(address string, response *models.Response) {
 	tableData := new(models.TableData)
 	tableData.Address = address
 
+	mutex.Lock()
 	client := service.GrpcClients[address]
+	mutex.Unlock()
 
-	wg.Add(1)
-	go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
+	if client != nil {
+		wg.Add(1)
+		go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
 
-	wg.Add(1)
-	go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
+		wg.Add(1)
+		go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
-	wg.Add(1)
-	go GetPing(client, &tableData.GRPC, &wg)
+		wg.Add(1)
+		go GetPing(client, &tableData.GRPC, &wg)
 
-	wg.Wait()
+		wg.Wait()
+	}
 
 	mutex.Lock()
 	response.Data = append(response.Data, tableData)

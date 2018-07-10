@@ -53,7 +53,7 @@ func InitResponseMap() {
 					for _, tableData := range response.Data {
 						tableData.GRPCMonitor = ""
 
-						if pings, ok := PingMonitor[tableData.Address]; ok {
+						if pings, ok := TronMonitor.GRPCMonitor.LatestGRPCs[tableData.Address]; ok {
 							for index, ping := range pings {
 								tableData.GRPCMonitor += strconv.Itoa(int(ping))
 
@@ -111,6 +111,28 @@ func (w *WsMonitorController) Ws() {
 		v.Increase()
 	}
 
+	go func() {
+		for {
+			if c == nil {
+				return
+			}
+			_, p, err := c.ReadMessage()
+			if err != nil {
+				return
+			}
+
+			if v, ok := responseMap[tag]; ok {
+				v.Reduce()
+			}
+
+			tag = string(p)
+
+			if v, ok := responseMap[tag]; ok {
+				v.Increase()
+			}
+		}
+	}()
+
 	for {
 		response := responseMap[tag].Response
 
@@ -128,25 +150,6 @@ func (w *WsMonitorController) Ws() {
 		}
 
 		time.Sleep(1 * time.Second)
-
-		go func() {
-			for {
-				_, p, err := c.ReadMessage()
-				if err != nil {
-					return
-				}
-
-				if v, ok := responseMap[tag]; ok {
-					v.Reduce()
-				}
-
-				tag = string(p)
-
-				if v, ok := responseMap[tag]; ok {
-					v.Increase()
-				}
-			}
-		}()
 	}
 }
 

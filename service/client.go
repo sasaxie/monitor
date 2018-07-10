@@ -55,6 +55,10 @@ func (g *GrpcClient) Start() {
 func (g *GrpcClient) GetNowBlock(num *int64, hash *string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	if g.Conn == nil {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
 	defer cancel()
 	result, err := g.WalletClient.GetNowBlock(ctx, new(api.EmptyMessage))
@@ -69,6 +73,9 @@ func (g *GrpcClient) GetNowBlock(num *int64, hash *string, wg *sync.WaitGroup) {
 }
 
 func (g *GrpcClient) GetNextMaintenanceTime() *api.NumberMessage {
+	if g.Conn == nil {
+		return new(api.NumberMessage)
+	}
 
 	result, err := g.WalletClient.GetNextMaintenanceTime(context.Background(),
 		new(api.EmptyMessage))
@@ -81,6 +88,9 @@ func (g *GrpcClient) GetNextMaintenanceTime() *api.NumberMessage {
 }
 
 func (g *GrpcClient) TotalTransaction() *api.NumberMessage {
+	if g.Conn == nil {
+		return new(api.NumberMessage)
+	}
 
 	result, err := g.WalletClient.TotalTransaction(context.Background(),
 		new(api.EmptyMessage))
@@ -96,6 +106,10 @@ func (g *GrpcClient) GetLastSolidityBlockNum(num *int64,
 	wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	if g.Conn == nil {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
 	defer cancel()
 
@@ -110,6 +124,10 @@ func (g *GrpcClient) GetLastSolidityBlockNum(num *int64,
 }
 
 func (g *GrpcClient) GetPing() int64 {
+	if g.Conn == nil {
+		return 0
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
 	defer cancel()
 
@@ -123,4 +141,34 @@ func (g *GrpcClient) GetPing() int64 {
 	}
 
 	return end - start
+}
+
+func (g *GrpcClient) ListWitnesses() *api.WitnessList {
+	if g.Conn == nil {
+		return new(api.WitnessList)
+	}
+
+	witnessList, err := g.WalletClient.ListWitnesses(context.Background(),
+		new(api.EmptyMessage))
+
+	if err != nil {
+		log.Printf("get witnesses error: %v\n", err)
+	}
+
+	return witnessList
+}
+
+func (g *GrpcClient) ListNodes() *api.NodeList {
+	if g.Conn == nil {
+		return new(api.NodeList)
+	}
+
+	nodeList, err := g.WalletClient.ListNodes(context.Background(),
+		new(api.EmptyMessage))
+
+	if err != nil {
+		log.Printf("get nodes error: %v\n", err)
+	}
+
+	return nodeList
 }
