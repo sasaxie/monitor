@@ -1,19 +1,31 @@
 package models
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego"
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 )
 
-var ServersConfig *Servers
+var ServersConfig = new(Servers)
 
-func init() {
-	ServersConfig = new(Servers)
-	ServersConfig.Load()
+const ServerFilePath = "ServerFile"
+
+func InitServerConfig() {
+	path := beego.AppConfig.String(ServerFilePath)
+	file, err := os.Open(path)
+	defer file.Close()
+
+	if err != nil {
+		log.Fatalln("init server config error:", err.Error())
+	}
+
+	ServersConfig.Load(file)
 }
 
 type Servers struct {
@@ -26,7 +38,7 @@ type Server struct {
 }
 
 type Setting struct {
-	IsOpenMonitor bool   `json:"isOpenMonitor"`
+	IsOpenMonitor string `json:"isOpenMonitor"`
 	Tag           string `json:"tag"`
 }
 
@@ -35,10 +47,10 @@ type Address struct {
 	Port int    `json:"port"`
 }
 
-func (s *Servers) Load() {
-	path := beego.AppConfig.String("ServerFile")
+func (s *Servers) Load(reader io.Reader) {
+	r := bufio.NewReader(reader)
 
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadAll(r)
 
 	if err != nil {
 		log.Fatalln("load servers file error:", err.Error())
@@ -49,6 +61,25 @@ func (s *Servers) Load() {
 	if err != nil {
 		log.Fatalln("load servers file error:", err.Error())
 	}
+}
+
+func (s *Servers) FlushToFile(writer io.Writer) {
+	b, err := json.MarshalIndent(s, "", "  ")
+
+	if err != nil {
+		log.Println("flush to file error:", err.Error())
+		return
+	}
+
+	w := bufio.NewWriter(writer)
+	_, err = w.Write(b)
+
+	if err != nil {
+		log.Println("flush to file error:", err.Error())
+		return
+	}
+
+	defer w.Flush()
 }
 
 func (s *Servers) String() string {
@@ -117,7 +148,7 @@ func (s *Servers) GetAllMonitorAddresses() []string {
 
 	addresses := make(map[string]bool)
 	for _, server := range s.Servers {
-		if server.Setting.IsOpenMonitor {
+		if strings.EqualFold("true", server.Setting.IsOpenMonitor) {
 			for _, address := range server.Addresses {
 				addresses[fmt.Sprintf("%s:%d", address.Ip,
 					address.Port)] = false

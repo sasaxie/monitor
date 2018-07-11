@@ -25,6 +25,21 @@ func init() {
 				&controllers.MonitorController{},
 			),
 		),
+		beego.NSNamespace("/wsmonitor",
+			beego.NSInclude(
+				&controllers.WsMonitorController{},
+			),
+		),
+		beego.NSNamespace("/user",
+			beego.NSInclude(
+				&controllers.UserInfoController{},
+			),
+		),
+		beego.NSNamespace("/node",
+			beego.NSInclude(
+				&controllers.NodeController{},
+			),
+		),
 	)
 	beego.AddNamespace(ns)
 }
