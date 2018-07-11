@@ -111,6 +111,8 @@ func (w *WsMonitorController) Ws() {
 		v.Increase()
 	}
 
+	msgChan := make(chan []byte, 2)
+
 	go func() {
 		for {
 			if c == nil {
@@ -131,6 +133,10 @@ func (w *WsMonitorController) Ws() {
 				v.Increase()
 			}
 
+			if _, ok := responseMap[tag]; !ok {
+				continue
+			}
+
 			response := responseMap[tag].Response
 
 			b, err := json.Marshal(response)
@@ -139,32 +145,39 @@ func (w *WsMonitorController) Ws() {
 				continue
 			}
 
-			err = c.WriteMessage(websocket.TextMessage, b)
-
-			if err != nil {
-				log.Error(err.Error())
-				break
-			}
+			msgChan <- b
 		}
 	}()
 
-	for {
-		response := responseMap[tag].Response
+	go func(msgChan chan []byte) {
+		for {
+			if _, ok := responseMap[tag]; !ok {
+				continue
+			}
 
-		b, err := json.Marshal(response)
+			response := responseMap[tag].Response
 
-		if err != nil {
-			continue
+			b, err := json.Marshal(response)
+
+			if err != nil {
+				continue
+			}
+
+			msgChan <- b
+
+			time.Sleep(5 * time.Second)
 		}
+	}(msgChan)
 
-		err = c.WriteMessage(websocket.TextMessage, b)
+	for {
+		msg := <-msgChan
+
+		err = c.WriteMessage(websocket.TextMessage, msg)
 
 		if err != nil {
-			log.Error(err.Error())
+			beego.Error(err.Error())
 			break
 		}
-
-		time.Sleep(5 * time.Second)
 	}
 }
 
