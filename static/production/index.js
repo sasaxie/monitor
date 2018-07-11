@@ -370,34 +370,3 @@ function initTable() {
     }, 3000);
 }
 */
-function logout(form) {
-    $.ajax({
-        url: serverHost+"/v1/user/info/tag/logout",// 获取自己系统后台用户信息接口
-        type: "GET",
-        dataType: "json",
-        success: function (data) {
-            if (data === "success") { //判断返回值，这里根据的业务内容可做调整
-                showMsg('登出成功','success');
-
-                window.location.href = serverHost+"/static/production/login.html";//指向登录的页面地址
-            } else {
-                showMsg('登出失败','error');
-
-                return false;
-            }
-        },
-        error: function (data) {
-            showMsg('登出失败','error');
-
-        }
-    });
-}
-
-//错误信息提醒
-function showMsg(title, type) {
-    new PNotify({
-        title: title,
-        type: type,
-        styling: 'bootstrap3'
-    });
-}
