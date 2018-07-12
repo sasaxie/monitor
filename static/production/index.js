@@ -135,29 +135,33 @@ function initTag() {
                 var radioStr = `
             <div class="radio">
                 <label>
-                    <input type="radio" class="flat" name="serverTags" value="` + response[i].tag + `">` +
+                    <input type="radio" class="flat" name="serverTags" value="` + response[i].tag + `">
+                    &nbsp;` +
                     response[i].tag + `
                 </label>
+                </div>
             `;
 
-                if (response[i].isOpenMonitor === "true") {
-                    radioStr += `
-                <small class="fa fa-bell green">已开启钉钉报警</small>
-                `
-                } else {
-                    radioStr += `
-                <small class="fa fa-bell">未开启钉钉报警</small>
-                `
-                }
+                // if (response[i].isOpenMonitor === "true") {
+                //     radioStr += `
+                // <small class="fa fa-bell green">已开启钉钉报警</small>
+                // `
+                // } else {
+                //     radioStr += `
+                // <small class="fa fa-bell">未开启钉钉报警</small>
+                // `
+                // }
 
-                radioStr += `
-             </div>
-            `;
                 $("#serverRadios").append(radioStr);
             }
+
             $(":radio[name='serverTags']:first").attr("checked","true");
 
-            $(":radio[name='serverTags']").change(function () {
+            $('#serverRadios').iCheck({
+                radioClass: 'iradio_flat-green'
+            });
+
+            $('#serverRadios input').on('ifChecked', function () {
                 if (connection != undefined) {
                     connection.send(this.value);
                 }
