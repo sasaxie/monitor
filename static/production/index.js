@@ -21,6 +21,7 @@ $(document).ready(function () {
             {"data": "NowBlockNum"},
             {"data": "NowBlockHash"},
             {"data": "LastSolidityBlockNum"},
+            {"data": "TotalTransaction"},
             {"data": "gRPC"},
             {"data": "gRPCMonitor"},
             {"data": "Message"}
@@ -63,35 +64,38 @@ $(document).ready(function () {
                 }
 
                 arr[3] = resultData.data[i].LastSolidityBlockNum;
+                arr[4] =resultData.data[i].TotalTransaction;
 
                 if (resultData.data[i].gRPC <= 0) {
-                    arr[4] = '<p class="red">0</p>';
+                    arr[5] = '<p class="red">0</p>';
                 } else if (resultData.data[i].gRPC < 100) {
-                    arr[4] = '<p class="green">' + resultData.data[i].gRPC + '</p>';
+                    arr[5] = '<p class="green">' + resultData.data[i].gRPC + '</p>';
                 } else if (resultData.data[i].gRPC < 300) {
-                    arr[4] = '<p class="blue">' + resultData.data[i].gRPC + '</p>';
+                    arr[5] = '<p class="blue">' + resultData.data[i].gRPC + '</p>';
                 } else {
-                    arr[4] = '<p style="color: #F39C12;">' + resultData.data[i].gRPC + '</p>';
+                    arr[5] = '<p style="color: #F39C12;">' + resultData.data[i].gRPC + '</p>';
                 }
 
-                arr[5] = "--";
+                arr[6] = "--";
                 if (resultData.data[i].gRPCMonitor.length !== 0) {
-                    arr[5] = '<span class="sparklines_ping">' + resultData.data[i].gRPCMonitor + '</span>'
+                    arr[6] = '<span class="sparklines_ping">' + resultData.data[i].gRPCMonitor + '</span>'
                 }
 
                 if (resultData.data[i].Message === 'success') {
-                    arr[6] = '<p class="green">' + resultData.data[i].Message + '</p>';
+                    arr[7] = '<p class="green">' + resultData.data[i].Message + '</p>';
                 } else {
-                    arr[6] = '<p class="red">' + resultData.data[i].Message + '</p>';
+                    arr[7] = '<p class="red">' + resultData.data[i].Message + '</p>';
                 }
 
                 resultData.data[i].Address = arr[0];
                 resultData.data[i].NowBlockNum = arr[1];
                 resultData.data[i].NowBlockHash = arr[2];
                 resultData.data[i].LastSolidityBlockNum = arr[3];
-                resultData.data[i].gRPC = arr[4];
-                resultData.data[i].gRPCMonitor = arr[5];
-                resultData.data[i].Message = arr[6];
+                resultData.data[i].TotalTransaction = arr[4];
+                resultData.data[i].gRPC = arr[5];
+                resultData.data[i].gRPCMonitor = arr[6];
+                resultData.data[i].Message = arr[7];
+
             }
 
             table.rows().remove();

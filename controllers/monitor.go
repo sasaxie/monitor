@@ -87,6 +87,9 @@ func getResult(address string, response *models.Response) {
 		wg.Add(1)
 		go GetPing(client, &tableData.GRPC, &wg)
 
+		wg.Add(1)
+		go client.TotalTransaction(&tableData.TotalTransaction, &wg)
+
 		wg.Wait()
 	}
 
