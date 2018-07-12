@@ -87,19 +87,25 @@ func (g *GrpcClient) GetNextMaintenanceTime() *api.NumberMessage {
 	return result
 }
 
-func (g *GrpcClient) TotalTransaction() *api.NumberMessage {
+func (g *GrpcClient) TotalTransaction(num *int64, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	if g.Conn == nil {
-		return new(api.NumberMessage)
+		return
 	}
 
-	result, err := g.WalletClient.TotalTransaction(context.Background(),
+	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
+	defer cancel()
+
+	result, err := g.WalletClient.TotalTransaction(ctx,
 		new(api.EmptyMessage))
 
 	if err != nil {
-		log.Fatalf("total transaction error: %v", err)
+		log.Printf("total transaction error: %v", err)
+		return
 	}
 
-	return result
+	*num = result.Num
 }
 
 func (g *GrpcClient) GetLastSolidityBlockNum(num *int64,
