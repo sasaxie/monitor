@@ -24,7 +24,6 @@ type TableData struct {
 	GRPC                 int64 `json:"gRPC"`
 	Message              string
 	TotalTransaction     int64
-	GRPCMonitor          string `json:"gRPCMonitor"`
 }
 
 // 每新增一个socket连接，计数加一
