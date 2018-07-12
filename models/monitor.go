@@ -23,6 +23,7 @@ type TableData struct {
 	LastSolidityBlockNum int64
 	GRPC                 int64 `json:"gRPC"`
 	Message              string
+	TotalTransaction     int64
 	GRPCMonitor          string `json:"gRPCMonitor"`
 }
 
