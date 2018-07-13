@@ -16,7 +16,7 @@ document.writeln("    }");
 document.writeln("");
 document.writeln("    function logout(form) {");
 document.writeln("        $.ajax({");
-document.writeln("            url: serverHost+\'/v1/user/info/tag/logout\',// 获取自己系统后台用户信息接口");
+document.writeln("            url: serverHost+\'/v1/user/logout\',// 获取自己系统后台用户信息接口");
 document.writeln("            type: \'GET\',");
 document.writeln("            dataType: \'json\',");
 document.writeln("            success: function (data) {");
