@@ -138,12 +138,9 @@ function initTag() {
                     connection.send(this.value);
                 }
             });
-        }
-
-        ,
+        },
         error: function (response) {
             console.log(response);
-
         }
     });
 
