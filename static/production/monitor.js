@@ -1,5 +1,5 @@
 var wsInfoUrl = wsServerHost + "/v1/wsmonitor/tag";
-var settingsUrl = serverHost + "/v1/monitor/settings/";
+var settingsUrl = serverHost + "/v1/server-group-config/settings/";
 
 var echartLine;
 function initEchartBar() {

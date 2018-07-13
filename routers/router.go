@@ -20,11 +20,6 @@ func init() {
 	}))
 
 	ns := beego.NewNamespace("/v1",
-		beego.NSNamespace("/monitor",
-			beego.NSInclude(
-				&controllers.MonitorController{},
-			),
-		),
 		beego.NSNamespace("/wsmonitor",
 			beego.NSInclude(
 				&controllers.WsMonitorController{},
@@ -38,6 +33,16 @@ func init() {
 		beego.NSNamespace("/node",
 			beego.NSInclude(
 				&controllers.NodeController{},
+			),
+		),
+		beego.NSNamespace("/program",
+			beego.NSInclude(
+				&controllers.ProgramController{},
+			),
+		),
+		beego.NSNamespace("/server-group-config",
+			beego.NSInclude(
+				&controllers.ServerGroupConfigController{},
 			),
 		),
 	)

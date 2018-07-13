@@ -6,7 +6,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gorilla/websocket"
 	"github.com/sasaxie/monitor/models"
+	"github.com/sasaxie/monitor/service"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -63,6 +65,48 @@ func InitResponseMap() {
 			}
 		}
 	}()
+}
+
+var waitGroup sync.WaitGroup
+var mutex sync.Mutex
+
+func getResult(address string, response *models.Response) {
+	defer waitGroup.Done()
+
+	var wg sync.WaitGroup
+	tableData := new(models.TableData)
+	tableData.Address = address
+
+	mutex.Lock()
+	client := service.GrpcClients[address]
+	mutex.Unlock()
+
+	if client != nil {
+		wg.Add(1)
+		go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
+
+		wg.Add(1)
+		go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
+
+		wg.Add(1)
+		go GetPing(client, &tableData.GRPC, &wg)
+
+		wg.Add(1)
+		go client.TotalTransaction(&tableData.TotalTransaction, &wg)
+
+		wg.Wait()
+	}
+
+	mutex.Lock()
+	response.Data = append(response.Data, tableData)
+	mutex.Unlock()
+}
+
+func GetPing(client *service.GrpcClient, ping *int64,
+	wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	*ping = client.GetPing()
 }
 
 var upgrader = websocket.Upgrader{}

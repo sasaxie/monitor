@@ -1,4 +1,4 @@
-var serverConfigUrl = serverHost + "/v1/monitor/server-config";
+var serverConfigUrl = serverHost + "/v1/server-group-config/";
 
 var editor;
 
