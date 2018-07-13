@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/sasaxie/monitor/models"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -51,18 +50,6 @@ func InitResponseMap() {
 					waitGroup.Wait()
 
 					for _, tableData := range response.Data {
-						tableData.GRPCMonitor = ""
-
-						if pings, ok := TronMonitor.GRPCMonitor.LatestGRPCs[tableData.Address]; ok {
-							for index, ping := range pings {
-								tableData.GRPCMonitor += strconv.Itoa(int(ping))
-
-								if index != len(pings)-1 {
-									tableData.GRPCMonitor += ","
-								}
-							}
-						}
-
 						if tableData.LastSolidityBlockNum == 0 {
 							tableData.Message = "timeout"
 						} else {

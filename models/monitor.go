@@ -23,7 +23,7 @@ type TableData struct {
 	LastSolidityBlockNum int64
 	GRPC                 int64 `json:"gRPC"`
 	Message              string
-	GRPCMonitor          string `json:"gRPCMonitor"`
+	TotalTransaction     int64
 }
 
 // 每新增一个socket连接，计数加一

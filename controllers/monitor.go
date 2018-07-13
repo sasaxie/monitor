@@ -6,7 +6,6 @@ import (
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -41,18 +40,6 @@ func (m *MonitorController) Info() {
 		waitGroup.Wait()
 
 		for _, tableData := range response.Data {
-			tableData.GRPCMonitor = ""
-
-			if pings, ok := TronMonitor.GRPCMonitor.LatestGRPCs[tableData.Address]; ok {
-				for index, ping := range pings {
-					tableData.GRPCMonitor += strconv.Itoa(int(ping))
-
-					if index != len(pings)-1 {
-						tableData.GRPCMonitor += ","
-					}
-				}
-			}
-
 			if tableData.LastSolidityBlockNum == 0 {
 				tableData.Message = "timeout"
 			} else {
@@ -86,6 +73,9 @@ func getResult(address string, response *models.Response) {
 
 		wg.Add(1)
 		go GetPing(client, &tableData.GRPC, &wg)
+
+		wg.Add(1)
+		go client.TotalTransaction(&tableData.TotalTransaction, &wg)
 
 		wg.Wait()
 	}
