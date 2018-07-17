@@ -70,21 +70,27 @@ func (m *MonitorController) Ws() {
 			}
 
 			if models.ServersConfig.IsMonitorByTag(tag) {
-				for k, gRPC := range TronMonitor.GRPCMonitor.GRPC {
-					if gRPC > 0 {
-						if client, ok := service.GrpcClients[k]; ok {
-							witnesses := client.ListWitnesses()
+				for _, address := range addresses {
+					if gRPC, ok := TronMonitor.GRPCMonitor.GRPC[address]; ok {
+						if gRPC > 0 {
+							if client, ok := service.GrpcClients[address]; ok {
+								witnesses := client.ListWitnesses()
 
-							for _, witness := range witnesses.Witnesses {
-								if witness.IsJobs {
-									if totalMissed, ok := TronMonitor.WitnessMonitor.
-										LatestWitnessMissBlock[witness.Url]; ok {
-										response.WitnessMissBlockResponse[witness.Url] = totalMissed
+								if witnesses != nil {
+									if witnesses.Witnesses != nil {
+										for _, witness := range witnesses.Witnesses {
+											if witness.IsJobs {
+												if totalMissed, ok := TronMonitor.WitnessMonitor.
+													LatestWitnessMissBlock[witness.Url]; ok {
+													response.WitnessMissBlockResponse[witness.Url] = totalMissed
+												}
+											}
+										}
+
+										break
 									}
 								}
 							}
-
-							break
 						}
 					}
 				}

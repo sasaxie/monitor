@@ -230,8 +230,6 @@ $(document).ready(function () {
                     });
 
                     idCounts++;
-
-                    console.log("echartBar", echartBar)
                 }
             }
 
