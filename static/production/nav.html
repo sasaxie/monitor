@@ -16,7 +16,7 @@ http://tool.chinaz.com/Tools/Html_Js.aspx
 
     function logout(form) {
         $.ajax({
-            url: serverHost+"/v1/user/info/tag/logout",// 获取自己系统后台用户信息接口
+            url: serverHost+"/v1/user/logout",// 获取自己系统后台用户信息接口
             type: "GET",
             dataType: "json",
             success: function (data) {

@@ -15,7 +15,7 @@ var (
 	passwordValidate = beego.AppConfig.String("password")
 )
 
-// @router /info/tag/:UserName/:Password [get,post]
+// @router /login/:UserName/:Password [get,post]
 func (c *UserInfoController) Login() {
 
 	userName := c.GetString(":UserName", "")
@@ -31,7 +31,7 @@ func (c *UserInfoController) Login() {
 	c.ServeJSON()
 }
 
-// @router /info/tag/logout [get,post]
+// @router /logout [get,post]
 func (c *UserInfoController) Logout() {
 	//获得id
 	//设置返回对象。

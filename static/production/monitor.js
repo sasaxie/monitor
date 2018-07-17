@@ -1,11 +1,12 @@
-var wsInfoUrl = wsServerHost + "/v1/wsmonitor/tag";
-var settingsUrl = serverHost + "/v1/monitor/settings/";
+var monitorUrl = wsServerHost + "/v1/monitor/ws/tag";
+var settingsUrl = serverHost + "/v1/server-group-config/settings/";
 
-var echartLine;
-function initEchartBar() {
-    var echartBar = echarts.init(document.getElementById('eee'));
-    var echartBar2 = echarts.init(document.getElementById('bbb'));
+var connection;
 
+var gRPCMap = new Map();
+var WitnessMissBlockMap = new Map();
+
+function getGRPCOptionBar(k, d) {
     // 指定图表的配置项和数据
     var option = {
         title: {
@@ -16,34 +17,31 @@ function initEchartBar() {
             data: ['gRPC']
         },
         xAxis: {
-            max: "dataMax",
-            data: ["13:00:01", "13:01:01", "13:02:01", "13:03:01", "13:04:01", "13:05:01"]
+            data: k
         },
-        yAxis: {
-            min: "dataMin"
-        },
+        yAxis: {},
         series: [{
             barMinHeight: 1,
             name: 'gRPC',
             type: 'bar',
-            data: [0, 1, 100, 200, 200, 500]
+            data: d
         }],
         dataZoom: [
             {
                 type: "slider",
-                start: 96,
+                start: 0,
                 end: 100,
             },
             {
                 type: "inside",
-                start: 96,
+                start: 0,
                 end: 100,
             }
         ],
         visualMap: {
             pieces: [
-                {min: 300, label: ">299ms"},
-                {min: 100, max: 299, label: ">99ms"},
+                {min: 299, label: ">299ms"},
+                {min: 99, max: 299, label: ">99ms"},
                 {min: 1, max: 99, label: ">0ms"},
                 {max: 0, label: "0"}
             ],
@@ -51,13 +49,11 @@ function initEchartBar() {
         },
     };
 
-    // 使用刚指定的配置项和数据显示图表。
-    echartBar.setOption(option);
-    echartBar2.setOption(option);
+    return option;
+}
 
-    echartLine = echarts.init(document.getElementById('eeee'));
-
-    var option2 = {
+function getWitnessOptionLine(k, d) {
+    var option = {
         title: {
             text: '过去1天的Witness Miss Block监控数据'
         },
@@ -66,61 +62,48 @@ function initEchartBar() {
             data: ['Miss Block']
         },
         xAxis: {
-            data: ["13:00:01", "13:01:01", "13:02:01", "13:03:01", "13:04:01", "13:05:01"]
+            data: k
         },
         yAxis: {},
         series: [{
             name: 'Miss Block',
             type: 'line',
-            data: [0, 0, 1, 3, 4, 8]
+            data: d
         }],
         dataZoom: [
             {
                 type: "slider",
-                start: 96,
+                start: 0,
                 end: 100,
             },
             {
                 type: "inside",
-                start: 96,
+                start: 0,
                 end: 100,
             }
         ],
     };
-
-    echartLine.setOption(option2);
+    return option;
 }
 
-function initEchartLine() {
+function initEChartLine() {
     setTimeout(function () {
-        echartLine.resize();
+        for (var v of WitnessMissBlockMap.values()) {
+            v.resize();
+        }
+
+        for (var v of gRPCMap.values()) {
+            v.resize();
+        }
     }, 500);
 }
 
 // 页面加载后执行
 $(document).ready(function () {
-    initEchartBar();
-
     initTag();
 
-    var table = $('#showdatatable').DataTable({
-        destroy: true,
-        searching: true,
-        fixedHeader: true,
-        pageLength: 100,
-        autoWidth: false,
-        progress: false,
-        data: [],
-        "columns": [
-            {"data": "Address"},
-            {"data": "gRPC"},
-            {"data": "WitnessMissBlock"},
-        ],
-
-    });
-
     if (window.WebSocket != undefined) {
-        connection = new WebSocket(wsInfoUrl);
+        connection = new WebSocket(monitorUrl);
 
         connection.onopen = function (event) {
             console.log("ws on open");
@@ -137,51 +120,132 @@ $(document).ready(function () {
         };
 
         connection.onmessage = function (event) {
-            if (event.data == null || event.data === "") {
-                return "";
+            if (event == null || event.data === "null") {
+                return;
             }
 
-            var resultData = JSON.parse(event.data);
+            var jsonAllObj = JSON.parse(event.data);
+            var jsonGRPC = jsonAllObj.GRPCResponse;
+            var jsonWitnessMissBlock = jsonAllObj.WitnessMissBlockResponse;
 
-            var tableData = [];
-            for (var i = 0; i < resultData.data.length; ++i) {
-                var arr = [];
-                arr[0] = resultData.data[i].Address;
+            var idCounts = 1;
 
-                arr[1] = resultData.data[i].NowBlockNum;
-                arr[2] = "****";
-                if (resultData.data[i].NowBlockHash.length !== 0) {
-                    arr[2] = resultData.data[i].NowBlockHash.substring(0, 4) + "****" + resultData.data[i].NowBlockHash.substring(resultData.data[i].NowBlockHash.length - 4, resultData.data[i].NowBlockHash.length);
+            for (var key in jsonGRPC) {
+                var id = "gRPC" + idCounts;
+
+                var gRPCData = jsonGRPC[key].Data;
+                var gRPCCounts = jsonGRPC[key].Date;
+
+                if (typeof(gRPCMap.get(id)) == "undefined") {
+                    var obj = `
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="x_panel">
+                                <div class="x_title">
+                                    <h2>[` + idCounts + `/` + Object.keys(jsonGRPC).length + `] ` + key + `</h2>
+                                    <div class="clearfix"></div>
+                                </div>
+                                <div class="x_content">
+                                    <div id="` + id + `"
+                                         style="height:260px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+
+                    $("#gRPCContent").append(obj);
+
+                    var option = getGRPCOptionBar(gRPCCounts, gRPCData);
+                    var echartBar = echarts.init(document.getElementById(id));
+                    echartBar.setOption(option);
+
+                    idCounts++;
+
+                    gRPCMap.set(id, echartBar);
+                } else {
+                    var echartBar = gRPCMap.get(id);
+                    echartBar.setOption({
+                        xAxis: {
+                            data: gRPCCounts
+                        },
+                        series: [{
+                            barMinHeight: 1,
+                            name: 'gRPC',
+                            type: 'bar',
+                            data: gRPCData
+                        }],
+                    });
+
+                    idCounts++;
                 }
-
-                var o = {};
-                o.Address = arr[0];
-                o.gRPC = arr[1];
-                o.WitnessMissBlock = arr[2];
-                tableData[i] = o;
             }
 
-            table.rows().remove();
-            table.rows.add(tableData).draw();
+            var idCounts = 1;
 
-            initPing();
+            for (var key in jsonWitnessMissBlock) {
+                var id = "WitnessMissBlock" + idCounts;
+
+                var data = jsonWitnessMissBlock[key].Data;
+                var date = jsonWitnessMissBlock[key].Date;
+
+                if (typeof(WitnessMissBlockMap.get(id)) == "undefined") {
+                    var obj = `
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="x_panel">
+                                <div class="x_title">
+                                    <h2>[` + idCounts + `/` + Object.keys(jsonWitnessMissBlock).length + `] ` + key + `</h2>
+                                    <div class="clearfix"></div>
+                                </div>
+                                <div class="x_content">
+                                    <div id="` + id + `"
+                                         style="height:260px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+
+                    $("#WitnessMissBlockContent").append(obj);
+
+                    var option = getWitnessOptionLine(date, data);
+                    var echartBar = echarts.init(document.getElementById(id));
+                    echartBar.setOption(option);
+
+                    idCounts++;
+
+                    WitnessMissBlockMap.set(id, echartBar);
+                } else {
+                    var echartBar = WitnessMissBlockMap.get(id);
+                    echartBar.setOption({
+                        xAxis: {
+                            data: date
+                        },
+                        series: [{
+                            name: 'Miss Block',
+                            type: 'line',
+                            data: data
+                        }],
+                    });
+
+                    idCounts++;
+
+                    console.log("echartBar", echartBar)
+                }
+            }
+
+            for (var v of gRPCMap.values()) {
+                v.resize();
+            }
+
+            for (var v of WitnessMissBlockMap.values()) {
+                v.resize();
+            }
         }
     }
 
 });
-function initPing() {
-    $('.sparklines_ping').sparkline('html', {
-        type: 'bar',
-        zeroColor: '#ff0000',
-        barColor: '#00bf00',
-        colorMap: {
-            '1:99': '#1CBD20',
-            '100:299': '#48A4DF',
-            '300:': '#F39C12'
-        },
-        //tooltipFormat: $.spformat('{{value}}', 'tooltip-class'),
-    });
-}
 
 function initTag() {
     $.ajax({
@@ -229,15 +293,17 @@ function initTag() {
 
             $('#serverRadios input').on('ifChecked', function () {
                 if (connection != undefined) {
+                    $("#gRPCContent").empty();
+                    $("#WitnessMissBlockContent").empty();
+                    gRPCMap.clear();
+                    WitnessMissBlockMap.clear();
                     connection.send(this.value);
                 }
             });
-        }
+        },
 
-        ,
         error: function (response) {
             console.log(response);
-
         }
     });
 

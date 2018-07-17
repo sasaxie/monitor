@@ -1,6 +1,6 @@
 var wsInfoUrl = wsServerHost + "/v1/wsmonitor/tag";
-var settingsUrl = serverHost + "/v1/monitor/settings/";
-var runTimeUrl = serverHost + "/v1/monitor/program-info/";
+var settingsUrl = serverHost + "/v1/server-group-config/settings/";
+var runTimeUrl = serverHost + "/v1/program/";
 
 // 页面加载后执行
 $(document).ready(function () {
@@ -152,12 +152,9 @@ function initTag() {
                     connection.send(this.value);
                 }
             });
-        }
-
-        ,
+        },
         error: function (response) {
             console.log(response);
-
         }
     });
 
