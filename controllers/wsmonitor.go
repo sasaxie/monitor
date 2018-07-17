@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gorilla/websocket"
@@ -39,6 +40,7 @@ func InitResponseMap() {
 					response := new(models.Response)
 
 					response.Data = make([]*models.TableData, 0)
+					response.Total = new(models.TotalData)
 
 					addresses := models.ServersConfig.GetAddressStringByTag(tag)
 
@@ -48,15 +50,47 @@ func InitResponseMap() {
 					}
 
 					waitGroup.Wait()
-
+					response.Total.TotalServerErrorNum = 0
+					response.Total.TotalServerSuccessNum = 0
 					for _, tableData := range response.Data {
+
 						if tableData.LastSolidityBlockNum == 0 {
 							tableData.Message = "timeout"
+							response.Total.TotalServerErrorNum++
 						} else {
 							tableData.Message = "success"
+							response.Total.TotalServerSuccessNum++
+
+						}
+					}
+					var totalBlockNum int64 = 0
+					var totalBlockHash string = "0"
+					var totalLastSolidityBlockNum int64 = 0
+					var totalTransaction int64 = 0
+					for i, _ := range response.Data {
+						if response.Data[i].NowBlockNum > totalBlockNum {
+							totalBlockNum = response.Data[i].NowBlockNum
+							totalBlockHash = response.Data[i].NowBlockHash
 						}
 					}
 
+					for i, _ := range response.Data {
+						if response.Data[i].LastSolidityBlockNum > totalLastSolidityBlockNum {
+							totalLastSolidityBlockNum = response.Data[i].LastSolidityBlockNum
+						}
+					}
+					for i, _ := range response.Data {
+						if response.Data[i].TotalTransaction > totalTransaction {
+							totalTransaction = response.Data[i].TotalTransaction
+						}
+					}
+					response.Total.TotalBlockNum = totalBlockNum
+					response.Total.TotalBlockHash = totalBlockHash
+					response.Total.TotalSolidityBlockNum = totalLastSolidityBlockNum
+					response.Total.TotalMaxTransaction = totalTransaction
+
+					response.Total.TotalServerNum = len(addresses)
+					fmt.Println(response.Total.TotalServerNum)
 					responses.Response = response
 					responseMap[tag] = responses
 				}
