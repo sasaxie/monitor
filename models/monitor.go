@@ -13,7 +13,8 @@ type Responses struct {
 }
 
 type Response struct {
-	Data []*TableData `json:"data"`
+	Data  []*TableData `json:"data"`
+	Total *TotalData   `json:"total"`
 }
 
 type TableData struct {
@@ -24,6 +25,16 @@ type TableData struct {
 	GRPC                 int64 `json:"gRPC"`
 	Message              string
 	TotalTransaction     int64
+}
+
+type TotalData struct {
+	TotalServerNum        int
+	TotalServerSuccessNum int
+	TotalServerErrorNum   int
+	TotalBlockNum         int64
+	TotalBlockHash        string
+	TotalSolidityBlockNum int64
+	TotalMaxTransaction   int64
 }
 
 // 每新增一个socket连接，计数加一

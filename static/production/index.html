@@ -119,11 +119,11 @@
                                 <div class="tile-stats">
                                     <div class="icon"><i class="fa
                                     fa-tasks"></i></div>
-                                    <div class="count green">179</div>
+                                    <div class="count green" id="serverCounts">179</div>
                                     <h3>服务器数量</h3>
                                     <p><span
-                                            class="green">178 </span>活跃 / <span
-                                            class="red"
+                                            class="green" id="serverSuccessCounts">178 </span>活跃 / <span
+                                            class="red" id="serverErrorCounts"
                                     >1 </span>超时</p>
                                 </div>
                             </div>
@@ -132,16 +132,16 @@
                                 <div class="tile-stats">
                                     <div class="icon"><i class="fa
                                     fa-minus-square-o"></i></div>
-                                    <div class="count green">179</div>
+                                    <div class="count green" id="totalBlockNum">179</div>
                                     <h3>当前块</h3>
-                                    <p>哈希：0000000000077cc700077cc7c7c7...</p>
+                                    <p id="totalBlockHash">哈希：0000000000077cc700077cc7c7c7...</p>
                                 </div>
                             </div>
 
                             <div class="animated flipInY col-lg-3 col-md-3 col-sm-6 col-xs-12">
                                 <div class="tile-stats">
                                     <div class="icon"><i class="fa fa-minus-square"></i></div>
-                                    <div class="count green">179</div>
+                                    <div class="count green" id="totalSolidityBlockNum">179</div>
                                     <h3>最新固化块</h3>
                                     <p>&nbsp;</p>
                                 </div>
@@ -151,7 +151,7 @@
                                 <div class="tile-stats">
                                     <div class="icon"><i class="fa
                                     fa-bar-chart"></i></div>
-                                    <div class="count green">179</div>
+                                    <div class="count green" id="totalMaxTransaction">179</div>
                                     <h3>交易总数</h3>
                                     <p>&nbsp;</p>
                                 </div>
