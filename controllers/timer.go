@@ -36,16 +36,34 @@ func (m *Monitor) Start() {
 
 	m.GRPCMonitor.Start(m.MonitorAddresses)
 
-	activeAddress := ""
-	for k, gRPC := range m.GRPCMonitor.GRPC {
-		if gRPC > 0 {
-			activeAddress = k
+	addresses := m.getWitnessActiveNodes()
+
+	for _, address := range addresses {
+		m.WitnessMonitor.Start(address)
+
+	}
+}
+
+func (m *Monitor) getWitnessActiveNodes() []string {
+
+	settings := models.ServersConfig.GetSettings()
+
+	addresses := make([]string, 0)
+	for _, setting := range settings {
+		if strings.EqualFold(setting.IsOpenMonitor, "true") {
+			ads := models.ServersConfig.GetAddressStringByTag(setting.Tag)
+			for _, ad := range ads {
+				if gRPC, ok := m.GRPCMonitor.GRPC[ad]; ok {
+					if gRPC > 0 {
+						addresses = append(addresses, ad)
+						break
+					}
+				}
+			}
 		}
 	}
 
-	if !strings.EqualFold(activeAddress, "") {
-		m.WitnessMonitor.Start(activeAddress)
-	}
+	return addresses
 }
 
 func (m *Monitor) GetMonitorAddresses() {
