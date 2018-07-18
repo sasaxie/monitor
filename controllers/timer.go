@@ -71,7 +71,7 @@ func (m *Monitor) GetMonitorAddresses() {
 }
 
 type GRPCMonitor struct {
-	LatestGRPCs          map[string]*GRPCs             //最近1440次GRPC值
+	LatestGRPCs          map[string]*GRPCs             //最近300次GRPC值
 	GRPCMonitorStatusMap map[string]*GRPCMonitorStatus //GRPC监控的数据，用来判断是否需要报警，是否需要提醒恢复
 	AlarmMessage         GRPCMonitorMessage            //报警消息
 	RecoverMessage       GRPCMonitorMessage            //恢复消息
@@ -186,9 +186,9 @@ func (g *GRPCMonitor) UpdateLatestGRPCs() {
 			gRPCs.Date = append(gRPCs.Date,
 				time.Now().Format("2006-01-02 15:04:05"))
 
-			if len(gRPCs.Data) > 1440 {
-				gRPCs.Data = gRPCs.Data[len(gRPCs.Data)-1440:]
-				gRPCs.Date = gRPCs.Date[len(gRPCs.Date)-1440:]
+			if len(gRPCs.Data) > 300 {
+				gRPCs.Data = gRPCs.Data[len(gRPCs.Data)-300:]
+				gRPCs.Date = gRPCs.Date[len(gRPCs.Date)-300:]
 			}
 
 			g.LatestGRPCs[address] = gRPCs
@@ -276,9 +276,9 @@ func (w *WitnessMonitor) UpdateLatestWitnessMissBlock(
 		latestWitnessMissBlock.Date = append(latestWitnessMissBlock.Date,
 			time.Now().Format("2006-01-02 15:04:05"))
 
-		if len(latestWitnessMissBlock.Data) > 1440 {
-			latestWitnessMissBlock.Data = latestWitnessMissBlock.Data[len(latestWitnessMissBlock.Data)-1440:]
-			latestWitnessMissBlock.Date = latestWitnessMissBlock.Date[len(latestWitnessMissBlock.Date)-1440:]
+		if len(latestWitnessMissBlock.Data) > 300 {
+			latestWitnessMissBlock.Data = latestWitnessMissBlock.Data[len(latestWitnessMissBlock.Data)-300:]
+			latestWitnessMissBlock.Date = latestWitnessMissBlock.Date[len(latestWitnessMissBlock.Date)-300:]
 		}
 
 		w.LatestWitnessMissBlock[key] = latestWitnessMissBlock

@@ -10,7 +10,7 @@ function getGRPCOptionBar(k, d) {
     // 指定图表的配置项和数据
     var option = {
         title: {
-            text: '过去1天的gRPC监控数据'
+            text: '过去5小时的gRPC监控数据'
         },
         tooltip: {},
         legend: {
@@ -29,12 +29,12 @@ function getGRPCOptionBar(k, d) {
         dataZoom: [
             {
                 type: "slider",
-                start: 0,
+                start: 80,
                 end: 100,
             },
             {
                 type: "inside",
-                start: 0,
+                start: 80,
                 end: 100,
             }
         ],
@@ -55,7 +55,7 @@ function getGRPCOptionBar(k, d) {
 function getWitnessOptionLine(k, d) {
     var option = {
         title: {
-            text: '过去1天的Witness Miss Block监控数据'
+            text: '过去5小时的Witness Miss Block监控数据'
         },
         tooltip: {},
         legend: {
@@ -73,12 +73,12 @@ function getWitnessOptionLine(k, d) {
         dataZoom: [
             {
                 type: "slider",
-                start: 0,
+                start: 80,
                 end: 100,
             },
             {
                 type: "inside",
-                start: 0,
+                start: 80,
                 end: 100,
             }
         ],
