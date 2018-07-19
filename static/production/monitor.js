@@ -267,23 +267,38 @@ function initTag() {
                     &nbsp;` +
                     response[i].tag + `
                 </label>
-                </div>
             `;
 
-                // if (response[i].isOpenMonitor === "true") {
-                //     radioStr += `
-                // <small class="fa fa-bell green">已开启钉钉报警</small>
-                // `
-                // } else {
-                //     radioStr += `
-                // <small class="fa fa-bell">未开启钉钉报警</small>
-                // `
-                // }
+                if (response[i].isOpenMonitor === "true") {
+                    radioStr += `
+                <small class="fa fa-bell green"
+                        data-toggle="tooltip" 
+                        data-placement="top"
+                        title="每分钟检测一次，连续3次超时（>5000ms）并且上一次报警时间1小时以内会钉钉报警，恢复后会钉钉提醒；每分钟检测一次，Miss Block比上一次值大就会钉钉报警，直到不会继续增大">
+                                   已开启钉钉报警
+                </small>
+                `
+                } else {
+                    radioStr += `
+                <small class="fa fa-bell"
+                        data-toggle="tooltip" 
+                        data-placement="top"
+                        title="每分钟检测一次，连续3次超时（>5000ms）并且上一次报警时间1小时以内会钉钉报警，恢复后会钉钉提醒；每分钟检测一次，Miss Block比上一次值大就会钉钉报警，直到不会继续增大">
+                        未开启钉钉报警
+                </small>
+                `
+                }
+
+                radioStr += `
+                    </div>
+                `;
 
                 $("#serverRadios").append(radioStr);
             }
 
             $(":radio[name='serverTags']:first").attr("checked", "true");
+
+            $("[data-toggle='tooltip']").tooltip();
 
             $('#serverRadios').iCheck({
                 radioClass: 'iradio_flat-green'
