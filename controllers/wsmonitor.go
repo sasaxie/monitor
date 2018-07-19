@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gorilla/websocket"
@@ -92,7 +91,6 @@ func InitResponseMap() {
 					response.Total.TotalMaxTransaction = totalTransaction
 
 					response.Total.TotalServerNum = len(addresses)
-					fmt.Println(response.Total.TotalServerNum)
 					responses.Response = response
 					responseMap[tag] = responses
 				}
