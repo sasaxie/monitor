@@ -53,5 +53,5 @@ func (r *Responses) Reduce() {
 
 // 当计数为零时，不需要运行
 func (r *Responses) Runnable() bool {
-	return r.Count != 0
+	return true
 }
