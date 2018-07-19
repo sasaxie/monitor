@@ -57,6 +57,7 @@ document.writeln("                    fa-chevron-down\'></span></a>");
 document.writeln("                        <ul class=\'nav child_menu\'>");
 document.writeln("                            <li><a href=\'index.html\'>分析页</a></li>");
 document.writeln("                            <li><a href=\'monitor.html\'>监控页</a></li>");
+document.writeln("                            <li><a href=\'nodes.html\'>节点数量</a></li>");
 document.writeln("                        </ul>");
 document.writeln("                    </li>");
 document.writeln("                    <li><a><i class=\'fa fa-edit\'></i> 配置 <span");

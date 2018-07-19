@@ -7,6 +7,7 @@ import (
 	"github.com/sasaxie/monitor/service"
 	"strings"
 	"sync"
+	"time"
 )
 
 type NodeController struct {
@@ -18,6 +19,47 @@ type NodesTaskPool map[string]bool
 type NodesResult map[string]bool
 
 var m sync.Mutex
+var nodesMap = make(map[string][]string)
+
+func GetNodesTask() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				tags := models.ServersConfig.GetTags()
+
+				for _, tag := range tags {
+					nodesTaskPool := make(NodesTaskPool)
+					nodesResult := make(NodesResult)
+
+					addresses := models.ServersConfig.GetAddressStringByTag(tag)
+
+					for _, address := range addresses {
+						if _, ok := nodesTaskPool[address]; !ok {
+							nodesTaskPool[address] = false
+						}
+					}
+
+					getAllNodes(nodesTaskPool, nodesResult)
+
+					res := make([]string, 0)
+					for k := range nodesResult {
+						res = append(res, strings.Split(k, ":")[0])
+					}
+
+					m.Lock()
+					nodesMap[tag] = res
+					m.Unlock()
+				}
+
+				time.Sleep(10 * time.Minute)
+			}
+		}
+	}()
+}
 
 // @Title Get all nodes
 // @Description get all nodes
@@ -25,27 +67,16 @@ var m sync.Mutex
 func (n *NodeController) Nodes() {
 	tag := n.GetString(":tag")
 
-	nodesTaskPool := make(NodesTaskPool)
-	nodesResult := make(NodesResult)
-
 	if tag == "" && len(tag) == 0 {
 		n.Data["json"] = "not found tag"
 	} else {
-		addresses := models.ServersConfig.GetAddressStringByTag(tag)
-
-		for _, address := range addresses {
-			if _, ok := nodesTaskPool[address]; !ok {
-				nodesTaskPool[address] = false
-			}
+		m.Lock()
+		if res, ok := nodesMap[tag]; ok {
+			n.Data["json"] = res
+		} else {
+			n.Data["json"] = "not data found, please try again..."
 		}
-
-		getAllNodes(nodesTaskPool, nodesResult)
-
-		res := make([]string, 0)
-		for k := range nodesResult {
-			res = append(res, strings.Split(k, ":")[0])
-		}
-		n.Data["json"] = res
+		m.Unlock()
 	}
 
 	n.ServeJSON()
