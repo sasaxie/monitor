@@ -114,16 +114,14 @@ func getResult(address string, response *models.Response) {
 	mutex.Unlock()
 
 	if client != nil {
-		wg.Add(1)
+		wg.Add(4)
+
 		go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
 
-		wg.Add(1)
 		go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
-		wg.Add(1)
 		go GetPing(client, &tableData.GRPC, &wg)
 
-		wg.Add(1)
 		go client.TotalTransaction(&tableData.TotalTransaction, &wg)
 
 		wg.Wait()
@@ -228,7 +226,7 @@ func (w *WsMonitorController) Ws() {
 
 			msgChan <- b
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}(msgChan)
 
