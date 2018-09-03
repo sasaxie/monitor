@@ -41,6 +41,7 @@ func InitResponseMap() {
 					response := new(models.Response)
 
 					response.Data = make([]*models.TableData, 0)
+					response.Total = new(models.TotalData)
 
 					addresses := models.ServersConfig.GetAddressStringByTag(tag)
 
@@ -50,15 +51,46 @@ func InitResponseMap() {
 					}
 
 					waitGroup.Wait()
-
+					response.Total.TotalServerErrorNum = 0
+					response.Total.TotalServerSuccessNum = 0
 					for _, tableData := range response.Data {
+
 						if tableData.LastSolidityBlockNum == 0 {
 							tableData.Message = "timeout"
+							response.Total.TotalServerErrorNum++
 						} else {
 							tableData.Message = "success"
+							response.Total.TotalServerSuccessNum++
+
+						}
+					}
+					var totalBlockNum int64 = 0
+					var totalBlockHash string = "0"
+					var totalLastSolidityBlockNum int64 = 0
+					var totalTransaction int64 = 0
+					for i, _ := range response.Data {
+						if response.Data[i].NowBlockNum > totalBlockNum {
+							totalBlockNum = response.Data[i].NowBlockNum
+							totalBlockHash = response.Data[i].NowBlockHash
 						}
 					}
 
+					for i, _ := range response.Data {
+						if response.Data[i].LastSolidityBlockNum > totalLastSolidityBlockNum {
+							totalLastSolidityBlockNum = response.Data[i].LastSolidityBlockNum
+						}
+					}
+					for i, _ := range response.Data {
+						if response.Data[i].TotalTransaction > totalTransaction {
+							totalTransaction = response.Data[i].TotalTransaction
+						}
+					}
+					response.Total.TotalBlockNum = totalBlockNum
+					response.Total.TotalBlockHash = totalBlockHash
+					response.Total.TotalSolidityBlockNum = totalLastSolidityBlockNum
+					response.Total.TotalMaxTransaction = totalTransaction
+
+					response.Total.TotalServerNum = len(addresses)
 					responses.Response = response
 					responseMap[tag] = responses
 				}
@@ -82,16 +114,14 @@ func getResult(address string, response *models.Response) {
 	mutex.Unlock()
 
 	if client != nil {
-		wg.Add(1)
+		wg.Add(4)
+
 		go client.GetNowBlock(&tableData.NowBlockNum, &tableData.NowBlockHash, &wg)
 
-		wg.Add(1)
 		go client.GetLastSolidityBlockNum(&tableData.LastSolidityBlockNum, &wg)
 
-		wg.Add(1)
 		go GetPing(client, &tableData.GRPC, &wg)
 
-		wg.Add(1)
 		go client.TotalTransaction(&tableData.TotalTransaction, &wg)
 
 		wg.Wait()
@@ -196,7 +226,7 @@ func (w *WsMonitorController) Ws() {
 
 			msgChan <- b
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}(msgChan)
 

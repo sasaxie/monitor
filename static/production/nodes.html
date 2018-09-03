@@ -20,8 +20,6 @@
     <link href="../vendors/nprogress/nprogress.css" rel="stylesheet">
     <!-- iCheck -->
     <link href="../vendors/iCheck/skins/flat/green.css" rel="stylesheet">
-    <!-- Switchery -->
-    <link href="../vendors/switchery/dist/switchery.min.css" rel="stylesheet">
 
     <!-- bootstrap-progressbar -->
     <link href="../vendors/bootstrap-progressbar/css/bootstrap-progressbar-3.3.4.min.css"
@@ -86,34 +84,42 @@
             </div>
             <!--/服务器分组标签-->
 
-            <div class="x_panel">
-                <div class="" role="tabpanel" data-example-id="togglable-tabs">
-                    <ul id="myTab" class="nav nav-tabs bar_tabs" role="tablist">
-                        <li role="presentation" class="active"><a
-                                href="#gRPCContent" id="home-tab" role="tab"
-                                data-toggle="tab"
-                                aria-expanded="true" onclick="initEChartLine()">gRPC超时监控</a>
-                        </li>
-                        <li role="presentation" class="" onclick="initEChartLine()"><a
-                                href="#WitnessMissBlockContent" role="tab"
-                                id="profile-tab" data-toggle="tab"
-                                aria-expanded="false">Witness Miss Block监控</a>
-                        </li>
-                    </ul>
-
-                    <div id="myTabContent" class="tab-content">
-                        <div role="tabpanel" class="tab-pane fade active in"
-                             id="gRPCContent" aria-labelledby="home-tab">
-
+            <!--总览数据-->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="x_panel">
+                        <div class="x_title">
+                            <h2>总览数据</h2>
+                            <div class="clearfix"></div>
                         </div>
-
-                        <div role="tabpanel" class="tab-pane fade"
-                             id="WitnessMissBlockContent"
-                             aria-labelledby="profile-tab">
-
+                        <div class="x_content">
+                            <div class="animated flipInY col-lg-3 col-md-3 col-sm-6 col-xs-12">
+                                <div class="tile-stats">
+                                    <div class="icon"><i class="fa
+                                    fa-tasks"></i></div>
+                                    <div class="count green"
+                                         id="nodesCount">179</div>
+                                    <h3>节点数量</h3>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+            <!--/总览数据-->
+
+            <div class="x_panel">
+                <table id="nodesTable"
+                       class="table table-striped table-bordered">
+                    <thead>
+                    <tr>
+                        <td>Address</td>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    </tbody>
+                </table>
             </div>
         </div>
         <!-- /page content -->
@@ -203,16 +209,12 @@
 <script src="../vendors/jquery-sparkline/dist/jquery.sparkline.min.js"></script>
 
 <script src="js/global_paramter.js"></script>
-<script src="monitor.js"></script>
+<script src="nodes.js"></script>
 
 <!-- PNotify -->
 <script src="../vendors/pnotify/dist/pnotify.js"></script>
 <script src="../vendors/pnotify/dist/pnotify.buttons.js"></script>
 <script src="../vendors/pnotify/dist/pnotify.nonblock.js"></script>
-
-<!-- ECharts -->
-<script src="../vendors/echarts/dist/echarts.min.js"></script>
-<script src="../vendors/echarts/map/js/world.js"></script>
 </body>
 
 

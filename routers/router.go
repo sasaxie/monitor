@@ -45,6 +45,11 @@ func init() {
 				&controllers.ServerGroupConfigController{},
 			),
 		),
+		beego.NSNamespace("/monitor",
+			beego.NSInclude(
+				&controllers.MonitorController{},
+			),
+		),
 	)
 	beego.AddNamespace(ns)
 }

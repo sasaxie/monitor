@@ -8,6 +8,14 @@ import (
 )
 
 func GetBlockHash(block core.Block) []byte {
+	if block.BlockHeader == nil {
+		return []byte{}
+	}
+
+	if block.BlockHeader.RawData == nil {
+		return []byte{}
+	}
+
 	rawData := block.BlockHeader.RawData
 
 	rawDataBytes, err := proto.Marshal(rawData)

@@ -162,3 +162,13 @@ func (s *Servers) GetAllMonitorAddresses() []string {
 
 	return res
 }
+
+func (s *Servers) IsMonitorByTag(tag string) bool {
+	for _, server := range s.Servers {
+		if strings.EqualFold(tag, server.Setting.Tag) {
+			return strings.EqualFold(server.Setting.IsOpenMonitor, "true")
+		}
+	}
+
+	return false
+}

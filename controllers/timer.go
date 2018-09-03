@@ -36,16 +36,34 @@ func (m *Monitor) Start() {
 
 	m.GRPCMonitor.Start(m.MonitorAddresses)
 
-	activeAddress := ""
-	for k, gRPC := range m.GRPCMonitor.GRPC {
-		if gRPC > 0 {
-			activeAddress = k
+	addresses := m.getWitnessActiveNodes()
+
+	for _, address := range addresses {
+		m.WitnessMonitor.Start(address)
+
+	}
+}
+
+func (m *Monitor) getWitnessActiveNodes() []string {
+
+	settings := models.ServersConfig.GetSettings()
+
+	addresses := make([]string, 0)
+	for _, setting := range settings {
+		if strings.EqualFold(setting.IsOpenMonitor, "true") {
+			ads := models.ServersConfig.GetAddressStringByTag(setting.Tag)
+			for _, ad := range ads {
+				if gRPC, ok := m.GRPCMonitor.GRPC[ad]; ok {
+					if gRPC > 0 {
+						addresses = append(addresses, ad)
+						break
+					}
+				}
+			}
 		}
 	}
 
-	if !strings.EqualFold(activeAddress, "") {
-		m.WitnessMonitor.Start(activeAddress)
-	}
+	return addresses
 }
 
 func (m *Monitor) GetMonitorAddresses() {
@@ -53,12 +71,17 @@ func (m *Monitor) GetMonitorAddresses() {
 }
 
 type GRPCMonitor struct {
-	LatestGRPCs          map[string][]int64            //最近30次GRPC值
+	LatestGRPCs          map[string]*GRPCs             //最近300次GRPC值
 	GRPCMonitorStatusMap map[string]*GRPCMonitorStatus //GRPC监控的数据，用来判断是否需要报警，是否需要提醒恢复
 	AlarmMessage         GRPCMonitorMessage            //报警消息
 	RecoverMessage       GRPCMonitorMessage            //恢复消息
 	GRPC                 map[string]int64              //此次GRPC值
 	Mutex                sync.Mutex                    //锁
+}
+
+type GRPCs struct {
+	Data []int64
+	Date []string
 }
 
 type GRPCMonitorStatus struct {
@@ -153,21 +176,29 @@ func (g *GRPCMonitor) UpdateRecoverMessage() {
 
 func (g *GRPCMonitor) UpdateLatestGRPCs() {
 	if g.LatestGRPCs == nil {
-		g.LatestGRPCs = make(map[string][]int64)
+		g.LatestGRPCs = make(map[string]*GRPCs)
 	}
 
 	for address, ping := range g.GRPC {
 		if gRPCs, ok := g.LatestGRPCs[address]; ok {
-			gRPCs = append(gRPCs, ping)
+			gRPCs.Data = append(gRPCs.Data, ping)
 
-			if len(gRPCs) > 30 {
-				gRPCs = gRPCs[len(gRPCs)-30:]
+			gRPCs.Date = append(gRPCs.Date,
+				time.Now().Format("2006-01-02 15:04:05"))
+
+			if len(gRPCs.Data) > 300 {
+				gRPCs.Data = gRPCs.Data[len(gRPCs.Data)-300:]
+				gRPCs.Date = gRPCs.Date[len(gRPCs.Date)-300:]
 			}
 
 			g.LatestGRPCs[address] = gRPCs
 		} else {
-			newGRPCs := make([]int64, 0)
-			newGRPCs = append(newGRPCs, ping)
+			newGRPCs := new(GRPCs)
+			newGRPCs.Data = make([]int64, 0)
+			newGRPCs.Date = make([]string, 0)
+			newGRPCs.Data = append(newGRPCs.Data, ping)
+			newGRPCs.Date = append(newGRPCs.Date,
+				time.Now().Format("2006-01-02 15:04:05"))
 			g.LatestGRPCs[address] = newGRPCs
 		}
 	}
@@ -224,6 +255,42 @@ func (p GRPCMonitorMessage) String() string {
 
 type WitnessMonitor struct {
 	WitnessMonitorStatusMap map[string]int64 //TotalMissed
+	LatestWitnessMissBlock  map[string]*WitnessMissBlock
+}
+
+type WitnessMissBlock struct {
+	Data []int64
+	Date []string
+}
+
+func (w *WitnessMonitor) UpdateLatestWitnessMissBlock(
+	key string, totalMissed int64) {
+
+	if w.LatestWitnessMissBlock == nil {
+		w.LatestWitnessMissBlock = make(map[string]*WitnessMissBlock)
+	}
+
+	if latestWitnessMissBlock, ok := w.LatestWitnessMissBlock[key]; ok {
+		latestWitnessMissBlock.Data = append(latestWitnessMissBlock.Data, totalMissed)
+
+		latestWitnessMissBlock.Date = append(latestWitnessMissBlock.Date,
+			time.Now().Format("2006-01-02 15:04:05"))
+
+		if len(latestWitnessMissBlock.Data) > 300 {
+			latestWitnessMissBlock.Data = latestWitnessMissBlock.Data[len(latestWitnessMissBlock.Data)-300:]
+			latestWitnessMissBlock.Date = latestWitnessMissBlock.Date[len(latestWitnessMissBlock.Date)-300:]
+		}
+
+		w.LatestWitnessMissBlock[key] = latestWitnessMissBlock
+	} else {
+		newLatestWitnessMissBlock := new(WitnessMissBlock)
+		newLatestWitnessMissBlock.Data = make([]int64, 0)
+		newLatestWitnessMissBlock.Date = make([]string, 0)
+		newLatestWitnessMissBlock.Data = append(newLatestWitnessMissBlock.Data, totalMissed)
+		newLatestWitnessMissBlock.Date = append(newLatestWitnessMissBlock.Date,
+			time.Now().Format("2006-01-02 15:04:05"))
+		w.LatestWitnessMissBlock[key] = newLatestWitnessMissBlock
+	}
 }
 
 func (w *WitnessMonitor) Start(activeAddress string) {
@@ -251,6 +318,8 @@ func (w *WitnessMonitor) Start(activeAddress string) {
 				} else {
 					w.WitnessMonitorStatusMap[key] = witness.TotalMissed
 				}
+
+				w.UpdateLatestWitnessMissBlock(witness.Url, witness.TotalMissed)
 			}
 		}
 	}

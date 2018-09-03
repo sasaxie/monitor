@@ -94,6 +94,20 @@ $(document).ready(function () {
             table.rows().remove();
             table.rows.add(resultData.data).draw();
 
+            if(event.data==null || event.data===""){
+                            return ""
+                        }
+                        var totalData = JSON.parse(event.data);
+                        $("#serverCounts").text(totalData.total.TotalServerNum);
+                        $("#serverSuccessCounts").text(totalData.total.TotalServerSuccessNum);
+                        $("#serverErrorCounts").text(totalData.total.TotalServerErrorNum);
+                        $("#totalBlockNum").text(totalData.total.TotalBlockNum);
+                        $("#totalBlockHash").text(totalData.total.TotalBlockHash.substr(0, 35)+"...");
+                        $("#totalSolidityBlockNum").text(totalData.total.TotalSolidityBlockNum);
+                        $("#totalMaxTransaction").text(totalData.total.TotalMaxTransaction);
+
+
+
         }
     }
 

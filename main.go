@@ -20,5 +20,7 @@ func main() {
 
 	controllers.StartMonitor()
 
+	controllers.GetNodesTask()
+
 	beego.Run()
 }

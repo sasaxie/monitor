@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const GrpcTimeout = 5 * time.Second
+const GrpcTimeout = 30 * time.Second
 
 var GrpcClients map[string]*GrpcClient
 
