@@ -26,8 +26,8 @@ bee run
 
 总览信息：
 
-[1.png](images/1.png)
+![1.png](images/1.png)
 
 监控状态：
 
-[2.png](images/2.png)
+![2.png](images/2.png)
