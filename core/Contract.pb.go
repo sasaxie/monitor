@@ -18,6 +18,29 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+type ResourceCode int32
+
+const (
+	ResourceCode_BANDWIDTH ResourceCode = 0
+	ResourceCode_ENERGY    ResourceCode = 1
+)
+
+var ResourceCode_name = map[int32]string{
+	0: "BANDWIDTH",
+	1: "ENERGY",
+}
+var ResourceCode_value = map[string]int32{
+	"BANDWIDTH": 0,
+	"ENERGY":    1,
+}
+
+func (x ResourceCode) String() string {
+	return proto.EnumName(ResourceCode_name, int32(x))
+}
+func (ResourceCode) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{0}
+}
+
 type AccountCreateContract struct {
 	OwnerAddress         []byte      `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
 	AccountAddress       []byte      `protobuf:"bytes,2,opt,name=account_address,json=accountAddress,proto3" json:"account_address,omitempty"`
@@ -31,7 +54,7 @@ func (m *AccountCreateContract) Reset()         { *m = AccountCreateContract{} }
 func (m *AccountCreateContract) String() string { return proto.CompactTextString(m) }
 func (*AccountCreateContract) ProtoMessage()    {}
 func (*AccountCreateContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{0}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{0}
 }
 func (m *AccountCreateContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AccountCreateContract.Unmarshal(m, b)
@@ -72,7 +95,7 @@ func (m *AccountCreateContract) GetType() AccountType {
 	return AccountType_Normal
 }
 
-// update account name if the account has no name.
+// Update account name. Account name is not unique now.
 type AccountUpdateContract struct {
 	AccountName          []byte   `protobuf:"bytes,1,opt,name=account_name,json=accountName,proto3" json:"account_name,omitempty"`
 	OwnerAddress         []byte   `protobuf:"bytes,2,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
@@ -85,7 +108,7 @@ func (m *AccountUpdateContract) Reset()         { *m = AccountUpdateContract{} }
 func (m *AccountUpdateContract) String() string { return proto.CompactTextString(m) }
 func (*AccountUpdateContract) ProtoMessage()    {}
 func (*AccountUpdateContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{1}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{1}
 }
 func (m *AccountUpdateContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AccountUpdateContract.Unmarshal(m, b)
@@ -119,6 +142,53 @@ func (m *AccountUpdateContract) GetOwnerAddress() []byte {
 	return nil
 }
 
+// Set account id if the account has no id. Account id is unique and case insensitive.
+type SetAccountIdContract struct {
+	AccountId            []byte   `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	OwnerAddress         []byte   `protobuf:"bytes,2,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SetAccountIdContract) Reset()         { *m = SetAccountIdContract{} }
+func (m *SetAccountIdContract) String() string { return proto.CompactTextString(m) }
+func (*SetAccountIdContract) ProtoMessage()    {}
+func (*SetAccountIdContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{2}
+}
+func (m *SetAccountIdContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SetAccountIdContract.Unmarshal(m, b)
+}
+func (m *SetAccountIdContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SetAccountIdContract.Marshal(b, m, deterministic)
+}
+func (dst *SetAccountIdContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetAccountIdContract.Merge(dst, src)
+}
+func (m *SetAccountIdContract) XXX_Size() int {
+	return xxx_messageInfo_SetAccountIdContract.Size(m)
+}
+func (m *SetAccountIdContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_SetAccountIdContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SetAccountIdContract proto.InternalMessageInfo
+
+func (m *SetAccountIdContract) GetAccountId() []byte {
+	if m != nil {
+		return m.AccountId
+	}
+	return nil
+}
+
+func (m *SetAccountIdContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
 type TransferContract struct {
 	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
 	ToAddress            []byte   `protobuf:"bytes,2,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"`
@@ -132,7 +202,7 @@ func (m *TransferContract) Reset()         { *m = TransferContract{} }
 func (m *TransferContract) String() string { return proto.CompactTextString(m) }
 func (*TransferContract) ProtoMessage()    {}
 func (*TransferContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{2}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{3}
 }
 func (m *TransferContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TransferContract.Unmarshal(m, b)
@@ -187,7 +257,7 @@ func (m *TransferAssetContract) Reset()         { *m = TransferAssetContract{} }
 func (m *TransferAssetContract) String() string { return proto.CompactTextString(m) }
 func (*TransferAssetContract) ProtoMessage()    {}
 func (*TransferAssetContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{3}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{4}
 }
 func (m *TransferAssetContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TransferAssetContract.Unmarshal(m, b)
@@ -249,7 +319,7 @@ func (m *VoteAssetContract) Reset()         { *m = VoteAssetContract{} }
 func (m *VoteAssetContract) String() string { return proto.CompactTextString(m) }
 func (*VoteAssetContract) ProtoMessage()    {}
 func (*VoteAssetContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{4}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{5}
 }
 func (m *VoteAssetContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_VoteAssetContract.Unmarshal(m, b)
@@ -310,7 +380,7 @@ func (m *VoteWitnessContract) Reset()         { *m = VoteWitnessContract{} }
 func (m *VoteWitnessContract) String() string { return proto.CompactTextString(m) }
 func (*VoteWitnessContract) ProtoMessage()    {}
 func (*VoteWitnessContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{5}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{6}
 }
 func (m *VoteWitnessContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_VoteWitnessContract.Unmarshal(m, b)
@@ -363,7 +433,7 @@ func (m *VoteWitnessContract_Vote) Reset()         { *m = VoteWitnessContract_Vo
 func (m *VoteWitnessContract_Vote) String() string { return proto.CompactTextString(m) }
 func (*VoteWitnessContract_Vote) ProtoMessage()    {}
 func (*VoteWitnessContract_Vote) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{5, 0}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{6, 0}
 }
 func (m *VoteWitnessContract_Vote) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_VoteWitnessContract_Vote.Unmarshal(m, b)
@@ -397,6 +467,60 @@ func (m *VoteWitnessContract_Vote) GetVoteCount() int64 {
 	return 0
 }
 
+type UpdateSettingContract struct {
+	OwnerAddress               []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ContractAddress            []byte   `protobuf:"bytes,2,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
+	ConsumeUserResourcePercent int64    `protobuf:"varint,3,opt,name=consume_user_resource_percent,json=consumeUserResourcePercent,proto3" json:"consume_user_resource_percent,omitempty"`
+	XXX_NoUnkeyedLiteral       struct{} `json:"-"`
+	XXX_unrecognized           []byte   `json:"-"`
+	XXX_sizecache              int32    `json:"-"`
+}
+
+func (m *UpdateSettingContract) Reset()         { *m = UpdateSettingContract{} }
+func (m *UpdateSettingContract) String() string { return proto.CompactTextString(m) }
+func (*UpdateSettingContract) ProtoMessage()    {}
+func (*UpdateSettingContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{7}
+}
+func (m *UpdateSettingContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UpdateSettingContract.Unmarshal(m, b)
+}
+func (m *UpdateSettingContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UpdateSettingContract.Marshal(b, m, deterministic)
+}
+func (dst *UpdateSettingContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UpdateSettingContract.Merge(dst, src)
+}
+func (m *UpdateSettingContract) XXX_Size() int {
+	return xxx_messageInfo_UpdateSettingContract.Size(m)
+}
+func (m *UpdateSettingContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_UpdateSettingContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UpdateSettingContract proto.InternalMessageInfo
+
+func (m *UpdateSettingContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *UpdateSettingContract) GetContractAddress() []byte {
+	if m != nil {
+		return m.ContractAddress
+	}
+	return nil
+}
+
+func (m *UpdateSettingContract) GetConsumeUserResourcePercent() int64 {
+	if m != nil {
+		return m.ConsumeUserResourcePercent
+	}
+	return 0
+}
+
 type WitnessCreateContract struct {
 	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
 	Url                  []byte   `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
@@ -409,7 +533,7 @@ func (m *WitnessCreateContract) Reset()         { *m = WitnessCreateContract{} }
 func (m *WitnessCreateContract) String() string { return proto.CompactTextString(m) }
 func (*WitnessCreateContract) ProtoMessage()    {}
 func (*WitnessCreateContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{6}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{8}
 }
 func (m *WitnessCreateContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WitnessCreateContract.Unmarshal(m, b)
@@ -455,7 +579,7 @@ func (m *WitnessUpdateContract) Reset()         { *m = WitnessUpdateContract{} }
 func (m *WitnessUpdateContract) String() string { return proto.CompactTextString(m) }
 func (*WitnessUpdateContract) ProtoMessage()    {}
 func (*WitnessUpdateContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{7}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{9}
 }
 func (m *WitnessUpdateContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WitnessUpdateContract.Unmarshal(m, b)
@@ -499,6 +623,7 @@ type AssetIssueContract struct {
 	Num                     int32                              `protobuf:"varint,8,opt,name=num,proto3" json:"num,omitempty"`
 	StartTime               int64                              `protobuf:"varint,9,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	EndTime                 int64                              `protobuf:"varint,10,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	Order                   int64                              `protobuf:"varint,11,opt,name=order,proto3" json:"order,omitempty"`
 	VoteScore               int32                              `protobuf:"varint,16,opt,name=vote_score,json=voteScore,proto3" json:"vote_score,omitempty"`
 	Description             []byte                             `protobuf:"bytes,20,opt,name=description,proto3" json:"description,omitempty"`
 	Url                     []byte                             `protobuf:"bytes,21,opt,name=url,proto3" json:"url,omitempty"`
@@ -515,7 +640,7 @@ func (m *AssetIssueContract) Reset()         { *m = AssetIssueContract{} }
 func (m *AssetIssueContract) String() string { return proto.CompactTextString(m) }
 func (*AssetIssueContract) ProtoMessage()    {}
 func (*AssetIssueContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{8}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{10}
 }
 func (m *AssetIssueContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AssetIssueContract.Unmarshal(m, b)
@@ -598,6 +723,13 @@ func (m *AssetIssueContract) GetEndTime() int64 {
 	return 0
 }
 
+func (m *AssetIssueContract) GetOrder() int64 {
+	if m != nil {
+		return m.Order
+	}
+	return 0
+}
+
 func (m *AssetIssueContract) GetVoteScore() int32 {
 	if m != nil {
 		return m.VoteScore
@@ -659,7 +791,7 @@ func (m *AssetIssueContract_FrozenSupply) Reset()         { *m = AssetIssueContr
 func (m *AssetIssueContract_FrozenSupply) String() string { return proto.CompactTextString(m) }
 func (*AssetIssueContract_FrozenSupply) ProtoMessage()    {}
 func (*AssetIssueContract_FrozenSupply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{8, 0}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{10, 0}
 }
 func (m *AssetIssueContract_FrozenSupply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AssetIssueContract_FrozenSupply.Unmarshal(m, b)
@@ -707,7 +839,7 @@ func (m *ParticipateAssetIssueContract) Reset()         { *m = ParticipateAssetI
 func (m *ParticipateAssetIssueContract) String() string { return proto.CompactTextString(m) }
 func (*ParticipateAssetIssueContract) ProtoMessage()    {}
 func (*ParticipateAssetIssueContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{9}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{11}
 }
 func (m *ParticipateAssetIssueContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ParticipateAssetIssueContract.Unmarshal(m, b)
@@ -755,66 +887,21 @@ func (m *ParticipateAssetIssueContract) GetAmount() int64 {
 	return 0
 }
 
-type DeployContract struct {
-	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
-	Script               []byte   `protobuf:"bytes,2,opt,name=script,proto3" json:"script,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *DeployContract) Reset()         { *m = DeployContract{} }
-func (m *DeployContract) String() string { return proto.CompactTextString(m) }
-func (*DeployContract) ProtoMessage()    {}
-func (*DeployContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{10}
-}
-func (m *DeployContract) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_DeployContract.Unmarshal(m, b)
-}
-func (m *DeployContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_DeployContract.Marshal(b, m, deterministic)
-}
-func (dst *DeployContract) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeployContract.Merge(dst, src)
-}
-func (m *DeployContract) XXX_Size() int {
-	return xxx_messageInfo_DeployContract.Size(m)
-}
-func (m *DeployContract) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeployContract.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeployContract proto.InternalMessageInfo
-
-func (m *DeployContract) GetOwnerAddress() []byte {
-	if m != nil {
-		return m.OwnerAddress
-	}
-	return nil
-}
-
-func (m *DeployContract) GetScript() []byte {
-	if m != nil {
-		return m.Script
-	}
-	return nil
-}
-
 type FreezeBalanceContract struct {
-	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
-	FrozenBalance        int64    `protobuf:"varint,2,opt,name=frozen_balance,json=frozenBalance,proto3" json:"frozen_balance,omitempty"`
-	FrozenDuration       int64    `protobuf:"varint,3,opt,name=frozen_duration,json=frozenDuration,proto3" json:"frozen_duration,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	OwnerAddress         []byte       `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	FrozenBalance        int64        `protobuf:"varint,2,opt,name=frozen_balance,json=frozenBalance,proto3" json:"frozen_balance,omitempty"`
+	FrozenDuration       int64        `protobuf:"varint,3,opt,name=frozen_duration,json=frozenDuration,proto3" json:"frozen_duration,omitempty"`
+	Resource             ResourceCode `protobuf:"varint,10,opt,name=resource,proto3,enum=protocol.ResourceCode" json:"resource,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
 }
 
 func (m *FreezeBalanceContract) Reset()         { *m = FreezeBalanceContract{} }
 func (m *FreezeBalanceContract) String() string { return proto.CompactTextString(m) }
 func (*FreezeBalanceContract) ProtoMessage()    {}
 func (*FreezeBalanceContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{11}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{12}
 }
 func (m *FreezeBalanceContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_FreezeBalanceContract.Unmarshal(m, b)
@@ -855,18 +942,26 @@ func (m *FreezeBalanceContract) GetFrozenDuration() int64 {
 	return 0
 }
 
+func (m *FreezeBalanceContract) GetResource() ResourceCode {
+	if m != nil {
+		return m.Resource
+	}
+	return ResourceCode_BANDWIDTH
+}
+
 type UnfreezeBalanceContract struct {
-	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	OwnerAddress         []byte       `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	Resource             ResourceCode `protobuf:"varint,10,opt,name=resource,proto3,enum=protocol.ResourceCode" json:"resource,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
 }
 
 func (m *UnfreezeBalanceContract) Reset()         { *m = UnfreezeBalanceContract{} }
 func (m *UnfreezeBalanceContract) String() string { return proto.CompactTextString(m) }
 func (*UnfreezeBalanceContract) ProtoMessage()    {}
 func (*UnfreezeBalanceContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{12}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{13}
 }
 func (m *UnfreezeBalanceContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_UnfreezeBalanceContract.Unmarshal(m, b)
@@ -893,6 +988,13 @@ func (m *UnfreezeBalanceContract) GetOwnerAddress() []byte {
 	return nil
 }
 
+func (m *UnfreezeBalanceContract) GetResource() ResourceCode {
+	if m != nil {
+		return m.Resource
+	}
+	return ResourceCode_BANDWIDTH
+}
+
 type UnfreezeAssetContract struct {
 	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -904,7 +1006,7 @@ func (m *UnfreezeAssetContract) Reset()         { *m = UnfreezeAssetContract{} }
 func (m *UnfreezeAssetContract) String() string { return proto.CompactTextString(m) }
 func (*UnfreezeAssetContract) ProtoMessage()    {}
 func (*UnfreezeAssetContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{13}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{14}
 }
 func (m *UnfreezeAssetContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_UnfreezeAssetContract.Unmarshal(m, b)
@@ -942,7 +1044,7 @@ func (m *WithdrawBalanceContract) Reset()         { *m = WithdrawBalanceContract
 func (m *WithdrawBalanceContract) String() string { return proto.CompactTextString(m) }
 func (*WithdrawBalanceContract) ProtoMessage()    {}
 func (*WithdrawBalanceContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{14}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{15}
 }
 func (m *WithdrawBalanceContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WithdrawBalanceContract.Unmarshal(m, b)
@@ -984,7 +1086,7 @@ func (m *UpdateAssetContract) Reset()         { *m = UpdateAssetContract{} }
 func (m *UpdateAssetContract) String() string { return proto.CompactTextString(m) }
 func (*UpdateAssetContract) ProtoMessage()    {}
 func (*UpdateAssetContract) Descriptor() ([]byte, []int) {
-	return fileDescriptor_Contract_f80cf82592f5ff49, []int{15}
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{16}
 }
 func (m *UpdateAssetContract) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_UpdateAssetContract.Unmarshal(m, b)
@@ -1039,87 +1141,784 @@ func (m *UpdateAssetContract) GetNewPublicLimit() int64 {
 	return 0
 }
 
+type ProposalCreateContract struct {
+	OwnerAddress         []byte          `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	Parameters           map[int64]int64 `protobuf:"bytes,2,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
+}
+
+func (m *ProposalCreateContract) Reset()         { *m = ProposalCreateContract{} }
+func (m *ProposalCreateContract) String() string { return proto.CompactTextString(m) }
+func (*ProposalCreateContract) ProtoMessage()    {}
+func (*ProposalCreateContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{17}
+}
+func (m *ProposalCreateContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ProposalCreateContract.Unmarshal(m, b)
+}
+func (m *ProposalCreateContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ProposalCreateContract.Marshal(b, m, deterministic)
+}
+func (dst *ProposalCreateContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProposalCreateContract.Merge(dst, src)
+}
+func (m *ProposalCreateContract) XXX_Size() int {
+	return xxx_messageInfo_ProposalCreateContract.Size(m)
+}
+func (m *ProposalCreateContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProposalCreateContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ProposalCreateContract proto.InternalMessageInfo
+
+func (m *ProposalCreateContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ProposalCreateContract) GetParameters() map[int64]int64 {
+	if m != nil {
+		return m.Parameters
+	}
+	return nil
+}
+
+type ProposalApproveContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ProposalId           int64    `protobuf:"varint,2,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	IsAddApproval        bool     `protobuf:"varint,3,opt,name=is_add_approval,json=isAddApproval,proto3" json:"is_add_approval,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ProposalApproveContract) Reset()         { *m = ProposalApproveContract{} }
+func (m *ProposalApproveContract) String() string { return proto.CompactTextString(m) }
+func (*ProposalApproveContract) ProtoMessage()    {}
+func (*ProposalApproveContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{18}
+}
+func (m *ProposalApproveContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ProposalApproveContract.Unmarshal(m, b)
+}
+func (m *ProposalApproveContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ProposalApproveContract.Marshal(b, m, deterministic)
+}
+func (dst *ProposalApproveContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProposalApproveContract.Merge(dst, src)
+}
+func (m *ProposalApproveContract) XXX_Size() int {
+	return xxx_messageInfo_ProposalApproveContract.Size(m)
+}
+func (m *ProposalApproveContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProposalApproveContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ProposalApproveContract proto.InternalMessageInfo
+
+func (m *ProposalApproveContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ProposalApproveContract) GetProposalId() int64 {
+	if m != nil {
+		return m.ProposalId
+	}
+	return 0
+}
+
+func (m *ProposalApproveContract) GetIsAddApproval() bool {
+	if m != nil {
+		return m.IsAddApproval
+	}
+	return false
+}
+
+type ProposalDeleteContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ProposalId           int64    `protobuf:"varint,2,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ProposalDeleteContract) Reset()         { *m = ProposalDeleteContract{} }
+func (m *ProposalDeleteContract) String() string { return proto.CompactTextString(m) }
+func (*ProposalDeleteContract) ProtoMessage()    {}
+func (*ProposalDeleteContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{19}
+}
+func (m *ProposalDeleteContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ProposalDeleteContract.Unmarshal(m, b)
+}
+func (m *ProposalDeleteContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ProposalDeleteContract.Marshal(b, m, deterministic)
+}
+func (dst *ProposalDeleteContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProposalDeleteContract.Merge(dst, src)
+}
+func (m *ProposalDeleteContract) XXX_Size() int {
+	return xxx_messageInfo_ProposalDeleteContract.Size(m)
+}
+func (m *ProposalDeleteContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProposalDeleteContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ProposalDeleteContract proto.InternalMessageInfo
+
+func (m *ProposalDeleteContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ProposalDeleteContract) GetProposalId() int64 {
+	if m != nil {
+		return m.ProposalId
+	}
+	return 0
+}
+
+type CreateSmartContract struct {
+	OwnerAddress         []byte         `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	NewContract          *SmartContract `protobuf:"bytes,2,opt,name=new_contract,json=newContract,proto3" json:"new_contract,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
+}
+
+func (m *CreateSmartContract) Reset()         { *m = CreateSmartContract{} }
+func (m *CreateSmartContract) String() string { return proto.CompactTextString(m) }
+func (*CreateSmartContract) ProtoMessage()    {}
+func (*CreateSmartContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{20}
+}
+func (m *CreateSmartContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_CreateSmartContract.Unmarshal(m, b)
+}
+func (m *CreateSmartContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_CreateSmartContract.Marshal(b, m, deterministic)
+}
+func (dst *CreateSmartContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateSmartContract.Merge(dst, src)
+}
+func (m *CreateSmartContract) XXX_Size() int {
+	return xxx_messageInfo_CreateSmartContract.Size(m)
+}
+func (m *CreateSmartContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateSmartContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateSmartContract proto.InternalMessageInfo
+
+func (m *CreateSmartContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *CreateSmartContract) GetNewContract() *SmartContract {
+	if m != nil {
+		return m.NewContract
+	}
+	return nil
+}
+
+type TriggerSmartContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ContractAddress      []byte   `protobuf:"bytes,2,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
+	CallValue            int64    `protobuf:"varint,3,opt,name=call_value,json=callValue,proto3" json:"call_value,omitempty"`
+	Data                 []byte   `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *TriggerSmartContract) Reset()         { *m = TriggerSmartContract{} }
+func (m *TriggerSmartContract) String() string { return proto.CompactTextString(m) }
+func (*TriggerSmartContract) ProtoMessage()    {}
+func (*TriggerSmartContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{21}
+}
+func (m *TriggerSmartContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_TriggerSmartContract.Unmarshal(m, b)
+}
+func (m *TriggerSmartContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_TriggerSmartContract.Marshal(b, m, deterministic)
+}
+func (dst *TriggerSmartContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TriggerSmartContract.Merge(dst, src)
+}
+func (m *TriggerSmartContract) XXX_Size() int {
+	return xxx_messageInfo_TriggerSmartContract.Size(m)
+}
+func (m *TriggerSmartContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_TriggerSmartContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TriggerSmartContract proto.InternalMessageInfo
+
+func (m *TriggerSmartContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *TriggerSmartContract) GetContractAddress() []byte {
+	if m != nil {
+		return m.ContractAddress
+	}
+	return nil
+}
+
+func (m *TriggerSmartContract) GetCallValue() int64 {
+	if m != nil {
+		return m.CallValue
+	}
+	return 0
+}
+
+func (m *TriggerSmartContract) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
+type BuyStorageContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	Quant                int64    `protobuf:"varint,2,opt,name=quant,proto3" json:"quant,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *BuyStorageContract) Reset()         { *m = BuyStorageContract{} }
+func (m *BuyStorageContract) String() string { return proto.CompactTextString(m) }
+func (*BuyStorageContract) ProtoMessage()    {}
+func (*BuyStorageContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{22}
+}
+func (m *BuyStorageContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BuyStorageContract.Unmarshal(m, b)
+}
+func (m *BuyStorageContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BuyStorageContract.Marshal(b, m, deterministic)
+}
+func (dst *BuyStorageContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BuyStorageContract.Merge(dst, src)
+}
+func (m *BuyStorageContract) XXX_Size() int {
+	return xxx_messageInfo_BuyStorageContract.Size(m)
+}
+func (m *BuyStorageContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_BuyStorageContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BuyStorageContract proto.InternalMessageInfo
+
+func (m *BuyStorageContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *BuyStorageContract) GetQuant() int64 {
+	if m != nil {
+		return m.Quant
+	}
+	return 0
+}
+
+type BuyStorageBytesContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	Bytes                int64    `protobuf:"varint,2,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *BuyStorageBytesContract) Reset()         { *m = BuyStorageBytesContract{} }
+func (m *BuyStorageBytesContract) String() string { return proto.CompactTextString(m) }
+func (*BuyStorageBytesContract) ProtoMessage()    {}
+func (*BuyStorageBytesContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{23}
+}
+func (m *BuyStorageBytesContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BuyStorageBytesContract.Unmarshal(m, b)
+}
+func (m *BuyStorageBytesContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BuyStorageBytesContract.Marshal(b, m, deterministic)
+}
+func (dst *BuyStorageBytesContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BuyStorageBytesContract.Merge(dst, src)
+}
+func (m *BuyStorageBytesContract) XXX_Size() int {
+	return xxx_messageInfo_BuyStorageBytesContract.Size(m)
+}
+func (m *BuyStorageBytesContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_BuyStorageBytesContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BuyStorageBytesContract proto.InternalMessageInfo
+
+func (m *BuyStorageBytesContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *BuyStorageBytesContract) GetBytes() int64 {
+	if m != nil {
+		return m.Bytes
+	}
+	return 0
+}
+
+type SellStorageContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	StorageBytes         int64    `protobuf:"varint,2,opt,name=storage_bytes,json=storageBytes,proto3" json:"storage_bytes,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SellStorageContract) Reset()         { *m = SellStorageContract{} }
+func (m *SellStorageContract) String() string { return proto.CompactTextString(m) }
+func (*SellStorageContract) ProtoMessage()    {}
+func (*SellStorageContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{24}
+}
+func (m *SellStorageContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SellStorageContract.Unmarshal(m, b)
+}
+func (m *SellStorageContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SellStorageContract.Marshal(b, m, deterministic)
+}
+func (dst *SellStorageContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SellStorageContract.Merge(dst, src)
+}
+func (m *SellStorageContract) XXX_Size() int {
+	return xxx_messageInfo_SellStorageContract.Size(m)
+}
+func (m *SellStorageContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_SellStorageContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SellStorageContract proto.InternalMessageInfo
+
+func (m *SellStorageContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *SellStorageContract) GetStorageBytes() int64 {
+	if m != nil {
+		return m.StorageBytes
+	}
+	return 0
+}
+
+type ExchangeCreateContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	FirstTokenId         []byte   `protobuf:"bytes,2,opt,name=first_token_id,json=firstTokenId,proto3" json:"first_token_id,omitempty"`
+	FirstTokenBalance    int64    `protobuf:"varint,3,opt,name=first_token_balance,json=firstTokenBalance,proto3" json:"first_token_balance,omitempty"`
+	SecondTokenId        []byte   `protobuf:"bytes,4,opt,name=second_token_id,json=secondTokenId,proto3" json:"second_token_id,omitempty"`
+	SecondTokenBalance   int64    `protobuf:"varint,5,opt,name=second_token_balance,json=secondTokenBalance,proto3" json:"second_token_balance,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ExchangeCreateContract) Reset()         { *m = ExchangeCreateContract{} }
+func (m *ExchangeCreateContract) String() string { return proto.CompactTextString(m) }
+func (*ExchangeCreateContract) ProtoMessage()    {}
+func (*ExchangeCreateContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{25}
+}
+func (m *ExchangeCreateContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ExchangeCreateContract.Unmarshal(m, b)
+}
+func (m *ExchangeCreateContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ExchangeCreateContract.Marshal(b, m, deterministic)
+}
+func (dst *ExchangeCreateContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ExchangeCreateContract.Merge(dst, src)
+}
+func (m *ExchangeCreateContract) XXX_Size() int {
+	return xxx_messageInfo_ExchangeCreateContract.Size(m)
+}
+func (m *ExchangeCreateContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ExchangeCreateContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ExchangeCreateContract proto.InternalMessageInfo
+
+func (m *ExchangeCreateContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ExchangeCreateContract) GetFirstTokenId() []byte {
+	if m != nil {
+		return m.FirstTokenId
+	}
+	return nil
+}
+
+func (m *ExchangeCreateContract) GetFirstTokenBalance() int64 {
+	if m != nil {
+		return m.FirstTokenBalance
+	}
+	return 0
+}
+
+func (m *ExchangeCreateContract) GetSecondTokenId() []byte {
+	if m != nil {
+		return m.SecondTokenId
+	}
+	return nil
+}
+
+func (m *ExchangeCreateContract) GetSecondTokenBalance() int64 {
+	if m != nil {
+		return m.SecondTokenBalance
+	}
+	return 0
+}
+
+type ExchangeInjectContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ExchangeId           int64    `protobuf:"varint,2,opt,name=exchange_id,json=exchangeId,proto3" json:"exchange_id,omitempty"`
+	TokenId              []byte   `protobuf:"bytes,3,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	Quant                int64    `protobuf:"varint,4,opt,name=quant,proto3" json:"quant,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ExchangeInjectContract) Reset()         { *m = ExchangeInjectContract{} }
+func (m *ExchangeInjectContract) String() string { return proto.CompactTextString(m) }
+func (*ExchangeInjectContract) ProtoMessage()    {}
+func (*ExchangeInjectContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{26}
+}
+func (m *ExchangeInjectContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ExchangeInjectContract.Unmarshal(m, b)
+}
+func (m *ExchangeInjectContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ExchangeInjectContract.Marshal(b, m, deterministic)
+}
+func (dst *ExchangeInjectContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ExchangeInjectContract.Merge(dst, src)
+}
+func (m *ExchangeInjectContract) XXX_Size() int {
+	return xxx_messageInfo_ExchangeInjectContract.Size(m)
+}
+func (m *ExchangeInjectContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ExchangeInjectContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ExchangeInjectContract proto.InternalMessageInfo
+
+func (m *ExchangeInjectContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ExchangeInjectContract) GetExchangeId() int64 {
+	if m != nil {
+		return m.ExchangeId
+	}
+	return 0
+}
+
+func (m *ExchangeInjectContract) GetTokenId() []byte {
+	if m != nil {
+		return m.TokenId
+	}
+	return nil
+}
+
+func (m *ExchangeInjectContract) GetQuant() int64 {
+	if m != nil {
+		return m.Quant
+	}
+	return 0
+}
+
+type ExchangeWithdrawContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ExchangeId           int64    `protobuf:"varint,2,opt,name=exchange_id,json=exchangeId,proto3" json:"exchange_id,omitempty"`
+	TokenId              []byte   `protobuf:"bytes,3,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	Quant                int64    `protobuf:"varint,4,opt,name=quant,proto3" json:"quant,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ExchangeWithdrawContract) Reset()         { *m = ExchangeWithdrawContract{} }
+func (m *ExchangeWithdrawContract) String() string { return proto.CompactTextString(m) }
+func (*ExchangeWithdrawContract) ProtoMessage()    {}
+func (*ExchangeWithdrawContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{27}
+}
+func (m *ExchangeWithdrawContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ExchangeWithdrawContract.Unmarshal(m, b)
+}
+func (m *ExchangeWithdrawContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ExchangeWithdrawContract.Marshal(b, m, deterministic)
+}
+func (dst *ExchangeWithdrawContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ExchangeWithdrawContract.Merge(dst, src)
+}
+func (m *ExchangeWithdrawContract) XXX_Size() int {
+	return xxx_messageInfo_ExchangeWithdrawContract.Size(m)
+}
+func (m *ExchangeWithdrawContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ExchangeWithdrawContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ExchangeWithdrawContract proto.InternalMessageInfo
+
+func (m *ExchangeWithdrawContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ExchangeWithdrawContract) GetExchangeId() int64 {
+	if m != nil {
+		return m.ExchangeId
+	}
+	return 0
+}
+
+func (m *ExchangeWithdrawContract) GetTokenId() []byte {
+	if m != nil {
+		return m.TokenId
+	}
+	return nil
+}
+
+func (m *ExchangeWithdrawContract) GetQuant() int64 {
+	if m != nil {
+		return m.Quant
+	}
+	return 0
+}
+
+type ExchangeTransactionContract struct {
+	OwnerAddress         []byte   `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`
+	ExchangeId           int64    `protobuf:"varint,2,opt,name=exchange_id,json=exchangeId,proto3" json:"exchange_id,omitempty"`
+	TokenId              []byte   `protobuf:"bytes,3,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	Quant                int64    `protobuf:"varint,4,opt,name=quant,proto3" json:"quant,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ExchangeTransactionContract) Reset()         { *m = ExchangeTransactionContract{} }
+func (m *ExchangeTransactionContract) String() string { return proto.CompactTextString(m) }
+func (*ExchangeTransactionContract) ProtoMessage()    {}
+func (*ExchangeTransactionContract) Descriptor() ([]byte, []int) {
+	return fileDescriptor_Contract_6198a9b3479eb160, []int{28}
+}
+func (m *ExchangeTransactionContract) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ExchangeTransactionContract.Unmarshal(m, b)
+}
+func (m *ExchangeTransactionContract) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ExchangeTransactionContract.Marshal(b, m, deterministic)
+}
+func (dst *ExchangeTransactionContract) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ExchangeTransactionContract.Merge(dst, src)
+}
+func (m *ExchangeTransactionContract) XXX_Size() int {
+	return xxx_messageInfo_ExchangeTransactionContract.Size(m)
+}
+func (m *ExchangeTransactionContract) XXX_DiscardUnknown() {
+	xxx_messageInfo_ExchangeTransactionContract.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ExchangeTransactionContract proto.InternalMessageInfo
+
+func (m *ExchangeTransactionContract) GetOwnerAddress() []byte {
+	if m != nil {
+		return m.OwnerAddress
+	}
+	return nil
+}
+
+func (m *ExchangeTransactionContract) GetExchangeId() int64 {
+	if m != nil {
+		return m.ExchangeId
+	}
+	return 0
+}
+
+func (m *ExchangeTransactionContract) GetTokenId() []byte {
+	if m != nil {
+		return m.TokenId
+	}
+	return nil
+}
+
+func (m *ExchangeTransactionContract) GetQuant() int64 {
+	if m != nil {
+		return m.Quant
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*AccountCreateContract)(nil), "protocol.AccountCreateContract")
 	proto.RegisterType((*AccountUpdateContract)(nil), "protocol.AccountUpdateContract")
+	proto.RegisterType((*SetAccountIdContract)(nil), "protocol.SetAccountIdContract")
 	proto.RegisterType((*TransferContract)(nil), "protocol.TransferContract")
 	proto.RegisterType((*TransferAssetContract)(nil), "protocol.TransferAssetContract")
 	proto.RegisterType((*VoteAssetContract)(nil), "protocol.VoteAssetContract")
 	proto.RegisterType((*VoteWitnessContract)(nil), "protocol.VoteWitnessContract")
 	proto.RegisterType((*VoteWitnessContract_Vote)(nil), "protocol.VoteWitnessContract.Vote")
+	proto.RegisterType((*UpdateSettingContract)(nil), "protocol.UpdateSettingContract")
 	proto.RegisterType((*WitnessCreateContract)(nil), "protocol.WitnessCreateContract")
 	proto.RegisterType((*WitnessUpdateContract)(nil), "protocol.WitnessUpdateContract")
 	proto.RegisterType((*AssetIssueContract)(nil), "protocol.AssetIssueContract")
 	proto.RegisterType((*AssetIssueContract_FrozenSupply)(nil), "protocol.AssetIssueContract.FrozenSupply")
 	proto.RegisterType((*ParticipateAssetIssueContract)(nil), "protocol.ParticipateAssetIssueContract")
-	proto.RegisterType((*DeployContract)(nil), "protocol.DeployContract")
 	proto.RegisterType((*FreezeBalanceContract)(nil), "protocol.FreezeBalanceContract")
 	proto.RegisterType((*UnfreezeBalanceContract)(nil), "protocol.UnfreezeBalanceContract")
 	proto.RegisterType((*UnfreezeAssetContract)(nil), "protocol.UnfreezeAssetContract")
 	proto.RegisterType((*WithdrawBalanceContract)(nil), "protocol.WithdrawBalanceContract")
 	proto.RegisterType((*UpdateAssetContract)(nil), "protocol.UpdateAssetContract")
+	proto.RegisterType((*ProposalCreateContract)(nil), "protocol.ProposalCreateContract")
+	proto.RegisterMapType((map[int64]int64)(nil), "protocol.ProposalCreateContract.ParametersEntry")
+	proto.RegisterType((*ProposalApproveContract)(nil), "protocol.ProposalApproveContract")
+	proto.RegisterType((*ProposalDeleteContract)(nil), "protocol.ProposalDeleteContract")
+	proto.RegisterType((*CreateSmartContract)(nil), "protocol.CreateSmartContract")
+	proto.RegisterType((*TriggerSmartContract)(nil), "protocol.TriggerSmartContract")
+	proto.RegisterType((*BuyStorageContract)(nil), "protocol.BuyStorageContract")
+	proto.RegisterType((*BuyStorageBytesContract)(nil), "protocol.BuyStorageBytesContract")
+	proto.RegisterType((*SellStorageContract)(nil), "protocol.SellStorageContract")
+	proto.RegisterType((*ExchangeCreateContract)(nil), "protocol.ExchangeCreateContract")
+	proto.RegisterType((*ExchangeInjectContract)(nil), "protocol.ExchangeInjectContract")
+	proto.RegisterType((*ExchangeWithdrawContract)(nil), "protocol.ExchangeWithdrawContract")
+	proto.RegisterType((*ExchangeTransactionContract)(nil), "protocol.ExchangeTransactionContract")
+	proto.RegisterEnum("protocol.ResourceCode", ResourceCode_name, ResourceCode_value)
 }
 
-func init() { proto.RegisterFile("core/Contract.proto", fileDescriptor_Contract_f80cf82592f5ff49) }
+func init() { proto.RegisterFile("core/Contract.proto", fileDescriptor_Contract_6198a9b3479eb160) }
 
-var fileDescriptor_Contract_f80cf82592f5ff49 = []byte{
-	// 922 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x56, 0xcd, 0x6e, 0xdb, 0x46,
-	0x10, 0x06, 0x2d, 0x4b, 0x96, 0x46, 0x8a, 0xed, 0xd0, 0x96, 0xcd, 0x38, 0x30, 0xe2, 0xb0, 0x28,
-	0xea, 0x5c, 0x24, 0x20, 0xbd, 0xf4, 0x60, 0x14, 0xf0, 0x0f, 0x82, 0x16, 0x48, 0x85, 0x40, 0x91,
-	0x1b, 0xa0, 0x3d, 0x08, 0x2b, 0x6a, 0xe4, 0x10, 0x20, 0x77, 0x89, 0xdd, 0x65, 0x65, 0xe5, 0x15,
-	0xda, 0x43, 0xd1, 0x63, 0xdf, 0xa3, 0x8f, 0xd1, 0x7b, 0x1f, 0xa7, 0xd8, 0xd9, 0xa5, 0x42, 0xcb,
-	0x16, 0x62, 0xe9, 0x24, 0xf2, 0x9b, 0x9f, 0xfd, 0x76, 0xe6, 0x9b, 0xa1, 0x60, 0x2f, 0x12, 0x12,
-	0xbb, 0x97, 0x82, 0x6b, 0xc9, 0x22, 0xdd, 0xc9, 0xa4, 0xd0, 0xc2, 0xaf, 0xd3, 0x4f, 0x24, 0x92,
-	0xa3, 0x1d, 0x32, 0x0f, 0xa4, 0xe0, 0xd6, 0x14, 0xfe, 0xe9, 0x41, 0xfb, 0x3c, 0x8a, 0x44, 0xce,
-	0xf5, 0xa5, 0x44, 0xa6, 0xb1, 0x08, 0xf5, 0xbf, 0x82, 0x27, 0x62, 0xca, 0x51, 0x0e, 0xd9, 0x78,
-	0x2c, 0x51, 0xa9, 0xc0, 0x3b, 0xf1, 0x4e, 0x5b, 0xfd, 0x16, 0x81, 0xe7, 0x16, 0xf3, 0xbf, 0x81,
-	0x1d, 0x66, 0xa3, 0xe7, 0x6e, 0x1b, 0xe4, 0xb6, 0xed, 0xe0, 0xc2, 0xf1, 0x15, 0x6c, 0xea, 0x59,
-	0x86, 0x41, 0xe5, 0xc4, 0x3b, 0xdd, 0x7e, 0xdd, 0xee, 0x14, 0x8c, 0x3a, 0xee, 0xf0, 0xc1, 0x2c,
-	0xc3, 0x3e, 0xb9, 0x84, 0xc3, 0x39, 0xa3, 0xeb, 0x6c, 0x5c, 0x66, 0xf4, 0x12, 0x5a, 0xc5, 0x61,
-	0x9c, 0xa5, 0xe8, 0x08, 0x35, 0x1d, 0xd6, 0x63, 0x29, 0xde, 0x27, 0xbd, 0x71, 0x9f, 0x74, 0xc8,
-	0x61, 0x77, 0x20, 0x19, 0x57, 0x13, 0x94, 0xab, 0xdd, 0xf6, 0x18, 0x40, 0x8b, 0x85, 0xd4, 0x0d,
-	0x2d, 0x0a, 0xf3, 0x01, 0xd4, 0x58, 0x6a, 0xa8, 0xd0, 0x2d, 0x2b, 0x7d, 0xf7, 0x16, 0xfe, 0xe5,
-	0x41, 0xbb, 0x38, 0xf0, 0x5c, 0x29, 0xd4, 0xf3, 0x53, 0x8f, 0x01, 0x98, 0x01, 0xca, 0xf7, 0x69,
-	0x10, 0xf2, 0xe8, 0xdb, 0x2c, 0x90, 0xaa, 0x2c, 0x27, 0xb5, 0x79, 0x87, 0xd4, 0xef, 0x1e, 0x3c,
-	0xfd, 0x59, 0x68, 0xbc, 0x4b, 0xe8, 0x51, 0x65, 0x78, 0x09, 0xad, 0xdf, 0x84, 0xc6, 0x12, 0xab,
-	0x8a, 0xe9, 0x83, 0xc1, 0x0a, 0x97, 0x00, 0xb6, 0x54, 0x9e, 0x65, 0x42, 0xda, 0x5a, 0xd4, 0xfb,
-	0xc5, 0xab, 0xbf, 0x0f, 0x55, 0x6a, 0x57, 0x50, 0x3d, 0xf1, 0x4e, 0xab, 0x7d, 0xfb, 0x12, 0xfe,
-	0xe7, 0xc1, 0x9e, 0x61, 0xf3, 0x21, 0xd6, 0x1c, 0x95, 0x5a, 0x8d, 0xcf, 0x77, 0x50, 0x35, 0x67,
-	0x5b, 0x22, 0xcd, 0xd7, 0xe1, 0x67, 0x71, 0x3d, 0x90, 0x92, 0xb0, 0xbe, 0x0d, 0x58, 0x4e, 0xf3,
-	0xe8, 0x07, 0xd8, 0x34, 0x8e, 0xf7, 0xee, 0xea, 0x34, 0x57, 0xbe, 0xeb, 0x31, 0x00, 0xb9, 0xd8,
-	0x6b, 0x6d, 0x50, 0x95, 0x1b, 0x06, 0xb9, 0xa4, 0xab, 0xf5, 0xa0, 0x5d, 0x50, 0x58, 0x63, 0xc0,
-	0x76, 0xa1, 0x92, 0xcb, 0xc4, 0x35, 0xde, 0x3c, 0x86, 0xbf, 0xce, 0xf3, 0x2d, 0x8c, 0xc7, 0x63,
-	0x25, 0x9c, 0x53, 0xd8, 0xd0, 0xa4, 0x6d, 0x59, 0xb5, 0x58, 0xe4, 0x5a, 0x26, 0xe1, 0xbf, 0x55,
-	0xf0, 0x49, 0x11, 0x3f, 0x2a, 0x95, 0xaf, 0x98, 0xda, 0x87, 0x4d, 0x92, 0xb1, 0xe5, 0x4a, 0xcf,
-	0x06, 0x63, 0xa3, 0x91, 0x74, 0xb2, 0xa4, 0x67, 0x53, 0x52, 0x2d, 0x34, 0x4b, 0x86, 0xa6, 0xd6,
-	0xc9, 0xcc, 0xe9, 0xb2, 0x49, 0xd8, 0x7b, 0x82, 0xfc, 0x1e, 0x3c, 0x99, 0x48, 0xf1, 0x09, 0x79,
-	0xe1, 0x53, 0xa5, 0xce, 0xbe, 0x2a, 0xad, 0x8d, 0x7b, 0x24, 0x3b, 0x6f, 0x28, 0xc2, 0x66, 0xe8,
-	0xb7, 0x26, 0xa5, 0x37, 0xff, 0x10, 0xb6, 0xb4, 0xbc, 0x1d, 0xf2, 0x3c, 0x0d, 0x6a, 0x24, 0xbb,
-	0x9a, 0x96, 0xb7, 0xbd, 0x3c, 0x35, 0xe5, 0x35, 0x60, 0x9d, 0x40, 0xf3, 0x68, 0x0a, 0xa4, 0x34,
-	0x93, 0x7a, 0xa8, 0xe3, 0x14, 0x83, 0x86, 0xed, 0x26, 0x21, 0x83, 0x38, 0x45, 0xff, 0x19, 0xd4,
-	0x91, 0x8f, 0xad, 0x11, 0xc8, 0xb8, 0x85, 0x7c, 0x4c, 0xa6, 0x42, 0x07, 0xca, 0xec, 0xd8, 0x60,
-	0x97, 0x52, 0x92, 0x0e, 0xde, 0x1b, 0xc0, 0x3f, 0x81, 0xe6, 0x18, 0x55, 0x24, 0xe3, 0x4c, 0xc7,
-	0x82, 0x07, 0xfb, 0x56, 0x48, 0x25, 0xa8, 0xe8, 0x75, 0x7b, 0xde, 0x6b, 0xbf, 0x0b, 0xfb, 0x13,
-	0x89, 0x38, 0x74, 0x4b, 0x02, 0xf5, 0x30, 0x89, 0xd3, 0x58, 0x07, 0x07, 0x74, 0xf2, 0x53, 0x63,
-	0xa3, 0x42, 0xf4, 0x50, 0xbf, 0x35, 0x06, 0xff, 0x0c, 0x9e, 0x67, 0xf9, 0x28, 0x89, 0xa3, 0xe1,
-	0x83, 0x71, 0x87, 0x14, 0x77, 0x68, 0x5d, 0xde, 0x3c, 0x3e, 0x3a, 0x57, 0xec, 0x06, 0x83, 0x60,
-	0x59, 0xf4, 0xb5, 0x31, 0x97, 0xa2, 0x13, 0xa6, 0x51, 0x69, 0x9b, 0xc4, 0x84, 0x53, 0xb5, 0x9e,
-	0x95, 0xa3, 0xdf, 0x92, 0x87, 0xc9, 0xd1, 0x43, 0x2a, 0xec, 0xd1, 0x00, 0x5a, 0xe5, 0x06, 0x1a,
-	0xc9, 0x39, 0x09, 0xb8, 0xf5, 0xe5, 0x51, 0xbc, 0xeb, 0xeb, 0x39, 0x61, 0xfe, 0x0b, 0x68, 0x3a,
-	0xa7, 0x31, 0x9b, 0x29, 0x37, 0x7b, 0x60, 0xa1, 0x2b, 0x36, 0x53, 0xe1, 0xdf, 0x1e, 0x1c, 0xbf,
-	0x63, 0x52, 0xc7, 0x51, 0x9c, 0x31, 0xb7, 0xec, 0xd6, 0x90, 0xf6, 0x17, 0x16, 0xff, 0xdd, 0x35,
-	0x5e, 0x59, 0x5c, 0xe3, 0xcb, 0x56, 0xf0, 0x4f, 0xb0, 0x7d, 0x85, 0x59, 0x22, 0x66, 0xab, 0x91,
-	0x39, 0x80, 0x9a, 0xd5, 0x8c, 0x23, 0xe2, 0xde, 0xc2, 0x3f, 0x3c, 0x68, 0x9b, 0x8a, 0x7e, 0xc2,
-	0x0b, 0x96, 0x30, 0x1e, 0xad, 0x78, 0xc7, 0xaf, 0x61, 0xdb, 0xd5, 0x72, 0x64, 0xc3, 0x5d, 0x39,
-	0x5d, 0x1b, 0x5c, 0x4e, 0xf3, 0xc5, 0x2f, 0x4a, 0x9e, 0x4b, 0x46, 0x52, 0xb6, 0x5f, 0x3b, 0x17,
-	0x7d, 0xe5, 0xd0, 0xf0, 0x7b, 0x38, 0xbc, 0xe6, 0x93, 0xb5, 0xf9, 0x84, 0x67, 0xd0, 0x2e, 0xe2,
-	0x57, 0xff, 0x46, 0x99, 0xd3, 0x3f, 0xc4, 0xfa, 0xe3, 0x58, 0xb2, 0xe9, 0x5a, 0xa7, 0xff, 0xe3,
-	0xc1, 0x9e, 0xdd, 0xaf, 0x6b, 0x7c, 0x20, 0x17, 0x46, 0x7d, 0x63, 0xe9, 0xa8, 0x57, 0x3e, 0x8f,
-	0xfa, 0x73, 0x68, 0x70, 0x9c, 0xba, 0x39, 0xb5, 0x3a, 0xa9, 0x73, 0x9c, 0xda, 0xc1, 0x3c, 0x85,
-	0x5d, 0x63, 0x2c, 0xc6, 0x8b, 0x7c, 0xaa, 0xb6, 0xea, 0x1c, 0xa7, 0xef, 0xec, 0x48, 0x19, 0xf4,
-	0xe2, 0x0c, 0x76, 0x84, 0xbc, 0xe9, 0xe8, 0xf9, 0x3f, 0x3c, 0x75, 0x51, 0x2f, 0xc8, 0xff, 0xf2,
-	0xe2, 0x26, 0xd6, 0x1f, 0xf3, 0x51, 0x27, 0x12, 0x69, 0x57, 0x31, 0xc5, 0x6e, 0x63, 0xec, 0xa6,
-	0x82, 0xc7, 0x5a, 0xc8, 0xae, 0xd9, 0x51, 0xa3, 0x1a, 0x85, 0x7c, 0xfb, 0x7f, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0x8c, 0xb1, 0x68, 0xef, 0x46, 0x0a, 0x00, 0x00,
+var fileDescriptor_Contract_6198a9b3479eb160 = []byte{
+	// 1467 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x58, 0xcb, 0x6e, 0x1b, 0xc7,
+	0x12, 0xbd, 0x23, 0x8a, 0x92, 0x58, 0xa4, 0x1e, 0x1e, 0x91, 0x22, 0x2d, 0x43, 0xb0, 0x3c, 0xbe,
+	0xd7, 0x57, 0xca, 0x82, 0x32, 0x94, 0x8d, 0x61, 0x38, 0x01, 0xa8, 0x87, 0x63, 0x01, 0x06, 0x23,
+	0x50, 0x94, 0x8d, 0x38, 0x40, 0x06, 0xad, 0x99, 0x12, 0x3d, 0xf1, 0x70, 0x7a, 0xd2, 0xdd, 0x23,
+	0x89, 0xfe, 0x81, 0x2c, 0xb2, 0xc8, 0x03, 0xd9, 0x24, 0x9f, 0x90, 0x7d, 0xf6, 0xf9, 0x82, 0xac,
+	0xb3, 0xcf, 0x3a, 0xff, 0x10, 0xf4, 0x8b, 0x1a, 0x49, 0x16, 0x22, 0x12, 0x01, 0xbc, 0xd2, 0xf4,
+	0xe9, 0xaa, 0xd3, 0xa7, 0xab, 0xab, 0xaa, 0x5b, 0x84, 0xc5, 0x80, 0x32, 0xdc, 0xd8, 0xa6, 0x89,
+	0x60, 0x24, 0x10, 0xcd, 0x94, 0x51, 0x41, 0xdd, 0x19, 0xf5, 0x27, 0xa0, 0xf1, 0xf2, 0xbc, 0x9a,
+	0xee, 0x32, 0x9a, 0xe8, 0x29, 0xef, 0x3b, 0x07, 0x6a, 0xad, 0x20, 0xa0, 0x59, 0x22, 0xb6, 0x19,
+	0x12, 0x81, 0xd6, 0xd5, 0xbd, 0x0f, 0xb3, 0xf4, 0x34, 0x41, 0xe6, 0x93, 0x30, 0x64, 0xc8, 0x79,
+	0xc3, 0x59, 0x75, 0xd6, 0x2a, 0x9d, 0x8a, 0x02, 0x5b, 0x1a, 0x73, 0xff, 0x0f, 0xf3, 0x44, 0x7b,
+	0x0f, 0xcd, 0x26, 0x94, 0xd9, 0x9c, 0x81, 0xad, 0xe1, 0x3a, 0x4c, 0x8a, 0x41, 0x8a, 0x8d, 0xc2,
+	0xaa, 0xb3, 0x36, 0xb7, 0x59, 0x6b, 0x5a, 0x45, 0x4d, 0xb3, 0x78, 0x77, 0x90, 0x62, 0x47, 0x99,
+	0x78, 0xfe, 0x50, 0xd1, 0x61, 0x1a, 0xe6, 0x15, 0xdd, 0x83, 0x8a, 0x5d, 0x2c, 0x21, 0x7d, 0x34,
+	0x82, 0xca, 0x06, 0x6b, 0x93, 0x3e, 0x5e, 0x15, 0x3d, 0x71, 0x55, 0xb4, 0xf7, 0x0a, 0xaa, 0x07,
+	0x28, 0xcc, 0x1a, 0x7b, 0xe1, 0x90, 0x7f, 0x05, 0xc0, 0xf2, 0x47, 0xa1, 0x61, 0x2f, 0x11, 0x6b,
+	0x76, 0x33, 0xee, 0x04, 0x16, 0xba, 0x8c, 0x24, 0xfc, 0x18, 0xd9, 0x68, 0x91, 0x5c, 0x01, 0x10,
+	0xf4, 0x12, 0x75, 0x49, 0x50, 0x3b, 0xbd, 0x04, 0x53, 0xa4, 0x2f, 0x85, 0xa8, 0x08, 0x16, 0x3a,
+	0x66, 0xe4, 0xfd, 0xe0, 0x40, 0xcd, 0x2e, 0xd8, 0xe2, 0x1c, 0xc5, 0x85, 0xdd, 0x48, 0x20, 0x1f,
+	0xab, 0x92, 0x42, 0x6e, 0x1c, 0xa9, 0x4b, 0xa2, 0x0a, 0xd7, 0x8b, 0x9a, 0xbc, 0x20, 0xea, 0x1b,
+	0x07, 0x6e, 0xbd, 0xa0, 0x02, 0x2f, 0x0a, 0xba, 0x51, 0x18, 0xee, 0x41, 0xe5, 0x84, 0x0a, 0xcc,
+	0xa9, 0x2a, 0xc8, 0x33, 0x96, 0x98, 0x35, 0x69, 0xc0, 0x34, 0xcf, 0xd2, 0x94, 0x32, 0x1d, 0x8b,
+	0x99, 0x8e, 0x1d, 0xba, 0x55, 0x28, 0xaa, 0xc3, 0x6a, 0x14, 0x57, 0x9d, 0xb5, 0x62, 0x47, 0x0f,
+	0xbc, 0x3f, 0x1c, 0x58, 0x94, 0x6a, 0x5e, 0x46, 0x22, 0x41, 0xce, 0x47, 0xd3, 0xf3, 0x08, 0x8a,
+	0x72, 0x6d, 0x2d, 0xa4, 0xbc, 0xe9, 0x9d, 0x27, 0xee, 0x3b, 0x28, 0x15, 0xd6, 0xd1, 0x0e, 0xd7,
+	0xcb, 0x5c, 0x7e, 0x06, 0x93, 0xd2, 0xf0, 0xca, 0x5e, 0x4d, 0x3e, 0xe7, 0xf7, 0xba, 0x02, 0xa0,
+	0x4c, 0xf4, 0xb6, 0x26, 0x54, 0x94, 0x4b, 0x12, 0xd9, 0x56, 0x5b, 0xfb, 0xc5, 0x81, 0x9a, 0x2e,
+	0x92, 0x03, 0x14, 0x22, 0x4a, 0x7a, 0xa3, 0x6d, 0x6e, 0x1d, 0x16, 0x02, 0xe3, 0x70, 0x29, 0x0d,
+	0xe6, 0x2d, 0x6e, 0x4d, 0x5b, 0xb0, 0x12, 0xd0, 0x84, 0x67, 0x7d, 0xf4, 0x33, 0x8e, 0xcc, 0x67,
+	0xc8, 0x69, 0xc6, 0x02, 0xf4, 0x53, 0x64, 0x01, 0x0e, 0xd3, 0x72, 0xd9, 0x18, 0x1d, 0x72, 0x64,
+	0x1d, 0x63, 0xb2, 0xaf, 0x2d, 0xbc, 0x36, 0xd4, 0x6c, 0xbc, 0xc6, 0xe8, 0x34, 0x0b, 0x50, 0xc8,
+	0x58, 0x6c, 0xe4, 0xc9, 0x4f, 0xef, 0xf3, 0x21, 0xdf, 0xa5, 0x3e, 0x71, 0xd3, 0x7a, 0xcb, 0x94,
+	0x9b, 0x2f, 0x69, 0x2b, 0x3a, 0xb5, 0x35, 0x72, 0xc8, 0x62, 0xef, 0xcf, 0x22, 0xb8, 0x2a, 0x7d,
+	0xf7, 0x38, 0xcf, 0x46, 0xa4, 0x76, 0x61, 0x52, 0xd5, 0x9c, 0xd6, 0xaa, 0xbe, 0x25, 0x46, 0x8e,
+	0x8e, 0x98, 0xa9, 0x21, 0xf5, 0x2d, 0xcf, 0x5f, 0x50, 0x41, 0x62, 0x5f, 0x26, 0x46, 0x3c, 0x30,
+	0x45, 0x54, 0x56, 0xd8, 0x81, 0x82, 0xdc, 0x36, 0xcc, 0x1e, 0x33, 0xfa, 0x16, 0x13, 0x6b, 0x53,
+	0x54, 0x69, 0xb8, 0x9e, 0xeb, 0x9f, 0x57, 0x44, 0x36, 0x9f, 0x2a, 0x0f, 0xcd, 0xd0, 0xa9, 0x1c,
+	0xe7, 0x46, 0x6e, 0x1d, 0xa6, 0x05, 0x3b, 0xf3, 0x93, 0xac, 0xdf, 0x98, 0x52, 0x35, 0x32, 0x25,
+	0xd8, 0x59, 0x3b, 0xeb, 0xcb, 0xf0, 0x4a, 0x70, 0x46, 0x81, 0xf2, 0x53, 0x06, 0x88, 0x0b, 0xc2,
+	0x84, 0x2f, 0xa2, 0x3e, 0x36, 0x4a, 0x3a, 0xf5, 0x14, 0xd2, 0x8d, 0xfa, 0xe8, 0xde, 0x86, 0x19,
+	0x4c, 0x42, 0x3d, 0x09, 0x6a, 0x72, 0x1a, 0x93, 0x50, 0x4d, 0x55, 0xa1, 0x48, 0x59, 0x88, 0xac,
+	0x51, 0x56, 0xb8, 0x1e, 0x0c, 0x53, 0x99, 0xcb, 0x2b, 0xa8, 0xb1, 0xa0, 0x16, 0x52, 0xa9, 0x7c,
+	0x20, 0x01, 0x77, 0x15, 0xca, 0x21, 0xf2, 0x80, 0x45, 0xa9, 0x88, 0x68, 0xd2, 0xa8, 0xea, 0x5a,
+	0xc8, 0x41, 0x36, 0x03, 0x6a, 0xc3, 0x0c, 0x70, 0x37, 0xa0, 0x7a, 0xcc, 0x10, 0x7d, 0xd3, 0xe7,
+	0x50, 0xf8, 0x71, 0xd4, 0x8f, 0x44, 0x63, 0x49, 0xad, 0x7b, 0x4b, 0xce, 0xa9, 0xf0, 0xb4, 0x51,
+	0x3c, 0x97, 0x13, 0xee, 0x13, 0xb8, 0x93, 0x66, 0x47, 0x71, 0x14, 0xf8, 0xef, 0xf4, 0xab, 0x2b,
+	0xbf, 0xba, 0x36, 0x79, 0x7a, 0x73, 0xef, 0x8c, 0x93, 0x1e, 0x36, 0x1a, 0xd7, 0x79, 0x1f, 0xca,
+	0xe9, 0x9c, 0x77, 0x4c, 0x04, 0x72, 0xa1, 0x49, 0xa4, 0xbb, 0x8a, 0xe1, 0xed, 0xbc, 0xf7, 0x73,
+	0x65, 0x21, 0x39, 0xda, 0xa8, 0xc2, 0xbd, 0xdc, 0x85, 0x4a, 0xfe, 0x58, 0x65, 0x22, 0x9a, 0xc4,
+	0x30, 0x1d, 0xd8, 0x51, 0xfe, 0xe6, 0xb4, 0x5b, 0x0a, 0x73, 0xef, 0x42, 0xd9, 0x18, 0x85, 0x64,
+	0xc0, 0x4d, 0xfb, 0x00, 0x0d, 0xed, 0x90, 0x01, 0xf7, 0x7e, 0x76, 0x60, 0x65, 0x9f, 0x30, 0x11,
+	0x05, 0x51, 0x4a, 0x4c, 0xbf, 0x1e, 0x23, 0xe1, 0xff, 0xe1, 0xee, 0xba, 0x78, 0x13, 0x15, 0x2e,
+	0xdf, 0x44, 0xd7, 0xdd, 0x22, 0xbf, 0x39, 0x50, 0x93, 0x21, 0x78, 0x8b, 0x5b, 0x24, 0x26, 0x49,
+	0x30, 0xa2, 0xa8, 0xff, 0xc1, 0x9c, 0xd9, 0xfc, 0x91, 0x76, 0x37, 0xfb, 0x37, 0x71, 0x33, 0x9c,
+	0xf2, 0x05, 0x63, 0x63, 0x94, 0x31, 0xa2, 0x72, 0x4f, 0xb7, 0x32, 0xe3, 0xbd, 0x63, 0x50, 0x77,
+	0x13, 0x66, 0x6c, 0xd3, 0x53, 0x09, 0x3f, 0xb7, 0xb9, 0x74, 0x5e, 0x85, 0xb6, 0xd7, 0x6d, 0xd3,
+	0x10, 0x3b, 0x43, 0x3b, 0x8f, 0x41, 0xfd, 0x30, 0x39, 0x1e, 0x7f, 0x0f, 0xe3, 0xac, 0xf9, 0x04,
+	0x6a, 0x76, 0xcd, 0xd1, 0xef, 0x5f, 0xef, 0x63, 0xa8, 0xbf, 0x8c, 0xc4, 0xeb, 0x90, 0x91, 0xd3,
+	0x71, 0x14, 0x7b, 0xbf, 0x3a, 0xb0, 0xa8, 0xdb, 0xf1, 0x18, 0x97, 0xff, 0xa5, 0x1e, 0x30, 0x71,
+	0x6d, 0x0f, 0x28, 0x9c, 0xf7, 0x80, 0x3b, 0x50, 0x4a, 0xf0, 0xd4, 0x14, 0xb0, 0x4e, 0xa0, 0x99,
+	0x04, 0x4f, 0x75, 0xc5, 0xae, 0xc1, 0x82, 0x9c, 0xb4, 0x75, 0xa7, 0x6c, 0x8a, 0xfa, 0x74, 0x13,
+	0x3c, 0xdd, 0xd7, 0xb5, 0x26, 0x51, 0xef, 0x77, 0x07, 0x96, 0xf6, 0x19, 0x4d, 0x29, 0x27, 0xf1,
+	0x38, 0xd7, 0xd3, 0x3e, 0x40, 0x4a, 0x18, 0xe9, 0xa3, 0x40, 0x66, 0x1f, 0x0b, 0x0f, 0xcf, 0xcf,
+	0xea, 0xdd, 0xd4, 0xcd, 0xfd, 0xa1, 0xcb, 0x6e, 0x22, 0xd8, 0xa0, 0x93, 0xe3, 0x58, 0xfe, 0x08,
+	0xe6, 0x2f, 0x4d, 0xcb, 0xdd, 0xbf, 0xc1, 0x81, 0x29, 0x75, 0xf9, 0x29, 0x5b, 0xed, 0x09, 0x89,
+	0x33, 0x9b, 0xdb, 0x7a, 0xf0, 0x78, 0xe2, 0x91, 0xe3, 0x7d, 0xed, 0x40, 0xdd, 0xae, 0xda, 0x4a,
+	0x53, 0x46, 0x4f, 0x46, 0xdc, 0xd1, 0x5d, 0x28, 0xa7, 0xc6, 0x5f, 0x3e, 0x87, 0x4d, 0xf3, 0xb0,
+	0xd0, 0x5e, 0xe8, 0x3e, 0x80, 0xf9, 0x88, 0x4b, 0x0a, 0x9f, 0x28, 0x7e, 0x12, 0x9b, 0x87, 0xce,
+	0x6c, 0xc4, 0x5b, 0x61, 0xd8, 0x32, 0xa0, 0xf7, 0xc5, 0x79, 0x64, 0x77, 0x30, 0x46, 0xf1, 0x2f,
+	0xeb, 0xf0, 0x4e, 0x60, 0x51, 0x87, 0xf5, 0xa0, 0x4f, 0xd8, 0x88, 0x19, 0xf7, 0x18, 0x2a, 0x32,
+	0x41, 0xec, 0x6b, 0x47, 0xb1, 0x97, 0x37, 0xeb, 0xe7, 0x07, 0x77, 0x81, 0xb3, 0x53, 0x4e, 0xf0,
+	0xd4, 0x0e, 0xbc, 0x9f, 0x1c, 0xa8, 0x76, 0x59, 0xd4, 0xeb, 0x21, 0x1b, 0x63, 0xe5, 0x11, 0xde,
+	0x5e, 0x2b, 0x00, 0x01, 0x89, 0x63, 0x5f, 0x9f, 0xb4, 0xee, 0x4e, 0x25, 0x89, 0xbc, 0x90, 0x80,
+	0x7c, 0x5a, 0x84, 0x44, 0x10, 0x95, 0xfc, 0x95, 0x8e, 0xfa, 0xf6, 0x3e, 0x05, 0x77, 0x2b, 0x1b,
+	0x1c, 0x08, 0xca, 0x48, 0x6f, 0xc4, 0x78, 0x57, 0xa1, 0xf8, 0x55, 0x46, 0x86, 0xaf, 0x4d, 0x3d,
+	0xf0, 0xba, 0x50, 0x3f, 0x27, 0xdc, 0x1a, 0x08, 0xe4, 0x23, 0xb3, 0x1e, 0x0d, 0xf4, 0x3b, 0x5a,
+	0xb1, 0xaa, 0x81, 0xe7, 0xc3, 0xe2, 0x01, 0xc6, 0xf1, 0x58, 0x3a, 0xef, 0xc3, 0x2c, 0xd7, 0x7e,
+	0x7e, 0x9e, 0xb9, 0xc2, 0x73, 0x1a, 0xbd, 0xbf, 0x1c, 0x58, 0xda, 0x3d, 0x0b, 0x5e, 0x93, 0xa4,
+	0x87, 0xe3, 0x94, 0xf5, 0x7f, 0x61, 0xee, 0x38, 0x62, 0x5c, 0xf8, 0x82, 0xbe, 0xc1, 0xc4, 0xe6,
+	0x5f, 0xa5, 0x53, 0x51, 0x68, 0x57, 0x82, 0x7b, 0xa1, 0xdb, 0x84, 0xc5, 0xbc, 0x95, 0xbd, 0x6f,
+	0x0a, 0xe6, 0x19, 0x32, 0x34, 0xb5, 0x77, 0xce, 0x03, 0x98, 0xe7, 0x18, 0x50, 0xf9, 0x7c, 0xb2,
+	0xb4, 0xfa, 0xf0, 0x66, 0x35, 0x6c, 0x79, 0x1f, 0x42, 0xf5, 0x82, 0x9d, 0x25, 0xd6, 0x2d, 0xcc,
+	0xcd, 0x19, 0x1b, 0x66, 0xef, 0xdb, 0xdc, 0x7e, 0xf7, 0x92, 0x2f, 0x31, 0x10, 0x23, 0x17, 0x1b,
+	0x1a, 0xf7, 0x5c, 0xb1, 0x59, 0x68, 0x2f, 0x94, 0xcf, 0xbe, 0xa1, 0x66, 0xdd, 0x85, 0xa7, 0x85,
+	0x51, 0x3b, 0x4c, 0x9c, 0xc9, 0x7c, 0xe2, 0x7c, 0xef, 0x40, 0xc3, 0x2a, 0xb2, 0x37, 0xcb, 0xfb,
+	0xd6, 0xf4, 0xa3, 0x03, 0x77, 0xac, 0x26, 0xf5, 0xcf, 0x33, 0x09, 0xe4, 0xed, 0xf2, 0x9e, 0x65,
+	0x7d, 0xb0, 0x0e, 0x95, 0xfc, 0x9d, 0xee, 0xce, 0x42, 0x69, 0xab, 0xd5, 0xde, 0x79, 0xb9, 0xb7,
+	0xd3, 0x7d, 0xb6, 0xf0, 0x1f, 0x17, 0x60, 0x6a, 0xb7, 0xbd, 0xdb, 0xf9, 0xe4, 0xb3, 0x05, 0x67,
+	0xeb, 0x09, 0xcc, 0x53, 0xd6, 0x6b, 0x8a, 0xe1, 0x0f, 0x39, 0x7c, 0x6b, 0xc6, 0xca, 0x7f, 0x75,
+	0xb7, 0x17, 0x89, 0xd7, 0xd9, 0x51, 0x33, 0xa0, 0xfd, 0x0d, 0x4e, 0x38, 0x39, 0x8b, 0x70, 0xa3,
+	0x4f, 0x93, 0x48, 0x50, 0xb6, 0x21, 0xdf, 0xda, 0x47, 0x53, 0xca, 0xe5, 0xc3, 0xbf, 0x03, 0x00,
+	0x00, 0xff, 0xff, 0x4e, 0x6a, 0xfe, 0x9b, 0x2d, 0x12, 0x00, 0x00,
 }
