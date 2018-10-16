@@ -3,20 +3,20 @@ package models
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
+	"github.com/sasaxie/monitor/common/config"
 	"io/ioutil"
 	"log"
 	"os"
 )
 
-const FilePath = "/data/monitor/conf/servers_prod2.json"
-
-var Sc = new(ServerConfig)
+var NodeList = new(Nodes)
 
 func init() {
-	Sc.Load(FilePath)
+	NodeList.Load(fmt.Sprintf("conf/%s", config.MonitorConfig.Node.DataFile))
 }
 
-type ServerConfig struct {
+type Nodes struct {
 	Addresses []*Address `json:"addresses"`
 }
 
@@ -26,7 +26,7 @@ type Address struct {
 	Type string `json:"type"`
 }
 
-func (s *ServerConfig) Load(filePath string) {
+func (s *Nodes) Load(filePath string) {
 	file, err := os.Open(filePath)
 	defer file.Close()
 
@@ -49,7 +49,7 @@ func (s *ServerConfig) Load(filePath string) {
 	}
 }
 
-func (s *ServerConfig) String() string {
+func (s *Nodes) String() string {
 
 	b, err := json.MarshalIndent(s, "", "\t")
 	if err != nil {

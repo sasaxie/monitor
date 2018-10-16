@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/influxdata/influxdb/client/v2"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
 	"log"
@@ -19,12 +20,11 @@ type WitnessInfo struct {
 }
 
 func main() {
-
 	var err error
 	c, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://localhost:8086",
-		Username: "tron",
-		Password: "trondb",
+		Addr:     config.MonitorConfig.InfluxDB.Address,
+		Username: config.MonitorConfig.InfluxDB.Username,
+		Password: config.MonitorConfig.InfluxDB.Password,
 	})
 
 	if err != nil {
@@ -39,7 +39,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				for _, address := range models.Sc.Addresses {
+				for _, address := range models.NodeList.Addresses {
 					if strings.EqualFold("full_node", address.Type) {
 						go dealFullNode(address.Ip, address.Port)
 					} else if strings.EqualFold("solidity_node", address.Type) {
@@ -79,7 +79,7 @@ func dealFullNode(ip string, port int) {
 	wg.Wait()
 
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "tronmonitor",
+		Database:  config.MonitorConfig.InfluxDB.Database,
 		Precision: "s",
 	})
 	if err != nil {
@@ -141,7 +141,7 @@ func dealSolidityNode(ip string, port int) {
 	wg.Wait()
 
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  "tronmonitor",
+		Database:  config.MonitorConfig.InfluxDB.Database,
 		Precision: "s",
 	})
 	if err != nil {
