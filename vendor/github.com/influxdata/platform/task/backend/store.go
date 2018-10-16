@@ -2,7 +2,7 @@ package backend
 
 // The tooling needed to correctly run go generate is managed by the Makefile.
 // Run `make` from the project root to ensure these generate commands execute correctly.
-//go:generate protoc -I . --plugin ../../bin/${GOOS}/protoc-gen-gogofaster --gogofaster_out=plugins=grpc:. ./meta.proto
+//go:generate protoc -I ../../internal -I . --plugin ../../scripts/protoc-gen-gogofaster --gogofaster_out=plugins=grpc:. ./meta.proto
 
 import (
 	"context"
@@ -15,23 +15,27 @@ import (
 	"github.com/influxdata/platform/task/options"
 )
 
-// ErrUserNotFound is an error for when we can't find a user
-var ErrUserNotFound = errors.New("user not found")
+var (
+	// ErrTaskNotFound indicates no task could be found for given parameters.
+	ErrTaskNotFound = errors.New("task not found")
 
-// ErrOrgNotFound is an error for when we can't find an org
-var ErrOrgNotFound = errors.New("org not found")
+	// ErrUserNotFound is an error for when we can't find a user
+	ErrUserNotFound = errors.New("user not found")
 
-// ErrTaskNameTaken is an error for when a task name is already taken
-var ErrTaskNameTaken = errors.New("task name already in use by current user or target organization")
+	// ErrOrgNotFound is an error for when we can't find an org
+	ErrOrgNotFound = errors.New("org not found")
 
-// ErrManualQueueFull is returned when a manual run request cannot be completed.
-var ErrManualQueueFull = errors.New("manual queue at capacity")
+	// ErrManualQueueFull is returned when a manual run request cannot be completed.
+	ErrManualQueueFull = errors.New("manual queue at capacity")
+)
 
 type TaskStatus string
 
 const (
-	TaskEnabled  TaskStatus = "enabled"
-	TaskDisabled TaskStatus = "disabled"
+	TaskActive   TaskStatus = "active"
+	TaskInactive TaskStatus = "inactive"
+
+	DefaultTaskStatus TaskStatus = TaskActive
 )
 
 type RunStatus int
@@ -79,13 +83,28 @@ type RunCreation struct {
 	HasQueue bool
 }
 
+type CreateTaskRequest struct {
+	// Owners.
+	Org, User platform.ID
+
+	// Script content of the task.
+	Script string
+
+	// Unix timestamp (seconds elapsed since January 1, 1970 UTC).
+	// The first run of the task will be run according to the earliest time after ScheduleAfter,
+	// matching the task's schedul via its cron or every option.
+	ScheduleAfter int64
+
+	// The initial task status.
+	// If empty, will be treated as DefaultTaskStatus.
+	Status TaskStatus
+}
+
 // Store is the interface around persisted tasks.
 type Store interface {
-	// CreateTask creates a task with the given script, belonging to the given org and user.
-	// The scheduleAfter parameter is a Unix timestamp (seconds elapsed since January 1, 1970 UTC),
-	// and the first run of the task will be run according to the earliest time after scheduleAfter,
-	// matching the task's schedule via its cron or every option.
-	CreateTask(ctx context.Context, org, user platform.ID, script string, scheduleAfter int64) (platform.ID, error)
+	// CreateTask creates a task with from the given CreateTaskRequest.
+	// If the task is created successfully, the ID of the new task is returned.
+	CreateTask(ctx context.Context, req CreateTaskRequest) (platform.ID, error)
 
 	// ModifyTask updates the script of an existing task.
 	// It returns an error if there was no task matching the given ID.
@@ -104,10 +123,10 @@ type Store interface {
 	// FindTaskByIDWithMeta combines finding the task and the meta into a single call.
 	FindTaskByIDWithMeta(ctx context.Context, id platform.ID) (*StoreTask, *StoreTaskMeta, error)
 
-	// EnableTask updates task status to enabled.
+	// EnableTask updates task status to active.
 	EnableTask(ctx context.Context, id platform.ID) error
 
-	// disableTask updates task status to disabled.
+	// DisableTask updates task status to inactive.
 	DisableTask(ctx context.Context, id platform.ID) error
 
 	// DeleteTask returns whether an entry matching the given ID was deleted.
@@ -242,29 +261,33 @@ type StoreValidation struct{}
 
 // CreateArgs returns the script's parsed options,
 // and an error if any of the provided fields are invalid for creating a task.
-func (StoreValidation) CreateArgs(org, user platform.ID, script string) (options.Options, error) {
+func (StoreValidation) CreateArgs(req CreateTaskRequest) (options.Options, error) {
 	var missing []string
 	var o options.Options
 
-	if script == "" {
+	if req.Script == "" {
 		missing = append(missing, "script")
 	} else {
 		var err error
-		o, err = options.FromScript(script)
+		o, err = options.FromScript(req.Script)
 		if err != nil {
 			return o, err
 		}
 	}
 
-	if !org.Valid() {
+	if !req.Org.Valid() {
 		missing = append(missing, "organization ID")
 	}
-	if !user.Valid() {
+	if !req.User.Valid() {
 		missing = append(missing, "user ID")
 	}
 
 	if len(missing) > 0 {
 		return o, fmt.Errorf("missing required fields to create task: %s", strings.Join(missing, ", "))
+	}
+
+	if req.Status != "" && req.Status != TaskActive && req.Status != TaskInactive {
+		return o, fmt.Errorf("invalid status: %s", req.Status)
 	}
 
 	return o, nil

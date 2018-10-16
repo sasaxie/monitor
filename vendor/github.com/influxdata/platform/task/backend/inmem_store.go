@@ -35,8 +35,8 @@ func NewInMemStore() Store {
 	}
 }
 
-func (s *inmem) CreateTask(_ context.Context, org, user platform.ID, script string, scheduleAfter int64) (platform.ID, error) {
-	o, err := StoreValidator.CreateArgs(org, user, script)
+func (s *inmem) CreateTask(_ context.Context, req CreateTaskRequest) (platform.ID, error) {
+	o, err := StoreValidator.CreateArgs(req)
 	if err != nil {
 		return platform.InvalidID(), err
 	}
@@ -46,25 +46,30 @@ func (s *inmem) CreateTask(_ context.Context, org, user platform.ID, script stri
 	task := StoreTask{
 		ID: id,
 
-		Org:  org,
-		User: user,
+		Org:  req.Org,
+		User: req.User,
 
 		Name: o.Name,
 
-		Script: script,
+		Script: req.Script,
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.tasks = append(s.tasks, task)
-	s.runners[id.String()] = StoreTaskMeta{
+
+	stm := StoreTaskMeta{
 		MaxConcurrency:  int32(o.Concurrency),
-		Status:          string(TaskEnabled),
-		LatestCompleted: scheduleAfter,
+		Status:          string(req.Status),
+		LatestCompleted: req.ScheduleAfter,
 		EffectiveCron:   o.EffectiveCronString(),
 		Delay:           int32(o.Delay / time.Second),
 	}
+	if stm.Status == "" {
+		stm.Status = string(DefaultTaskStatus)
+	}
+	s.runners[id.String()] = stm
 
 	return id, nil
 }
@@ -162,20 +167,24 @@ func (s *inmem) FindTaskByID(_ context.Context, id platform.ID) (*StoreTask, err
 		}
 	}
 
-	return nil, nil
+	return nil, ErrTaskNotFound
 }
 
 func (s *inmem) FindTaskByIDWithMeta(_ context.Context, id platform.ID) (*StoreTask, *StoreTaskMeta, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	task := new(StoreTask)
+	var task *StoreTask
 	for _, t := range s.tasks {
 		if t.ID == id {
 			// Return a copy of the task.
+			task = new(StoreTask)
 			*task = t
 			break
 		}
+	}
+	if task == nil {
+		return nil, nil, ErrTaskNotFound
 	}
 
 	meta, ok := s.runners[id.String()]
@@ -196,7 +205,7 @@ func (s *inmem) EnableTask(ctx context.Context, id platform.ID) error {
 	if !ok {
 		return errors.New("task meta not found")
 	}
-	meta.Status = string(TaskEnabled)
+	meta.Status = string(TaskActive)
 	s.runners[strID] = meta
 
 	return nil
@@ -211,7 +220,7 @@ func (s *inmem) DisableTask(ctx context.Context, id platform.ID) error {
 	if !ok {
 		return errors.New("task meta not found")
 	}
-	meta.Status = string(TaskDisabled)
+	meta.Status = string(TaskInactive)
 	s.runners[strID] = meta
 
 	return nil
@@ -223,7 +232,7 @@ func (s *inmem) FindTaskMetaByID(ctx context.Context, id platform.ID) (*StoreTas
 
 	meta, ok := s.runners[id.String()]
 	if !ok {
-		return nil, errors.New("task meta not found")
+		return nil, ErrTaskNotFound
 	}
 
 	return &meta, nil

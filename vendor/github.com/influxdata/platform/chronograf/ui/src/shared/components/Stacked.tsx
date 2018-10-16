@@ -13,6 +13,7 @@ import {Options} from 'src/external/dygraph'
 import {StackedView} from 'src/types/v2/dashboards'
 import {TimeRange} from 'src/types/v2'
 import {FluxTable, RemoteDataState} from 'src/types'
+import {setHoverTime} from 'src/dashboards/actions/v2/hoverTime'
 
 interface Props {
   loading: RemoteDataState
@@ -20,17 +21,12 @@ interface Props {
   timeRange: TimeRange
   tables: FluxTable[]
   viewID: string
-  staticLegend: boolean
-  onZoom: () => void
-  handleSetHoverTime: () => void
+  onZoom: (range: TimeRange) => void
+  handleSetHoverTime: typeof setHoverTime
 }
 
 @ErrorHandlingWith(InvalidData)
 class Stacked extends PureComponent<Props> {
-  public static defaultProps: Partial<Props> = {
-    staticLegend: false,
-  }
-
   public render() {
     const {
       tables,
@@ -39,7 +35,6 @@ class Stacked extends PureComponent<Props> {
       loading,
       timeRange,
       properties,
-      staticLegend,
       handleSetHoverTime,
     } = this.props
 
@@ -60,7 +55,6 @@ class Stacked extends PureComponent<Props> {
               options={this.options}
               timeRange={timeRange}
               timeSeries={dygraphsData}
-              staticLegend={staticLegend}
               handleSetHoverTime={handleSetHoverTime}
             />
           </DygraphCell>

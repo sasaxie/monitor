@@ -5,12 +5,17 @@ import {connect} from 'react-redux'
 import {ErrorHandling} from 'src/shared/decorators/errors'
 
 import {DYGRAPH_CONTAINER_XLABEL_MARGIN} from 'src/shared/constants'
+import {AppState} from 'src/types/v2'
 
-interface Props {
-  hoverTime: number
+interface OwnProps {
   dygraph: Dygraph
-  staticLegendHeight: number
 }
+
+interface StateProps {
+  hoverTime: number
+}
+
+type Props = OwnProps & StateProps
 
 @ErrorHandling
 class Crosshair extends PureComponent<Props> {
@@ -53,13 +58,12 @@ class Crosshair extends PureComponent<Props> {
   }
 
   private get crosshairHeight(): string {
-    return `calc(100% - ${this.props.staticLegendHeight +
-      DYGRAPH_CONTAINER_XLABEL_MARGIN}px)`
+    return `calc(100% - ${DYGRAPH_CONTAINER_XLABEL_MARGIN}px)`
   }
 }
 
-const mapStateToProps = ({hoverTime}) => ({
+const mstp = ({hoverTime}: AppState) => ({
   hoverTime: +hoverTime,
 })
 
-export default connect(mapStateToProps, null)(Crosshair)
+export default connect<StateProps, {}, OwnProps>(mstp, null)(Crosshair)

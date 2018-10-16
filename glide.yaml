@@ -18,3 +18,4 @@ import:
 - package: github.com/influxdata/platform
   subpackages:
   - models
+- package: github.com/BurntSushi/toml

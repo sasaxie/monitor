@@ -24,7 +24,7 @@ type pAdapter struct {
 var _ platform.TaskService = pAdapter{}
 
 func (p pAdapter) FindTaskByID(ctx context.Context, id platform.ID) (*platform.Task, error) {
-	t, err := p.s.FindTaskByID(ctx, id)
+	t, m, err := p.s.FindTaskByIDWithMeta(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (p pAdapter) FindTaskByID(ctx context.Context, id platform.ID) (*platform.T
 		return nil, nil
 	}
 
-	return toPlatformTask(*t)
+	return toPlatformTask(*t, m)
 }
 
 func (p pAdapter) FindTasks(ctx context.Context, filter platform.TaskFilter) ([]*platform.Task, int, error) {
@@ -57,7 +57,7 @@ func (p pAdapter) FindTasks(ctx context.Context, filter platform.TaskFilter) ([]
 
 	pts := make([]*platform.Task, len(ts))
 	for i, t := range ts {
-		pts[i], err = toPlatformTask(t)
+		pts[i], err = toPlatformTask(t, nil)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -75,7 +75,8 @@ func (p pAdapter) CreateTask(ctx context.Context, t *platform.Task) error {
 
 	// TODO(mr): decide whether we allow user to configure scheduleAfter. https://github.com/influxdata/platform/issues/595
 	scheduleAfter := time.Now().Unix()
-	id, err := p.s.CreateTask(ctx, t.Organization, t.Owner.ID, t.Flux, scheduleAfter)
+	req := backend.CreateTaskRequest{Org: t.Organization, User: t.Owner.ID, Script: t.Flux, ScheduleAfter: scheduleAfter}
+	id, err := p.s.CreateTask(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -115,9 +116,9 @@ func (p pAdapter) UpdateTask(ctx context.Context, id platform.ID, upd platform.T
 	if upd.Status != nil {
 		var err error
 		switch *upd.Status {
-		case string(backend.TaskEnabled):
+		case string(backend.TaskActive):
 			err = p.s.EnableTask(ctx, id)
-		case string(backend.TaskDisabled):
+		case string(backend.TaskInactive):
 			err = p.s.DisableTask(ctx, id)
 		default:
 			err = fmt.Errorf("invalid status: %s", *upd.Status)
@@ -160,7 +161,7 @@ func (p pAdapter) RetryRun(ctx context.Context, id platform.ID) (*platform.Run, 
 	return nil, errors.New("not yet implemented")
 }
 
-func toPlatformTask(t backend.StoreTask) (*platform.Task, error) {
+func toPlatformTask(t backend.StoreTask, m *backend.StoreTaskMeta) (*platform.Task, error) {
 	opts, err := options.FromScript(t.Script)
 	if err != nil {
 		return nil, err
@@ -170,7 +171,6 @@ func toPlatformTask(t backend.StoreTask) (*platform.Task, error) {
 		ID:           t.ID,
 		Organization: t.Org,
 		Name:         t.Name,
-		Status:       "", // TODO: set and update status
 		Owner: platform.User{
 			ID:   t.User,
 			Name: "", // TODO(mr): how to get owner name?
@@ -180,6 +180,9 @@ func toPlatformTask(t backend.StoreTask) (*platform.Task, error) {
 	}
 	if opts.Every != 0 {
 		pt.Every = opts.Every.String()
+	}
+	if m != nil {
+		pt.Status = string(m.Status)
 	}
 	return pt, nil
 }

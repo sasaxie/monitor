@@ -93,8 +93,8 @@ func New(db *bolt.DB, rootBucket string) (*Store, error) {
 }
 
 // CreateTask creates a task in the boltdb task store.
-func (s *Store) CreateTask(ctx context.Context, org, user platform.ID, script string, scheduleAfter int64) (platform.ID, error) {
-	o, err := backend.StoreValidator.CreateArgs(org, user, script)
+func (s *Store) CreateTask(ctx context.Context, req backend.CreateTaskRequest) (platform.ID, error) {
+	o, err := backend.StoreValidator.CreateArgs(req)
 	if err != nil {
 		return platform.InvalidID(), err
 	}
@@ -114,7 +114,7 @@ func (s *Store) CreateTask(ctx context.Context, org, user platform.ID, script st
 		}
 
 		// write script
-		err = b.Bucket(tasksPath).Put(encodedID, []byte(script))
+		err = b.Bucket(tasksPath).Put(encodedID, []byte(req.Script))
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (s *Store) CreateTask(ctx context.Context, org, user platform.ID, script st
 		}
 
 		// Encode org ID
-		encodedOrg, err := org.Encode()
+		encodedOrg, err := req.Org.Encode()
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func (s *Store) CreateTask(ctx context.Context, org, user platform.ID, script st
 		}
 
 		// Encoded user ID
-		encodedUser, err := user.Encode()
+		encodedUser, err := req.User.Encode()
 		if err != nil {
 			return err
 		}
@@ -169,13 +169,15 @@ func (s *Store) CreateTask(ctx context.Context, org, user platform.ID, script st
 			return err
 		}
 
-		// metadata
 		stm := backend.StoreTaskMeta{
 			MaxConcurrency:  int32(o.Concurrency),
-			Status:          string(backend.TaskEnabled),
-			LatestCompleted: scheduleAfter,
+			Status:          string(req.Status),
+			LatestCompleted: req.ScheduleAfter,
 			EffectiveCron:   o.EffectiveCronString(),
 			Delay:           int32(o.Delay / time.Second),
+		}
+		if stm.Status == "" {
+			stm.Status = string(backend.DefaultTaskStatus)
 		}
 
 		stmBytes, err := stm.Marshal()
@@ -209,8 +211,8 @@ func (s *Store) ModifyTask(ctx context.Context, id platform.ID, newScript string
 			return err
 		}
 
-		if v := bt.Get(encodedID); v == nil { // this is so we can error if the task doesn't exist
-			return ErrNotFound
+		if v := bt.Get(encodedID); v == nil {
+			return backend.ErrTaskNotFound
 		}
 		err = bt.Put(encodedID, []byte(newScript))
 		if err != nil {
@@ -394,7 +396,7 @@ func (s *Store) FindTaskByID(ctx context.Context, id platform.ID) (*backend.Stor
 		b := tx.Bucket(s.bucket)
 		scriptBytes := b.Bucket(tasksPath).Get(encodedID)
 		if scriptBytes == nil {
-			return ErrNotFound
+			return backend.ErrTaskNotFound
 		}
 		script = string(scriptBytes)
 
@@ -409,9 +411,6 @@ func (s *Store) FindTaskByID(ctx context.Context, id platform.ID) (*backend.Stor
 		name = string(b.Bucket(nameByTaskID).Get(encodedID))
 		return nil
 	})
-	if err == ErrNotFound {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +434,7 @@ func (s *Store) FindTaskMetaByID(ctx context.Context, id platform.ID) (*backend.
 		b := tx.Bucket(s.bucket)
 		stmBytes = b.Bucket(taskMetaPath).Get(encodedID)
 		if stmBytes == nil {
-			return errors.New("task meta not found")
+			return backend.ErrTaskNotFound
 		}
 		return nil
 	})
@@ -464,7 +463,7 @@ func (s *Store) FindTaskByIDWithMeta(ctx context.Context, id platform.ID) (*back
 		b := tx.Bucket(s.bucket)
 		scriptBytes := b.Bucket(tasksPath).Get(encodedID)
 		if scriptBytes == nil {
-			return ErrNotFound
+			return backend.ErrTaskNotFound
 		}
 		script = string(scriptBytes)
 
@@ -487,8 +486,7 @@ func (s *Store) FindTaskByIDWithMeta(ctx context.Context, id platform.ID) (*back
 	}
 
 	stm := backend.StoreTaskMeta{}
-	err = stm.Unmarshal(stmBytes)
-	if err != nil {
+	if err := stm.Unmarshal(stmBytes); err != nil {
 		return nil, nil, err
 	}
 
@@ -498,7 +496,7 @@ func (s *Store) FindTaskByIDWithMeta(ctx context.Context, id platform.ID) (*back
 		User:   userID,
 		Name:   name,
 		Script: script,
-	}, &stm, err
+	}, &stm, nil
 }
 
 func (s *Store) EnableTask(ctx context.Context, id platform.ID) error {
@@ -517,7 +515,7 @@ func (s *Store) EnableTask(ctx context.Context, id platform.ID) error {
 		if err != nil {
 			return err
 		}
-		stm.Status = string(backend.TaskEnabled)
+		stm.Status = string(backend.TaskActive)
 		stmBytes, err = stm.Marshal()
 		if err != nil {
 			return err
@@ -543,7 +541,7 @@ func (s *Store) DisableTask(ctx context.Context, id platform.ID) error {
 		if err != nil {
 			return err
 		}
-		stm.Status = string(backend.TaskDisabled)
+		stm.Status = string(backend.TaskInactive)
 		stmBytes, err = stm.Marshal()
 		if err != nil {
 			return err
@@ -562,7 +560,7 @@ func (s *Store) DeleteTask(ctx context.Context, id platform.ID) (deleted bool, e
 	err = s.db.Batch(func(tx *bolt.Tx) error {
 		b := tx.Bucket(s.bucket)
 		if check := b.Bucket(tasksPath).Get(encodedID); check == nil {
-			return ErrNotFound
+			return backend.ErrTaskNotFound
 		}
 		if err := b.Bucket(taskMetaPath).Delete(encodedID); err != nil {
 			return err
@@ -591,10 +589,10 @@ func (s *Store) DeleteTask(ctx context.Context, id platform.ID) (deleted bool, e
 		}
 		return b.Bucket(orgByTaskID).Delete(encodedID)
 	})
-	if err == ErrNotFound {
-		return false, nil
-	}
 	if err != nil {
+		if err == backend.ErrTaskNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil
@@ -612,7 +610,7 @@ func (s *Store) CreateNextRun(ctx context.Context, taskID platform.ID, now int64
 		b := tx.Bucket(s.bucket)
 		stmBytes := b.Bucket(taskMetaPath).Get(encodedID)
 		if stmBytes == nil {
-			return ErrNotFound
+			return backend.ErrTaskNotFound
 		}
 
 		var stm backend.StoreTaskMeta

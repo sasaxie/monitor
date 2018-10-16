@@ -2,7 +2,7 @@ import {Dispatch} from 'redux'
 
 import {getLinks as getLinksAJAX} from 'src/shared/apis/links'
 
-import {errorThrown} from 'src/shared/actions/errors'
+// Types
 import {Links} from 'src/types/v2/links'
 
 export enum ActionTypes {
@@ -53,7 +53,7 @@ const linksGetFailed = (): LinksGetFailedAction => ({
   type: ActionTypes.LinksGetFailed,
 })
 
-export const getLinksAsync = () => async (
+export const getLinks = () => async (
   dispatch: Dispatch<
     LinksGetRequestedAction | LinksGetCompletedAction | LinksGetFailedAction
   >
@@ -63,8 +63,6 @@ export const getLinksAsync = () => async (
     const links = await getLinksAJAX()
     dispatch(linksGetCompleted(links))
   } catch (error) {
-    const message = `Failed to retrieve links`
-    dispatch(errorThrown(error, message))
     dispatch(linksGetFailed())
   }
 }

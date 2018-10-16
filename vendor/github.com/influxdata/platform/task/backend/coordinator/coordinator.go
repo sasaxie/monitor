@@ -38,8 +38,8 @@ func New(scheduler backend.Scheduler, st backend.Store, opts ...Option) backend.
 	return c
 }
 
-func (c *Coordinator) CreateTask(ctx context.Context, org, user platform.ID, script string, scheduleAfter int64) (platform.ID, error) {
-	id, err := c.Store.CreateTask(ctx, org, user, script, scheduleAfter)
+func (c *Coordinator) CreateTask(ctx context.Context, req backend.CreateTaskRequest) (platform.ID, error) {
+	id, err := c.Store.CreateTask(ctx, req)
 	if err != nil {
 		return id, err
 	}
@@ -70,11 +70,7 @@ func (c *Coordinator) ModifyTask(ctx context.Context, id platform.ID, newScript 
 		return err
 	}
 
-	if err := c.sch.ReleaseTask(id); err != nil {
-		return err
-	}
-
-	if err := c.sch.ClaimTask(task, meta); err != nil {
+	if err := c.sch.UpdateTask(task, meta); err != nil {
 		return err
 	}
 

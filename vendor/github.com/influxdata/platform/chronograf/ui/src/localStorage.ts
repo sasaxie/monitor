@@ -8,7 +8,7 @@ import {LocalStorage} from 'src/types/localStorage'
 
 const VERSION = process.env.npm_package_version
 
-export const loadLocalStorage = (errorsQueue: any[]): LocalStorage | {} => {
+export const loadLocalStorage = (): LocalStorage => {
   try {
     const serializedState = localStorage.getItem('state')
 
@@ -18,7 +18,6 @@ export const loadLocalStorage = (errorsQueue: any[]): LocalStorage | {} => {
       const version = VERSION ? ` (${VERSION})` : ''
 
       console.log(newVersion(version).message) // tslint:disable-line no-console
-      errorsQueue.push(newVersion(version))
     }
 
     delete state.VERSION
@@ -26,19 +25,12 @@ export const loadLocalStorage = (errorsQueue: any[]): LocalStorage | {} => {
     return state
   } catch (error) {
     console.error(loadLocalSettingsFailed(error).message)
-    errorsQueue.push(loadLocalSettingsFailed(error))
-
-    return {}
   }
 }
 
 export const saveToLocalStorage = ({
   app: {persisted},
-  dataExplorerQueryConfigs,
-  timeRange,
-  dataExplorer,
   ranges,
-  script,
 }: LocalStorage): void => {
   try {
     const appPersisted = {app: {persisted}}
@@ -47,11 +39,7 @@ export const saveToLocalStorage = ({
       JSON.stringify({
         ...appPersisted,
         VERSION,
-        timeRange,
         ranges: normalizer(ranges),
-        dataExplorer,
-        dataExplorerQueryConfigs,
-        script,
       })
     )
   } catch (err) {

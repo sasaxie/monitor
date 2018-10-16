@@ -56,14 +56,10 @@ func (t *floatTable) Close() {
 func (t *floatTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -149,14 +145,10 @@ func (t *floatGroupTable) Close() {
 func (t *floatGroupTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -209,14 +201,14 @@ func (t *floatGroupTable) advanceCursor() bool {
 			continue
 		}
 
-		if cur, ok := cur.(cursors.FloatArrayCursor); !ok {
+		if typedCur, ok := cur.(cursors.FloatArrayCursor); !ok {
 			// TODO(sgc): error or skip?
 			cur.Close()
 			t.err = errors.Errorf("expected float cursor type, got %T", cur)
 			return false
 		} else {
 			t.readTags(t.gc.Tags())
-			t.cur = cur
+			t.cur = typedCur
 			return true
 		}
 	}
@@ -265,14 +257,10 @@ func (t *integerTable) Close() {
 func (t *integerTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -358,14 +346,10 @@ func (t *integerGroupTable) Close() {
 func (t *integerGroupTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -418,14 +402,14 @@ func (t *integerGroupTable) advanceCursor() bool {
 			continue
 		}
 
-		if cur, ok := cur.(cursors.IntegerArrayCursor); !ok {
+		if typedCur, ok := cur.(cursors.IntegerArrayCursor); !ok {
 			// TODO(sgc): error or skip?
 			cur.Close()
 			t.err = errors.Errorf("expected integer cursor type, got %T", cur)
 			return false
 		} else {
 			t.readTags(t.gc.Tags())
-			t.cur = cur
+			t.cur = typedCur
 			return true
 		}
 	}
@@ -474,14 +458,10 @@ func (t *unsignedTable) Close() {
 func (t *unsignedTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -567,14 +547,10 @@ func (t *unsignedGroupTable) Close() {
 func (t *unsignedGroupTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -627,14 +603,14 @@ func (t *unsignedGroupTable) advanceCursor() bool {
 			continue
 		}
 
-		if cur, ok := cur.(cursors.UnsignedArrayCursor); !ok {
+		if typedCur, ok := cur.(cursors.UnsignedArrayCursor); !ok {
 			// TODO(sgc): error or skip?
 			cur.Close()
 			t.err = errors.Errorf("expected unsigned cursor type, got %T", cur)
 			return false
 		} else {
 			t.readTags(t.gc.Tags())
-			t.cur = cur
+			t.cur = typedCur
 			return true
 		}
 	}
@@ -683,14 +659,10 @@ func (t *stringTable) Close() {
 func (t *stringTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -776,14 +748,10 @@ func (t *stringGroupTable) Close() {
 func (t *stringGroupTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -836,14 +804,14 @@ func (t *stringGroupTable) advanceCursor() bool {
 			continue
 		}
 
-		if cur, ok := cur.(cursors.StringArrayCursor); !ok {
+		if typedCur, ok := cur.(cursors.StringArrayCursor); !ok {
 			// TODO(sgc): error or skip?
 			cur.Close()
 			t.err = errors.Errorf("expected string cursor type, got %T", cur)
 			return false
 		} else {
 			t.readTags(t.gc.Tags())
-			t.cur = cur
+			t.cur = typedCur
 			return true
 		}
 	}
@@ -892,14 +860,10 @@ func (t *booleanTable) Close() {
 func (t *booleanTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -985,14 +949,10 @@ func (t *booleanGroupTable) Close() {
 func (t *booleanGroupTable) Do(f func(flux.ColReader) error) error {
 	defer t.Close()
 
-	if !t.more {
-		return t.err
-	}
-
-	f(t)
-	for t.advance() {
-		if err := f(t); err != nil {
-			return err
+	if t.more {
+		t.err = f(t)
+		for t.err == nil && t.advance() {
+			t.err = f(t)
 		}
 	}
 
@@ -1045,14 +1005,14 @@ func (t *booleanGroupTable) advanceCursor() bool {
 			continue
 		}
 
-		if cur, ok := cur.(cursors.BooleanArrayCursor); !ok {
+		if typedCur, ok := cur.(cursors.BooleanArrayCursor); !ok {
 			// TODO(sgc): error or skip?
 			cur.Close()
 			t.err = errors.Errorf("expected boolean cursor type, got %T", cur)
 			return false
 		} else {
 			t.readTags(t.gc.Tags())
-			t.cur = cur
+			t.cur = typedCur
 			return true
 		}
 	}
