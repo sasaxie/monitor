@@ -2,6 +2,4 @@
 monitor
 *.tmp
 monitor.tar.gz
-conf/nodes.json
-conf/monitor.toml
 .DS_Store
