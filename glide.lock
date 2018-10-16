@@ -1,27 +1,14 @@
-hash: b1132002b939e10c1c317a2f09d4644c157c6249799265897c6cfd94842834c1
-updated: 2018-07-06T15:51:37.628238+08:00
+hash: 1e95bffa23534c91fbc4126631db2ac190fcdf9ab5c6df82910e27874f012d66
+updated: 2018-10-12T12:17:00.826177+08:00
 imports:
 - name: github.com/astaxie/beego
   version: f16688817aa428d10361394015b40d096b680542
-  subpackages:
-  - config
-  - context
-  - context/param
-  - grace
-  - logs
-  - plugins/cors
-  - session
-  - toolbox
-  - utils
 - name: github.com/ethereum/go-ethereum
   version: ccc0debb63124ee99906c2cfff6125de30e8c62f
   subpackages:
   - crypto
-  - log
-- name: github.com/go-stack/stack
-  version: 259ab82a6cad3992b4e21ff5cac294ccb06474bc
 - name: github.com/golang/protobuf
-  version: 3a3da3a4e26776cc22a79ef46d5d58477532dede
+  version: b4deda0973fb4c70b50d226b1af49f3da59f5265
   subpackages:
   - proto
   - protoc-gen-go
@@ -31,33 +18,44 @@ imports:
   - ptypes/duration
   - ptypes/timestamp
 - name: github.com/gorilla/websocket
-  version: 5ed622c449da6d44c3c8329331ff47a9e5844f71
+  version: 76e4896901ef89d253d69b528d3701dd146fe2ae
+- name: github.com/influxdata/influxdb
+  version: b99b1215f70555027a92585c936a5f9e4611c408
+  subpackages:
+  - client/v2
+  - models
+  - pkg/escape
+- name: github.com/influxdata/platform
+  version: 2b9304d0aeb58879f68618e63c597e576b0783ca
+  subpackages:
+  - models
+  - pkg/escape
 - name: github.com/shengdoushi/base58
   version: c2e5dd9cebf91f86ab174cf5fd8bdb66d99c9e22
 - name: golang.org/x/net
-  version: dfa909b99c79129e1100513e5cd36307665e5723
+  version: 92b859f39abd2d91a854c9f9c4621b2f5054a92d
   subpackages:
   - context
-  - http/httpguts
   - http2
   - http2/hpack
   - idna
   - internal/timeseries
+  - lex/httplex
   - trace
 - name: golang.org/x/text
-  version: 5c1cf69b5978e5a34c5f9ba09a83e56acc4b7877
+  version: f21a4dfb5e38f5895301dc265a8def02365cc3d0
   subpackages:
   - secure/bidirule
   - transform
   - unicode/bidi
   - unicode/norm
 - name: google.golang.org/genproto
-  version: 694d95ba50e67b2e363f3483057db5d4910c18f9
+  version: ff3583edef7de132f219f0efc00e097cabcc0ec0
   subpackages:
   - googleapis/api/annotations
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 1fa3750c9a209f5efbdc2722d40f2657885af5e5
+  version: 168a6198bcb0ef175f7dacec0b8691fc141dc9b8
   subpackages:
   - balancer
   - balancer/base
@@ -71,6 +69,8 @@ imports:
   - grpclb/grpc_lb_v1/messages
   - grpclog
   - internal
+  - internal/channelz
+  - internal/grpcrand
   - keepalive
   - metadata
   - naming
