@@ -1,26 +1,17 @@
 package main
 
 import (
-	"github.com/astaxie/beego"
-	"github.com/sasaxie/monitor/controllers"
-	"github.com/sasaxie/monitor/models"
-	_ "github.com/sasaxie/monitor/routers"
-	"github.com/sasaxie/monitor/service"
+	"github.com/sasaxie/monitor/common/database/influxdb"
+	"github.com/sasaxie/monitor/task"
+	"time"
 )
 
 func main() {
-	if beego.BConfig.RunMode == "dev" {
-		beego.BConfig.WebConfig.DirectoryIndex = true
-		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
+	go task.StartGrpcMonitor()
+
+	defer influxdb.Client.C.Close()
+
+	for {
+		time.Sleep(time.Minute)
 	}
-
-	models.InitServerConfig()
-	service.InitGrpcClients()
-	controllers.InitResponseMap()
-
-	controllers.StartMonitor()
-
-	controllers.GetNodesTask()
-
-	beego.Run()
 }

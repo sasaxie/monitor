@@ -12,3 +12,10 @@ import:
   - crypto
 - package: github.com/astaxie/beego
 - package: github.com/gorilla/websocket
+- package: github.com/influxdata/influxdb
+  subpackages:
+  - client/v2
+- package: github.com/influxdata/platform
+  subpackages:
+  - models
+- package: github.com/BurntSushi/toml

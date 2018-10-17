@@ -1,0 +1,8 @@
+[node]
+dataFile = "nodes.json"
+
+[influxdb]
+address = "http://influxdb_monitor:8086"
+username = "tron"
+password = "trondb"
+database = "tronmonitor"
