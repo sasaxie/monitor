@@ -90,14 +90,21 @@ Open grafana in your browser (default: http://localhost:3000) and login with adm
 2. Add Data Source
 
 Name: influxdb
+
 Type: InfluxDB
 
+
 HTTP URL: http://localhost:8086
+
 HTTP Access: Browser
 
+
 InfluxDB Details Database: tronmonitor
+
 InfluxDB Details User: tron
+
 InfluxDB Details Password: trondb
+
 
 [Save & Test]
 
