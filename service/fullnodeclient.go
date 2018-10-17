@@ -34,6 +34,10 @@ func (g *FullNodeGrpcClient) Start() {
 	g.DatabaseClient = api.NewDatabaseClient(g.Conn)
 }
 
+func (g *FullNodeGrpcClient) Shutdown() {
+	g.Conn.Close()
+}
+
 func (g *FullNodeGrpcClient) GetNowBlockNum() int64 {
 	if g.Conn == nil {
 		return 0

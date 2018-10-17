@@ -1,5 +1,8 @@
 package models
 
+import "sync"
+
 type WitnessInfo struct {
-	TotalMissed int64
+	Info map[string]int64
+	Lock *sync.Mutex
 }

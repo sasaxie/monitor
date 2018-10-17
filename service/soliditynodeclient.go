@@ -32,6 +32,10 @@ func (g *SolidityNodeGrpcClient) Start() {
 	g.DatabaseClient = api.NewDatabaseClient(g.Conn)
 }
 
+func (g *SolidityNodeGrpcClient) Shutdown() {
+	g.Conn.Close()
+}
+
 func (g *SolidityNodeGrpcClient) GetNowBlockNum() int64 {
 	if g.Conn == nil {
 		return 0

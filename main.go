@@ -2,243 +2,126 @@ package main
 
 import (
 	"fmt"
-	"github.com/influxdata/influxdb/client/v2"
 	"github.com/sasaxie/monitor/common/config"
+	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
-	"log"
 	"strings"
 	"sync"
 	"time"
 )
 
-var c client.Client
-
-type WitnessInfo struct {
-	Info map[string]int64
-	lock *sync.Mutex
-}
-
 func main() {
-	var err error
-	c, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr:     config.MonitorConfig.InfluxDB.Address,
-		Username: config.MonitorConfig.InfluxDB.Username,
-		Password: config.MonitorConfig.InfluxDB.Password,
-	})
+	go startGrpcMonitor()
 
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer c.Close()
-
-	go func() {
-		ticker := time.NewTicker(40 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				for _, address := range models.NodeList.Addresses {
-					if strings.EqualFold("full_node", address.Type) {
-						go dealFullNode(address.Ip, address.Port)
-					} else if strings.EqualFold("solidity_node", address.Type) {
-						go dealSolidityNode(address.Ip, address.Port)
-					}
-				}
-			}
-		}
-	}()
+	defer influxdb.Client.C.Close()
 
 	for {
 		time.Sleep(time.Minute)
 	}
 }
 
-func dealFullNode(ip string, port int) {
-	address := fmt.Sprintf("%s:%d", ip, port)
+func startGrpcMonitor() {
+	ticker := time.NewTicker(40 * time.Second)
+	defer ticker.Stop()
 
-	cli := service.NewFullNodeGrpcClient(address)
-
-	cli.Start()
-
-	defer cli.Conn.Close()
-
-	var wg sync.WaitGroup
-	var num int64 = 0
-	var ping int64 = 0
-	var lastSolidityBlockNum int64 = 0
-	witnessInfo := new(WitnessInfo)
-	witnessInfo.Info = make(map[string]int64)
-	witnessInfo.lock = new(sync.Mutex)
-	wg.Add(4)
-	go reportFullNodeNowBlockNum(cli, &wg, &num)
-	go reportFullNodePing(cli, &wg, &ping)
-	go reportFullNodeLastSolidityBlockNum(cli, &wg, &lastSolidityBlockNum)
-	go reportFullNodeWitness(cli, &wg, witnessInfo)
-	wg.Wait()
-
-	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  config.MonitorConfig.InfluxDB.Database,
-		Precision: "s",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	tags := map[string]string{"node": ip}
-	fields := map[string]interface{}{
-		"NowBlockNum":          num,
-		"ping":                 ping,
-		"LastSolidityBlockNum": lastSolidityBlockNum,
-	}
-
-	pt, err := client.NewPoint("node_status", tags, fields, time.Now())
-	if err != nil {
-		log.Fatal(err)
-	}
-	bp.AddPoint(pt)
-
-	tags2 := map[string]string{"node": ip}
-	fields2 := make(map[string]interface{})
-	witnessInfo.lock.Lock()
-	for k, v := range witnessInfo.Info {
-		fields2[k] = v
-	}
-	witnessInfo.lock.Unlock()
-	pt2, err := client.NewPoint("witness", tags2, fields2, time.Now())
-	if err != nil {
-		log.Fatal(err)
-	}
-	bp.AddPoint(pt2)
-
-	if err := c.Write(bp); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func dealSolidityNode(ip string, port int) {
-	address := fmt.Sprintf("%s:%d", ip, port)
-
-	cli := service.NewSolidityNodeGrpcClient(address)
-
-	cli.Start()
-
-	defer cli.Conn.Close()
-
-	var wg sync.WaitGroup
-	var num int64 = 0
-	var ping int64 = 0
-	var lastSolidityBlockNum int64 = 0
-	witnessInfo := new(WitnessInfo)
-	witnessInfo.Info = make(map[string]int64)
-	witnessInfo.lock = new(sync.Mutex)
-	wg.Add(4)
-	go reportSolidityNodeNowBlockNum(cli, &wg, &num)
-	go reportSolidityNodePing(cli, &wg, &ping)
-	go reportSolidityNodeLastSolidityBlockNum(cli, &wg, &lastSolidityBlockNum)
-	go reportSolidityNodeWitness(cli, &wg, witnessInfo)
-	wg.Wait()
-
-	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  config.MonitorConfig.InfluxDB.Database,
-		Precision: "s",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	tags := map[string]string{"node": ip}
-	fields := map[string]interface{}{
-		"NowBlockNum":          num,
-		"ping":                 ping,
-		"LastSolidityBlockNum": lastSolidityBlockNum,
-	}
-
-	pt, err := client.NewPoint("node_status", tags, fields, time.Now())
-	if err != nil {
-		log.Fatal(err)
-	}
-	bp.AddPoint(pt)
-
-	tags2 := map[string]string{"node": ip}
-	fields2 := make(map[string]interface{})
-	witnessInfo.lock.Lock()
-	for k, v := range witnessInfo.Info {
-		fields2[k] = v
-	}
-	witnessInfo.lock.Unlock()
-	pt2, err := client.NewPoint("witness", tags2, fields2, time.Now())
-	if err != nil {
-		log.Fatal(err)
-	}
-	bp.AddPoint(pt2)
-
-	if err := c.Write(bp); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func reportFullNodeNowBlockNum(client *service.FullNodeGrpcClient,
-	wg *sync.WaitGroup, num *int64) {
-	defer wg.Done()
-	*num = client.GetNowBlockNum()
-}
-
-func reportFullNodePing(client *service.FullNodeGrpcClient,
-	wg *sync.WaitGroup, ping *int64) {
-	defer wg.Done()
-	*ping = client.GetPing()
-}
-
-func reportFullNodeLastSolidityBlockNum(client *service.FullNodeGrpcClient,
-	wg *sync.WaitGroup, lastSolidityBlockNum *int64) {
-	defer wg.Done()
-	*lastSolidityBlockNum = client.GetLastSolidityBlockNum()
-}
-
-func reportFullNodeWitness(client *service.FullNodeGrpcClient,
-	wg *sync.WaitGroup, res *WitnessInfo) {
-	defer wg.Done()
-	witnessList := client.ListWitnesses()
-
-	for _, witness := range witnessList.Witnesses {
-		if witness.IsJobs {
-			key := witness.Url
-			res.lock.Lock()
-			res.Info[key] = witness.TotalMissed
-			res.lock.Unlock()
+	for {
+		select {
+		case <-ticker.C:
+			for _, address := range models.NodeList.Addresses {
+				if strings.EqualFold(config.FullNode.String(), address.Type) {
+					go dealGrpcMonitor(address.Type, address.Ip, address.Port)
+				} else if strings.EqualFold(config.SolidityNode.String(),
+					address.Type) {
+					go dealGrpcMonitor(address.Type, address.Ip, address.Port)
+				}
+			}
 		}
 	}
 }
 
-func reportSolidityNodeNowBlockNum(client *service.SolidityNodeGrpcClient,
+func dealGrpcMonitor(t, ip string, port int) {
+	address := fmt.Sprintf("%s:%d", ip, port)
+
+	cli := newGrpcClient(t, address)
+
+	cli.Start()
+
+	defer cli.Shutdown()
+
+	var wg sync.WaitGroup
+	var num int64 = 0
+	var ping int64 = 0
+	var lastSolidityBlockNum int64 = 0
+	witnessInfo := new(models.WitnessInfo)
+	witnessInfo.Info = make(map[string]int64)
+	witnessInfo.Lock = new(sync.Mutex)
+	wg.Add(4)
+	go getNowBlockNum(cli, &wg, &num)
+	go getPing(cli, &wg, &ping)
+	go getLastSolidityBlockNum(cli, &wg, &lastSolidityBlockNum)
+	go getWitnessList(cli, &wg, witnessInfo)
+	wg.Wait()
+
+	nodeStatusTags := map[string]string{config.InfluxDBTagNode: ip}
+	nodeStatusFields := map[string]interface{}{
+		config.InfluxDBFieldNowBlockNum:          num,
+		config.InfluxDBFieldPing:                 ping,
+		config.InfluxDBFieldLastSolidityBlockNum: lastSolidityBlockNum,
+	}
+
+	witnessTags := map[string]string{config.InfluxDBTagNode: ip}
+	witnessFields := make(map[string]interface{})
+	witnessInfo.Lock.Lock()
+	for k, v := range witnessInfo.Info {
+		witnessFields[k] = v
+	}
+	witnessInfo.Lock.Unlock()
+
+	influxdb.Client.Write(config.InfluxDBPointNameNodeStatus, nodeStatusTags,
+		nodeStatusFields)
+	influxdb.Client.Write(config.InfluxDBPointNameWitness, witnessTags, witnessFields)
+}
+
+func newGrpcClient(t, addr string) service.Client {
+	if strings.EqualFold(t, config.FullNode.String()) {
+		return service.NewFullNodeGrpcClient(addr)
+	} else if strings.EqualFold(t, config.SolidityNode.String()) {
+		return service.NewSolidityNodeGrpcClient(addr)
+	}
+
+	return nil
+}
+
+func getNowBlockNum(c service.Client,
 	wg *sync.WaitGroup, num *int64) {
 	defer wg.Done()
-	*num = client.GetNowBlockNum()
+	*num = c.GetNowBlockNum()
 }
 
-func reportSolidityNodePing(client *service.SolidityNodeGrpcClient, wg *sync.WaitGroup, ping *int64) {
+func getPing(c service.Client,
+	wg *sync.WaitGroup, ping *int64) {
 	defer wg.Done()
-	*ping = client.GetPing()
+	*ping = c.GetPing()
 }
 
-func reportSolidityNodeLastSolidityBlockNum(client *service.SolidityNodeGrpcClient, wg *sync.WaitGroup, lastSolidityBlockNum *int64) {
+func getLastSolidityBlockNum(c service.Client,
+	wg *sync.WaitGroup, lastSolidityBlockNum *int64) {
 	defer wg.Done()
-	*lastSolidityBlockNum = client.GetLastSolidityBlockNum()
+	*lastSolidityBlockNum = c.GetLastSolidityBlockNum()
 }
 
-func reportSolidityNodeWitness(client *service.SolidityNodeGrpcClient,
-	wg *sync.WaitGroup, res *WitnessInfo) {
+func getWitnessList(c service.Client,
+	wg *sync.WaitGroup, res *models.WitnessInfo) {
 	defer wg.Done()
-	witnessList := client.ListWitnesses()
+	witnessList := c.ListWitnesses()
 
 	for _, witness := range witnessList.Witnesses {
 		if witness.IsJobs {
 			key := witness.Url
-			res.lock.Lock()
+			res.Lock.Lock()
 			res.Info[key] = witness.TotalMissed
-			res.lock.Unlock()
+			res.Lock.Unlock()
 		}
 	}
 }
