@@ -153,7 +153,6 @@ func dealSolidityNode(ip string, port int) {
 		"NowBlockNum":          num,
 		"ping":                 ping,
 		"LastSolidityBlockNum": lastSolidityBlockNum,
-		"TotalTransaction":     0,
 	}
 
 	pt, err := client.NewPoint("node_status", tags, fields, time.Now())
@@ -196,12 +195,6 @@ func reportFullNodeLastSolidityBlockNum(client *service.FullNodeGrpcClient,
 	wg *sync.WaitGroup, lastSolidityBlockNum *int64) {
 	defer wg.Done()
 	*lastSolidityBlockNum = client.GetLastSolidityBlockNum()
-}
-
-func reportFullNodeTotalTransaction(client *service.FullNodeGrpcClient,
-	wg *sync.WaitGroup, totalTransaction *int64) {
-	defer wg.Done()
-	*totalTransaction = client.TotalTransaction()
 }
 
 func reportFullNodeWitness(client *service.FullNodeGrpcClient,

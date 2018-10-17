@@ -51,25 +51,6 @@ func (g *FullNodeGrpcClient) GetNowBlockNum() int64 {
 	return result.GetBlockHeader().GetRawData().GetNumber()
 }
 
-func (g *FullNodeGrpcClient) TotalTransaction() int64 {
-	if g.Conn == nil {
-		return 0
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), GrpcTimeout)
-	defer cancel()
-
-	result, err := g.WalletClient.TotalTransaction(ctx,
-		new(api.EmptyMessage))
-
-	if err != nil {
-		log.Printf("total transaction error: %v", err)
-		return 0
-	}
-
-	return result.Num
-}
-
 func (g *FullNodeGrpcClient) GetLastSolidityBlockNum() int64 {
 	if g.Conn == nil {
 		return 0
