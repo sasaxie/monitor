@@ -51,7 +51,7 @@ You can start influxdb by command `docker start influxdb_monitor`.
 
 ```shell
 cd monitor/
-docker pull sasaxie/monitor
+docker pull sasaxie/tron-monitor
 ```
 
 2. Modify monitor.toml
