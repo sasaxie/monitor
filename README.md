@@ -85,10 +85,10 @@ You can start monitor by command `docker start tron-monitor`.
 docker run -p 3000:3000 --name grafana_monitor grafana/grafana
 ```
 
+Open grafana in your browser (default: http://localhost:3000) and login with admin user (default: user/pass = admin/admin).
+
 2. Tips
 
-Default username: admin
-Default password: admin
 You can stop grafana by command `docker stop grafana_monitor`.
 You can start grafana by command `docker start grafana_monitor`.
 
