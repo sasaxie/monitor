@@ -5,6 +5,8 @@ import (
 	"log"
 )
 
+const configFilePath = "conf/monitor.toml"
+
 var MonitorConfig Config
 
 type Config struct {
@@ -25,7 +27,7 @@ type InfluxDB struct {
 
 func init() {
 	if _, err := toml.DecodeFile(
-		"conf/monitor.toml",
+		configFilePath,
 		&MonitorConfig); err != nil {
 		log.Fatal(err)
 	}
