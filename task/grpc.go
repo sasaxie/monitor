@@ -53,14 +53,14 @@ func dealGrpcMonitor(t, ip string, port int) {
 	go getWitnessList(cli, &wg, witnessInfo)
 	wg.Wait()
 
-	nodeStatusTags := map[string]string{config.InfluxDBTagNode: ip}
+	nodeStatusTags := map[string]string{config.InfluxDBTagNode: address}
 	nodeStatusFields := map[string]interface{}{
 		config.InfluxDBFieldNowBlockNum:          num,
 		config.InfluxDBFieldPing:                 ping,
 		config.InfluxDBFieldLastSolidityBlockNum: lastSolidityBlockNum,
 	}
 
-	witnessTags := map[string]string{config.InfluxDBTagNode: ip}
+	witnessTags := map[string]string{config.InfluxDBTagNode: address}
 	witnessFields := make(map[string]interface{})
 	witnessInfo.Lock.Lock()
 	for k, v := range witnessInfo.Info {

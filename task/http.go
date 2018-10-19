@@ -98,7 +98,7 @@ func dealHttpMonitor(ip string, port int) {
 			}
 		}
 
-		nodeInfoDetailTags := map[string]string{config.InfluxDBTagNode: ip}
+		nodeInfoDetailTags := map[string]string{config.InfluxDBTagNode: address}
 		nodeInfoDetailFields := map[string]interface{}{
 			config.InfluxDBFieldActiveConnectCount: nodeInfoDetail.
 				ActiveConnectCount,
@@ -154,7 +154,7 @@ func dealHttpMonitor(ip string, port int) {
 			nodeInfoDetailFields)
 
 		for _, v := range nodeInfoDetail.MachineInfo.MemoryDescInfoList {
-			t := map[string]string{config.InfluxDBTagNode: ip,
+			t := map[string]string{config.InfluxDBTagNode: address,
 				config.InfluxDBTagMemoryDescInfoName: v.Name}
 			f := map[string]interface{}{
 				config.InfluxDBFieldMemoryDescInfoInitSize: v.InitSize,
