@@ -7,9 +7,9 @@ import (
 
 func init() {
 	ns := beego.NewNamespace("/v1",
-		beego.NSNamespace("/node-info",
+		beego.NSNamespace("/monitor-info",
 			beego.NSInclude(
-				&controllers.NodeInfoController{},
+				&controllers.MonitorInfoController{},
 			),
 		),
 	)
