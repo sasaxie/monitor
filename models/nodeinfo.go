@@ -24,18 +24,24 @@ type NodeInfoDetail struct {
 }
 
 type ConfigNodeInfo struct {
-	ActiveNodeSize        int64
-	BackupListenPort      int64
-	BackupMemberSize      int64
-	BackupPriority        int64
-	CodeVersion           string
-	DiscoverEnable        bool
-	ListenPort            int64
-	MaxConnectCount       int64
-	P2pVersion            string
-	PassiveNodeSize       int64
-	SameIpMaxConnectCount int64
-	SendNodeSize          int64
+	ActiveNodeSize           int64
+	AllowCreationOfContracts int64
+	BackupListenPort         int64
+	BackupMemberSize         int64
+	BackupPriority           int64
+	CodeVersion              string
+	DbVersion                int64
+	DiscoverEnable           bool
+	ListenPort               int64
+	MaxConnectCount          int64
+	MaxTimeRatio             float64
+	MinParticipationRate     float64
+	MinTimeRatio             float64
+	P2pVersion               string
+	PassiveNodeSize          int64
+	SameIpMaxConnectCount    int64
+	SendNodeSize             int64
+	SupportConstant          bool
 }
 
 type MachineInfo struct {
