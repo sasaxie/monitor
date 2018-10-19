@@ -98,7 +98,6 @@ func dealHttpMonitor(ip string, port int) {
 			}
 		}
 
-		fmt.Println("xxd2", nodeInfoDetail.MachineInfo.JavaVersion)
 		nodeInfoDetailTags := map[string]string{config.InfluxDBTagNode: ip}
 		nodeInfoDetailFields := map[string]interface{}{
 			config.InfluxDBFieldActiveConnectCount: nodeInfoDetail.
@@ -147,7 +146,6 @@ func dealHttpMonitor(ip string, port int) {
 		influxdb.Client.Write(config.InfluxDBPointNameNodeInfoDetail, nodeInfoDetailTags,
 			nodeInfoDetailFields)
 
-		fmt.Println("xxddd1")
 		for _, v := range nodeInfoDetail.MachineInfo.MemoryDescInfoList {
 			t := map[string]string{config.InfluxDBTagNode: ip,
 				config.InfluxDBTagMemoryDescInfoName: v.Name}

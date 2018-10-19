@@ -36,9 +36,7 @@ func dealGrpcMonitor(t, ip string, port int) {
 	address := fmt.Sprintf("%s:%d", ip, port)
 
 	cli := newGrpcClient(t, address)
-
 	cli.Start()
-
 	defer cli.Shutdown()
 
 	var wg sync.WaitGroup
@@ -72,7 +70,10 @@ func dealGrpcMonitor(t, ip string, port int) {
 
 	influxdb.Client.Write(config.InfluxDBPointNameNodeStatus, nodeStatusTags,
 		nodeStatusFields)
-	influxdb.Client.Write(config.InfluxDBPointNameWitness, witnessTags, witnessFields)
+
+	if len(witnessFields) > 0 {
+		influxdb.Client.Write(config.InfluxDBPointNameWitness, witnessTags, witnessFields)
+	}
 }
 
 func newGrpcClient(t, addr string) service.Client {
