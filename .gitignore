@@ -3,3 +3,6 @@ monitor
 *.tmp
 monitor.tar.gz
 .DS_Store
+conf/test.json
+routers/commentsRouter_controllers.go
+*.log

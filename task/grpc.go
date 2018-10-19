@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"github.com/astaxie/beego/logs"
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
@@ -12,6 +13,7 @@ import (
 )
 
 func StartGrpcMonitor() {
+	logs.Info("start grpc monitor")
 	ticker := time.NewTicker(40 * time.Second)
 	defer ticker.Stop()
 
@@ -20,10 +22,10 @@ func StartGrpcMonitor() {
 		case <-ticker.C:
 			for _, address := range models.NodeList.Addresses {
 				if strings.EqualFold(config.FullNode.String(), address.Type) {
-					go dealGrpcMonitor(address.Type, address.Ip, address.Port)
+					go dealGrpcMonitor(address.Type, address.Ip, address.GrpcPort)
 				} else if strings.EqualFold(config.SolidityNode.String(),
 					address.Type) {
-					go dealGrpcMonitor(address.Type, address.Ip, address.Port)
+					go dealGrpcMonitor(address.Type, address.Ip, address.GrpcPort)
 				}
 			}
 		}
@@ -106,12 +108,15 @@ func getWitnessList(c service.Client,
 	defer wg.Done()
 	witnessList := c.ListWitnesses()
 
-	for _, witness := range witnessList.Witnesses {
-		if witness.IsJobs {
-			key := witness.Url
-			res.Lock.Lock()
-			res.Info[key] = witness.TotalMissed
-			res.Lock.Unlock()
+	if witnessList != nil {
+		for _, witness := range witnessList.Witnesses {
+			if witness.IsJobs {
+				key := witness.Url
+				res.Lock.Lock()
+				res.Info[key] = witness.TotalMissed
+				res.Lock.Unlock()
+			}
 		}
 	}
+
 }
