@@ -166,5 +166,84 @@ func dealHttpMonitor(ip string, port int) {
 			influxdb.Client.Write(config.InfluxDBPointNameNodeInfoDetail, t,
 				f)
 		}
+
+		for _, p := range nodeInfoDetail.PeerList {
+			hbn := 0
+			hbi := ""
+			if len(p.HeadBlockWeBothHave) > 0 && !strings.EqualFold(p.
+				HeadBlockWeBothHave, "") {
+				strs := strings.Split(p.HeadBlockWeBothHave, ",")
+				if len(strs) > 0 {
+					numStrs := strings.Split(strs[0], ":")
+					if len(numStrs) > 0 {
+						hbn, err = strconv.Atoi(numStrs[1])
+						if err != nil {
+							logs.Warn(err)
+						}
+					}
+
+					idStrs := strings.Split(strs[1], ":")
+					if len(idStrs) > 0 {
+						hbi = idStrs[1]
+					}
+				}
+			}
+
+			ln := 0
+			li := ""
+			if len(p.LastSyncBlock) > 0 && !strings.EqualFold(p.
+				LastSyncBlock, "") {
+				strs := strings.Split(p.LastSyncBlock, ",")
+				if len(strs) > 0 {
+					numStrs := strings.Split(strs[0], ":")
+					if len(numStrs) > 0 {
+						ln, err = strconv.Atoi(numStrs[1])
+						if err != nil {
+							logs.Warn(err)
+						}
+					}
+
+					idStrs := strings.Split(strs[1], ":")
+					if len(idStrs) > 0 {
+						li = idStrs[1]
+					}
+				}
+			}
+
+			t := map[string]string{config.InfluxDBTagNode: address,
+				config.InfluxDBTagPeer: p.Host}
+			f := map[string]interface{}{
+				config.InfluxDBFieldPeerActive:                  p.Active,
+				config.InfluxDBFieldPeerAvgLatency:              p.AvgLatency,
+				config.InfluxDBFieldPeerBlockInPorcSize:         p.BlockInPorcSize,
+				config.InfluxDBFieldPeerConnectTime:             p.ConnectTime,
+				config.InfluxDBFieldPeerDisconnectTimes:         p.DisconnectTimes,
+				config.InfluxDBFieldPeerHeadBlockTimeWeBothHave: p.HeadBlockTimeWeBothHave,
+				config.InfluxDBFieldPeerHeadBlockWeBothHaveNum:  hbn,
+				config.InfluxDBFieldPeerHeadBlockWeBothHaveID:   hbi,
+				config.InfluxDBFieldPeerHost:                    p.Host,
+				config.InfluxDBFieldPeerInFlow:                  p.InFlow,
+				config.InfluxDBFieldPeerLastBlockUpdateTime:     p.LastBlockUpdateTime,
+				config.InfluxDBFieldPeerLastSyncBlockNum:        ln,
+				config.InfluxDBFieldPeerLastSyncBlockID:         li,
+				config.InfluxDBFieldPeerLocalDisconnectReason:   p.LocalDisconnectReason,
+				config.InfluxDBFieldPeerNeedSyncFromPeer:        p.NeedSyncFromPeer,
+				config.InfluxDBFieldPeerNeedSyncFromUs:          p.NeedSyncFromUs,
+				config.InfluxDBFieldPeerNodeCount:               p.NodeCount,
+				config.InfluxDBFieldPeerNodeID:                  p.NodeId,
+				config.InfluxDBFieldPeerPort:                    p.Port,
+				config.InfluxDBFieldPeerRemainNum:               p.RemainNum,
+				config.InfluxDBFieldPeerRemoteDisconnectReason:  p.RemoteDisconnectReason,
+				config.InfluxDBFieldPeerScore:                   p.Score,
+				config.InfluxDBFieldPeerSyncBlockRequestedSize:  p.SyncBlockRequestedSize,
+				config.InfluxDBFieldPeerSyncFlag:                p.SyncFlag,
+				config.InfluxDBFieldPeerSyncToFetchSize:         p.SyncToFetchSize,
+				config.InfluxDBFieldPeerSyncToFetchSizePeekNum:  p.SyncToFetchSizePeekNum,
+				config.InfluxDBFieldPeerUnFetchSynNum:           p.UnFetchSynNum,
+			}
+
+			influxdb.Client.Write(config.InfluxDBPointNamePeerInfo, t,
+				f)
+		}
 	}
 }
