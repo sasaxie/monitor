@@ -1,7 +1,7 @@
 {
   "addresses": [
     {
-      "ip": "127.0.0.1",
+      "ip": "172.16.21.39",
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node"

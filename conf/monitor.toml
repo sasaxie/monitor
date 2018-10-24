@@ -10,8 +10,8 @@ dataFile = "nodes.json"
 
 [influxdb]
 address = "http://localhost:8086"
-username = "tron"
-password = "trondb"
+username = "root"
+password = "root"
 database = "tronmonitor"
 
 [log]

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sasaxie/monitor/common/config"
+	"github.com/sasaxie/monitor/util"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,7 +14,9 @@ import (
 var NodeList = new(Nodes)
 
 func init() {
-	NodeList.Load(fmt.Sprintf("conf/%s", config.MonitorConfig.Node.DataFile))
+	NodeList.Load(fmt.Sprintf("%s/conf/%s", util.GetCurrentDirectory(),
+		config.MonitorConfig.Node.
+			DataFile))
 }
 
 type Nodes struct {
