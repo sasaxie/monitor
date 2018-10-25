@@ -49,260 +49,13 @@
   "links": [],
   "panels": [
     {
-      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
       },
-      "id": 64,
-      "panels": [],
-      "title": "Solidity-47.74.147.80",
-      "type": "row"
-    },
-    {
-      "cacheTimeout": null,
-      "colorBackground": false,
-      "colorValue": true,
-      "colors": [
-        "#299c46",
-        "rgba(237, 129, 40, 0.89)",
-        "#d44a3a"
-      ],
-      "datasource": "${DS_INFLUXDB}",
-      "format": "none",
-      "gauge": {
-        "maxValue": 100,
-        "minValue": 0,
-        "show": false,
-        "thresholdLabels": false,
-        "thresholdMarkers": true
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 0,
-        "y": 1
-      },
-      "id": 66,
-      "interval": null,
-      "links": [],
-      "mappingType": 1,
-      "mappingTypes": [
-        {
-          "name": "value to text",
-          "value": 1
-        },
-        {
-          "name": "range to text",
-          "value": 2
-        }
-      ],
-      "maxDataPoints": 100,
-      "nullPointMode": "connected",
-      "nullText": null,
-      "postfix": "",
-      "postfixFontSize": "50%",
-      "prefix": "",
-      "prefixFontSize": "50%",
-      "rangeMaps": [
-        {
-          "from": "null",
-          "text": "N/A",
-          "to": "null"
-        }
-      ],
-      "sparkline": {
-        "fillColor": "rgba(31, 118, 189, 0.18)",
-        "full": false,
-        "lineColor": "rgb(31, 120, 193)",
-        "show": true
-      },
-      "tableColumn": "",
-      "targets": [
-        {
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "measurement": "node_status",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "NowBlockNum"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "node",
-              "operator": "=",
-              "value": "47.74.147.80:50051"
-            }
-          ]
-        }
-      ],
-      "thresholds": "",
-      "title": "Now Block Num",
-      "type": "singlestat",
-      "valueFontSize": "80%",
-      "valueMaps": [
-        {
-          "op": "=",
-          "text": "N/A",
-          "value": "null"
-        }
-      ],
-      "valueName": "current"
-    },
-    {
-      "cacheTimeout": null,
-      "colorBackground": false,
-      "colorValue": true,
-      "colors": [
-        "#299c46",
-        "rgba(237, 129, 40, 0.89)",
-        "#d44a3a"
-      ],
-      "datasource": "${DS_INFLUXDB}",
-      "format": "none",
-      "gauge": {
-        "maxValue": 100,
-        "minValue": 0,
-        "show": false,
-        "thresholdLabels": false,
-        "thresholdMarkers": true
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 4,
-        "y": 1
-      },
-      "id": 68,
-      "interval": null,
-      "links": [],
-      "mappingType": 1,
-      "mappingTypes": [
-        {
-          "name": "value to text",
-          "value": 1
-        },
-        {
-          "name": "range to text",
-          "value": 2
-        }
-      ],
-      "maxDataPoints": 100,
-      "nullPointMode": "connected",
-      "nullText": null,
-      "postfix": "",
-      "postfixFontSize": "50%",
-      "prefix": "",
-      "prefixFontSize": "50%",
-      "rangeMaps": [
-        {
-          "from": "null",
-          "text": "N/A",
-          "to": "null"
-        }
-      ],
-      "sparkline": {
-        "fillColor": "rgba(31, 118, 189, 0.18)",
-        "full": false,
-        "lineColor": "rgb(31, 120, 193)",
-        "show": true
-      },
-      "tableColumn": "",
-      "targets": [
-        {
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "measurement": "node_status",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "LastSolidityBlockNum"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "node",
-              "operator": "=",
-              "value": "47.74.147.80:50051"
-            }
-          ]
-        }
-      ],
-      "thresholds": "",
-      "title": "Last Solidity Block Num",
-      "type": "singlestat",
-      "valueFontSize": "80%",
-      "valueMaps": [
-        {
-          "op": "=",
-          "text": "N/A",
-          "value": "null"
-        }
-      ],
-      "valueName": "current"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 4
-      },
       "id": 34,
-      "panels": [],
       "title": "Solidity-47.74.147.80",
       "type": "row"
     },
@@ -328,7 +81,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 5
+        "y": 1
       },
       "id": 60,
       "interval": null,
@@ -444,7 +197,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 5
+        "y": 1
       },
       "id": 62,
       "interval": null,
@@ -544,7 +297,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 4
       },
       "id": 32,
       "panels": [],
@@ -573,7 +326,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 9
+        "y": 5
       },
       "id": 56,
       "interval": null,
@@ -689,7 +442,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 9
+        "y": 5
       },
       "id": 58,
       "interval": null,
@@ -789,7 +542,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 8
       },
       "id": 30,
       "panels": [],
@@ -818,7 +571,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 13
+        "y": 9
       },
       "id": 52,
       "interval": null,
@@ -934,7 +687,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 13
+        "y": 9
       },
       "id": 54,
       "interval": null,
@@ -1034,7 +787,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 12
       },
       "id": 28,
       "panels": [],
@@ -1063,7 +816,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 17
+        "y": 13
       },
       "id": 48,
       "interval": null,
@@ -1179,7 +932,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 17
+        "y": 13
       },
       "id": 50,
       "interval": null,
@@ -1279,7 +1032,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 16
       },
       "id": 26,
       "panels": [],
@@ -1308,7 +1061,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 21
+        "y": 17
       },
       "id": 44,
       "interval": null,
@@ -1424,7 +1177,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 21
+        "y": 17
       },
       "id": 46,
       "interval": null,
@@ -1524,7 +1277,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 20
       },
       "id": 24,
       "panels": [],
@@ -1553,7 +1306,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 25
+        "y": 21
       },
       "id": 40,
       "interval": null,
@@ -1669,7 +1422,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 25
+        "y": 21
       },
       "id": 42,
       "interval": null,
@@ -1769,7 +1522,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 24
       },
       "id": 22,
       "panels": [],
@@ -1798,7 +1551,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 29
+        "y": 25
       },
       "id": 36,
       "interval": null,
@@ -1914,7 +1667,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 29
+        "y": 25
       },
       "id": 38,
       "interval": null,
@@ -2014,7 +1767,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 28
       },
       "id": 16,
       "panels": [],
@@ -2043,7 +1796,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 33
+        "y": 29
       },
       "id": 18,
       "interval": null,
@@ -2159,7 +1912,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 33
+        "y": 29
       },
       "id": 20,
       "interval": null,
@@ -2259,7 +2012,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 32
       },
       "id": 10,
       "panels": [],
@@ -2288,7 +2041,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 37
+        "y": 33
       },
       "id": 12,
       "interval": null,
@@ -2404,7 +2157,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 37
+        "y": 33
       },
       "id": 14,
       "interval": null,
@@ -2504,7 +2257,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 36
       },
       "id": 2,
       "panels": [],
@@ -2533,7 +2286,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 41
+        "y": 37
       },
       "id": 8,
       "interval": null,
@@ -2649,7 +2402,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 41
+        "y": 37
       },
       "id": 6,
       "interval": null,
@@ -2783,5 +2536,5 @@
   "timezone": "",
   "title": "Solidity全部节点的块信息",
   "uid": "p0g2snbmk",
-  "version": 11
+  "version": 10
 }
