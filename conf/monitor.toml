@@ -1,0 +1,32 @@
+appName = "monitor"
+
+# App run mode:
+# 1. dev(default)
+# 2. prod
+runMode = "dev"
+
+[node]
+dataFile = "nodes.json"
+
+[influxdb]
+address = "http://localhost:8086"
+username = "root"
+password = "root"
+database = "tronmonitor"
+
+[log]
+filename = "monitor.log"
+
+# Log level:
+# 1. emergency
+# 2. alert
+# 3. critical
+# 4. error
+# 5. warning
+# 6. notice
+# 7. information
+# 8. debug(default)
+level = "debug"
+
+[http]
+port = 8080

@@ -10,15 +10,8 @@ echo 'Packing...'
 mkdir tmp
 cp monitor tmp/
 cp -R conf tmp/
-cp -R static tmp/
 
 cd tmp/
-
-cd conf/
-
-mv app_prod.conf app.conf
-
-cd ..
 
 tar -czf ../monitor.tar.gz *
 

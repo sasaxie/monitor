@@ -66,11 +66,13 @@ func (x Task_View) String() string {
 	return proto.EnumName(Task_View_name, int32(x))
 }
 func (Task_View) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_task_d7b9980220f5fece, []int{0, 0}
+	return fileDescriptor_task_3b902b34f1c5392b, []int{0, 0}
 }
 
 // A unit of scheduled work.
 type Task struct {
+	// Optionally caller-specified in [CreateTask][google.cloud.tasks.v2beta2.CloudTasks.CreateTask].
+	//
 	// The task name.
 	//
 	// The task name must have the following format:
@@ -88,9 +90,7 @@ type Task struct {
 	//   hyphens (-). The maximum length is 100 characters.
 	// * `TASK_ID` can contain only letters ([A-Za-z]), numbers ([0-9]),
 	//   hyphens (-), or underscores (_). The maximum length is 500 characters.
-	//
-	// Optionally caller-specified in [CreateTask][google.cloud.tasks.v2beta2.CloudTasks.CreateTask].
-	Name string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required.
 	//
 	// The task's payload is used by the task's target to process the task.
@@ -110,16 +110,16 @@ type Task struct {
 	// leased plus the [lease_duration][google.cloud.tasks.v2beta2.LeaseTasksRequest.lease_duration].
 	//
 	// `schedule_time` will be truncated to the nearest microsecond.
-	ScheduleTime *timestamp.Timestamp `protobuf:"bytes,5,opt,name=schedule_time,json=scheduleTime" json:"schedule_time,omitempty"`
+	ScheduleTime *timestamp.Timestamp `protobuf:"bytes,5,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"`
 	// Output only. The time that the task was created.
 	//
 	// `create_time` will be truncated to the nearest second.
-	CreateTime *timestamp.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime" json:"create_time,omitempty"`
+	CreateTime *timestamp.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. The task status.
-	Status *TaskStatus `protobuf:"bytes,7,opt,name=status" json:"status,omitempty"`
+	Status *TaskStatus `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
 	// Output only. The view specifies which subset of the [Task][google.cloud.tasks.v2beta2.Task] has
 	// been returned.
-	View                 Task_View `protobuf:"varint,8,opt,name=view,enum=google.cloud.tasks.v2beta2.Task_View" json:"view,omitempty"`
+	View                 Task_View `protobuf:"varint,8,opt,name=view,proto3,enum=google.cloud.tasks.v2beta2.Task_View" json:"view,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
@@ -129,7 +129,7 @@ func (m *Task) Reset()         { *m = Task{} }
 func (m *Task) String() string { return proto.CompactTextString(m) }
 func (*Task) ProtoMessage()    {}
 func (*Task) Descriptor() ([]byte, []int) {
-	return fileDescriptor_task_d7b9980220f5fece, []int{0}
+	return fileDescriptor_task_3b902b34f1c5392b, []int{0}
 }
 func (m *Task) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Task.Unmarshal(m, b)
@@ -154,10 +154,10 @@ type isTask_PayloadType interface {
 }
 
 type Task_AppEngineHttpRequest struct {
-	AppEngineHttpRequest *AppEngineHttpRequest `protobuf:"bytes,3,opt,name=app_engine_http_request,json=appEngineHttpRequest,oneof"`
+	AppEngineHttpRequest *AppEngineHttpRequest `protobuf:"bytes,3,opt,name=app_engine_http_request,json=appEngineHttpRequest,proto3,oneof"`
 }
 type Task_PullMessage struct {
-	PullMessage *PullMessage `protobuf:"bytes,4,opt,name=pull_message,json=pullMessage,oneof"`
+	PullMessage *PullMessage `protobuf:"bytes,4,opt,name=pull_message,json=pullMessage,proto3,oneof"`
 }
 
 func (*Task_AppEngineHttpRequest) isTask_PayloadType() {}
@@ -299,12 +299,12 @@ type TaskStatus struct {
 	//
 	// This count includes tasks which have been dispatched but haven't
 	// received a response.
-	AttemptDispatchCount int32 `protobuf:"varint,1,opt,name=attempt_dispatch_count,json=attemptDispatchCount" json:"attempt_dispatch_count,omitempty"`
+	AttemptDispatchCount int32 `protobuf:"varint,1,opt,name=attempt_dispatch_count,json=attemptDispatchCount,proto3" json:"attempt_dispatch_count,omitempty"`
 	// Output only. The number of attempts which have received a response.
 	//
 	// This field is not calculated for
 	// [pull tasks](google.cloud.tasks.v2beta2.PullTaskTarget).
-	AttemptResponseCount int32 `protobuf:"varint,2,opt,name=attempt_response_count,json=attemptResponseCount" json:"attempt_response_count,omitempty"`
+	AttemptResponseCount int32 `protobuf:"varint,2,opt,name=attempt_response_count,json=attemptResponseCount,proto3" json:"attempt_response_count,omitempty"`
 	// Output only. The status of the task's first attempt.
 	//
 	// Only [dispatch_time][google.cloud.tasks.v2beta2.AttemptStatus.dispatch_time] will be set.
@@ -312,12 +312,12 @@ type TaskStatus struct {
 	//
 	// This field is not calculated for
 	// [pull tasks](google.cloud.tasks.v2beta2.PullTaskTarget).
-	FirstAttemptStatus *AttemptStatus `protobuf:"bytes,3,opt,name=first_attempt_status,json=firstAttemptStatus" json:"first_attempt_status,omitempty"`
+	FirstAttemptStatus *AttemptStatus `protobuf:"bytes,3,opt,name=first_attempt_status,json=firstAttemptStatus,proto3" json:"first_attempt_status,omitempty"`
 	// Output only. The status of the task's last attempt.
 	//
 	// This field is not calculated for
 	// [pull tasks](google.cloud.tasks.v2beta2.PullTaskTarget).
-	LastAttemptStatus    *AttemptStatus `protobuf:"bytes,4,opt,name=last_attempt_status,json=lastAttemptStatus" json:"last_attempt_status,omitempty"`
+	LastAttemptStatus    *AttemptStatus `protobuf:"bytes,4,opt,name=last_attempt_status,json=lastAttemptStatus,proto3" json:"last_attempt_status,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_unrecognized     []byte         `json:"-"`
 	XXX_sizecache        int32          `json:"-"`
@@ -327,7 +327,7 @@ func (m *TaskStatus) Reset()         { *m = TaskStatus{} }
 func (m *TaskStatus) String() string { return proto.CompactTextString(m) }
 func (*TaskStatus) ProtoMessage()    {}
 func (*TaskStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_task_d7b9980220f5fece, []int{1}
+	return fileDescriptor_task_3b902b34f1c5392b, []int{1}
 }
 func (m *TaskStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TaskStatus.Unmarshal(m, b)
@@ -380,20 +380,20 @@ type AttemptStatus struct {
 	// Output only. The time that this attempt was scheduled.
 	//
 	// `schedule_time` will be truncated to the nearest microsecond.
-	ScheduleTime *timestamp.Timestamp `protobuf:"bytes,1,opt,name=schedule_time,json=scheduleTime" json:"schedule_time,omitempty"`
+	ScheduleTime *timestamp.Timestamp `protobuf:"bytes,1,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"`
 	// Output only. The time that this attempt was dispatched.
 	//
 	// `dispatch_time` will be truncated to the nearest microsecond.
-	DispatchTime *timestamp.Timestamp `protobuf:"bytes,2,opt,name=dispatch_time,json=dispatchTime" json:"dispatch_time,omitempty"`
+	DispatchTime *timestamp.Timestamp `protobuf:"bytes,2,opt,name=dispatch_time,json=dispatchTime,proto3" json:"dispatch_time,omitempty"`
 	// Output only. The time that this attempt response was received.
 	//
 	// `response_time` will be truncated to the nearest microsecond.
-	ResponseTime *timestamp.Timestamp `protobuf:"bytes,3,opt,name=response_time,json=responseTime" json:"response_time,omitempty"`
+	ResponseTime *timestamp.Timestamp `protobuf:"bytes,3,opt,name=response_time,json=responseTime,proto3" json:"response_time,omitempty"`
 	// Output only. The response from the target for this attempt.
 	//
 	// If the task has not been attempted or the task is currently running
 	// then the response status is unset.
-	ResponseStatus       *status.Status `protobuf:"bytes,4,opt,name=response_status,json=responseStatus" json:"response_status,omitempty"`
+	ResponseStatus       *status.Status `protobuf:"bytes,4,opt,name=response_status,json=responseStatus,proto3" json:"response_status,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_unrecognized     []byte         `json:"-"`
 	XXX_sizecache        int32          `json:"-"`
@@ -403,7 +403,7 @@ func (m *AttemptStatus) Reset()         { *m = AttemptStatus{} }
 func (m *AttemptStatus) String() string { return proto.CompactTextString(m) }
 func (*AttemptStatus) ProtoMessage()    {}
 func (*AttemptStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_task_d7b9980220f5fece, []int{2}
+	return fileDescriptor_task_3b902b34f1c5392b, []int{2}
 }
 func (m *AttemptStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AttemptStatus.Unmarshal(m, b)
@@ -459,10 +459,10 @@ func init() {
 }
 
 func init() {
-	proto.RegisterFile("google/cloud/tasks/v2beta2/task.proto", fileDescriptor_task_d7b9980220f5fece)
+	proto.RegisterFile("google/cloud/tasks/v2beta2/task.proto", fileDescriptor_task_3b902b34f1c5392b)
 }
 
-var fileDescriptor_task_d7b9980220f5fece = []byte{
+var fileDescriptor_task_3b902b34f1c5392b = []byte{
 	// 601 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x94, 0x5f, 0x6f, 0xda, 0x3c,
 	0x14, 0xc6, 0x1b, 0x9a, 0xf6, 0x2d, 0xe6, 0xcf, 0xcb, 0x3c, 0xb4, 0x46, 0x68, 0xda, 0x10, 0x52,

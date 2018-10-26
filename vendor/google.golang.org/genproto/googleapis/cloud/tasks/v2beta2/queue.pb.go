@@ -76,13 +76,16 @@ func (x Queue_State) String() string {
 	return proto.EnumName(Queue_State_name, int32(x))
 }
 func (Queue_State) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_queue_fcad6349d23af99b, []int{0, 0}
+	return fileDescriptor_queue_2041daffc3c0cfe8, []int{0, 0}
 }
 
 // A queue is a container of related tasks. Queues are configured to manage
 // how those tasks are dispatched. Configurable properties include rate limits,
 // retry options, target types, and others.
 type Queue struct {
+	// Caller-specified and required in [CreateQueue][google.cloud.tasks.v2beta2.CloudTasks.CreateQueue],
+	// after which it becomes output only.
+	//
 	// The queue name.
 	//
 	// The queue name must have the following format:
@@ -98,17 +101,14 @@ type Queue struct {
 	//    For more information, see https://cloud.google.com/about/locations/.
 	// * `QUEUE_ID` can contain letters ([A-Za-z]), numbers ([0-9]), or
 	//   hyphens (-). The maximum length is 100 characters.
-	//
-	// Caller-specified and required in [CreateQueue][google.cloud.tasks.v2beta2.CloudTasks.CreateQueue],
-	// after which it becomes output only.
-	Name string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	// The queue's target.
-	//
-	// The target applies to all tasks in the queue.
-	//
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Caller-specified and required in [CreateQueue][google.cloud.tasks.v2beta2.CloudTasks.CreateQueue][],
 	// after which the queue config type becomes output only, though fields within
 	// the config are mutable.
+	//
+	// The queue's target.
+	//
+	// The target applies to all tasks in the queue.
 	//
 	// Types that are valid to be assigned to TargetType:
 	//	*Queue_AppEngineHttpTarget
@@ -129,7 +129,7 @@ type Queue struct {
 	//   particular a task after its first attempt fails. That is,
 	//   [retry_config][google.cloud.tasks.v2beta2.Queue.retry_config] controls task retries (the
 	//   second attempt, third attempt, etc).
-	RateLimits *RateLimits `protobuf:"bytes,5,opt,name=rate_limits,json=rateLimits" json:"rate_limits,omitempty"`
+	RateLimits *RateLimits `protobuf:"bytes,5,opt,name=rate_limits,json=rateLimits,proto3" json:"rate_limits,omitempty"`
 	// Settings that determine the retry behavior.
 	//
 	// * For tasks created using Cloud Tasks: the queue-level retry settings
@@ -139,7 +139,7 @@ type Queue struct {
 	//   settings apply to all tasks in the queue which do not have retry settings
 	//   explicitly set on the task and were created by the App Engine SDK. See
 	//   [App Engine documentation](/appengine/docs/standard/python/taskqueue/push/retrying-tasks).
-	RetryConfig *RetryConfig `protobuf:"bytes,6,opt,name=retry_config,json=retryConfig" json:"retry_config,omitempty"`
+	RetryConfig *RetryConfig `protobuf:"bytes,6,opt,name=retry_config,json=retryConfig,proto3" json:"retry_config,omitempty"`
 	// Output only. The state of the queue.
 	//
 	// `state` can only be changed by called
@@ -147,7 +147,7 @@ type Queue struct {
 	// [ResumeQueue][google.cloud.tasks.v2beta2.CloudTasks.ResumeQueue], or uploading
 	// [queue.yaml/xml](/appengine/docs/python/config/queueref).
 	// [UpdateQueue][google.cloud.tasks.v2beta2.CloudTasks.UpdateQueue] cannot be used to change `state`.
-	State Queue_State `protobuf:"varint,7,opt,name=state,enum=google.cloud.tasks.v2beta2.Queue_State" json:"state,omitempty"`
+	State Queue_State `protobuf:"varint,7,opt,name=state,proto3,enum=google.cloud.tasks.v2beta2.Queue_State" json:"state,omitempty"`
 	// Output only. The last time this queue was purged.
 	//
 	// All tasks that were [created][google.cloud.tasks.v2beta2.Task.create_time] before this time
@@ -158,7 +158,7 @@ type Queue struct {
 	//
 	// Purge time will be truncated to the nearest microsecond. Purge
 	// time will be unset if the queue has never been purged.
-	PurgeTime            *timestamp.Timestamp `protobuf:"bytes,8,opt,name=purge_time,json=purgeTime" json:"purge_time,omitempty"`
+	PurgeTime            *timestamp.Timestamp `protobuf:"bytes,8,opt,name=purge_time,json=purgeTime,proto3" json:"purge_time,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
 	XXX_sizecache        int32                `json:"-"`
@@ -168,7 +168,7 @@ func (m *Queue) Reset()         { *m = Queue{} }
 func (m *Queue) String() string { return proto.CompactTextString(m) }
 func (*Queue) ProtoMessage()    {}
 func (*Queue) Descriptor() ([]byte, []int) {
-	return fileDescriptor_queue_fcad6349d23af99b, []int{0}
+	return fileDescriptor_queue_2041daffc3c0cfe8, []int{0}
 }
 func (m *Queue) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Queue.Unmarshal(m, b)
@@ -193,10 +193,10 @@ type isQueue_TargetType interface {
 }
 
 type Queue_AppEngineHttpTarget struct {
-	AppEngineHttpTarget *AppEngineHttpTarget `protobuf:"bytes,3,opt,name=app_engine_http_target,json=appEngineHttpTarget,oneof"`
+	AppEngineHttpTarget *AppEngineHttpTarget `protobuf:"bytes,3,opt,name=app_engine_http_target,json=appEngineHttpTarget,proto3,oneof"`
 }
 type Queue_PullTarget struct {
-	PullTarget *PullTarget `protobuf:"bytes,4,opt,name=pull_target,json=pullTarget,oneof"`
+	PullTarget *PullTarget `protobuf:"bytes,4,opt,name=pull_target,json=pullTarget,proto3,oneof"`
 }
 
 func (*Queue_AppEngineHttpTarget) isQueue_TargetType() {}
@@ -354,7 +354,7 @@ type RateLimits struct {
 	//
 	// This field has the same meaning as
 	// [rate in queue.yaml/xml](/appengine/docs/standard/python/config/queueref#rate).
-	MaxTasksDispatchedPerSecond float64 `protobuf:"fixed64,1,opt,name=max_tasks_dispatched_per_second,json=maxTasksDispatchedPerSecond" json:"max_tasks_dispatched_per_second,omitempty"`
+	MaxTasksDispatchedPerSecond float64 `protobuf:"fixed64,1,opt,name=max_tasks_dispatched_per_second,json=maxTasksDispatchedPerSecond,proto3" json:"max_tasks_dispatched_per_second,omitempty"`
 	// Output only. The max burst size.
 	//
 	// Max burst size limits how fast tasks in queue are processed when
@@ -388,7 +388,7 @@ type RateLimits struct {
 	// [max_tasks_dispatched_per_second][google.cloud.tasks.v2beta2.RateLimits.max_tasks_dispatched_per_second]
 	// is updated.
 	//
-	MaxBurstSize int32 `protobuf:"varint,2,opt,name=max_burst_size,json=maxBurstSize" json:"max_burst_size,omitempty"`
+	MaxBurstSize int32 `protobuf:"varint,2,opt,name=max_burst_size,json=maxBurstSize,proto3" json:"max_burst_size,omitempty"`
 	// The maximum number of concurrent tasks that Cloud Tasks allows
 	// to be dispatched for this queue. After this threshold has been
 	// reached, Cloud Tasks stops dispatching tasks until the number of
@@ -408,7 +408,7 @@ type RateLimits struct {
 	//
 	// This field has the same meaning as
 	// [max_concurrent_requests in queue.yaml/xml](/appengine/docs/standard/python/config/queueref#max_concurrent_requests).
-	MaxConcurrentTasks   int32    `protobuf:"varint,3,opt,name=max_concurrent_tasks,json=maxConcurrentTasks" json:"max_concurrent_tasks,omitempty"`
+	MaxConcurrentTasks   int32    `protobuf:"varint,3,opt,name=max_concurrent_tasks,json=maxConcurrentTasks,proto3" json:"max_concurrent_tasks,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -418,7 +418,7 @@ func (m *RateLimits) Reset()         { *m = RateLimits{} }
 func (m *RateLimits) String() string { return proto.CompactTextString(m) }
 func (*RateLimits) ProtoMessage()    {}
 func (*RateLimits) Descriptor() ([]byte, []int) {
-	return fileDescriptor_queue_fcad6349d23af99b, []int{1}
+	return fileDescriptor_queue_2041daffc3c0cfe8, []int{1}
 }
 func (m *RateLimits) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RateLimits.Unmarshal(m, b)
@@ -497,7 +497,7 @@ type RetryConfig struct {
 	//
 	// This field has the same meaning as
 	// [task_age_limit in queue.yaml/xml](/appengine/docs/standard/python/config/queueref#retry_parameters).
-	MaxRetryDuration *duration.Duration `protobuf:"bytes,3,opt,name=max_retry_duration,json=maxRetryDuration" json:"max_retry_duration,omitempty"`
+	MaxRetryDuration *duration.Duration `protobuf:"bytes,3,opt,name=max_retry_duration,json=maxRetryDuration,proto3" json:"max_retry_duration,omitempty"`
 	// A task will be [scheduled](Task.schedule_time) for retry between
 	// [min_backoff][google.cloud.tasks.v2beta2.RetryConfig.min_backoff] and
 	// [max_backoff][google.cloud.tasks.v2beta2.RetryConfig.max_backoff] duration after it fails,
@@ -515,7 +515,7 @@ type RetryConfig struct {
 	//
 	// This field has the same meaning as
 	// [min_backoff_seconds in queue.yaml/xml](/appengine/docs/standard/python/config/queueref#retry_parameters).
-	MinBackoff *duration.Duration `protobuf:"bytes,4,opt,name=min_backoff,json=minBackoff" json:"min_backoff,omitempty"`
+	MinBackoff *duration.Duration `protobuf:"bytes,4,opt,name=min_backoff,json=minBackoff,proto3" json:"min_backoff,omitempty"`
 	// A task will be [scheduled](Task.schedule_time) for retry between
 	// [min_backoff][google.cloud.tasks.v2beta2.RetryConfig.min_backoff] and
 	// [max_backoff][google.cloud.tasks.v2beta2.RetryConfig.max_backoff] duration after it fails,
@@ -533,7 +533,7 @@ type RetryConfig struct {
 	//
 	// This field has the same meaning as
 	// [max_backoff_seconds in queue.yaml/xml](/appengine/docs/standard/python/config/queueref#retry_parameters).
-	MaxBackoff *duration.Duration `protobuf:"bytes,5,opt,name=max_backoff,json=maxBackoff" json:"max_backoff,omitempty"`
+	MaxBackoff *duration.Duration `protobuf:"bytes,5,opt,name=max_backoff,json=maxBackoff,proto3" json:"max_backoff,omitempty"`
 	// The time between retries will double `max_doublings` times.
 	//
 	// A task's retry interval starts at
@@ -562,7 +562,7 @@ type RetryConfig struct {
 	//
 	// This field has the same meaning as
 	// [max_doublings in queue.yaml/xml](/appengine/docs/standard/python/config/queueref#retry_parameters).
-	MaxDoublings         int32    `protobuf:"varint,6,opt,name=max_doublings,json=maxDoublings" json:"max_doublings,omitempty"`
+	MaxDoublings         int32    `protobuf:"varint,6,opt,name=max_doublings,json=maxDoublings,proto3" json:"max_doublings,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -572,7 +572,7 @@ func (m *RetryConfig) Reset()         { *m = RetryConfig{} }
 func (m *RetryConfig) String() string { return proto.CompactTextString(m) }
 func (*RetryConfig) ProtoMessage()    {}
 func (*RetryConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_queue_fcad6349d23af99b, []int{2}
+	return fileDescriptor_queue_2041daffc3c0cfe8, []int{2}
 }
 func (m *RetryConfig) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RetryConfig.Unmarshal(m, b)
@@ -597,10 +597,10 @@ type isRetryConfig_NumAttempts interface {
 }
 
 type RetryConfig_MaxAttempts struct {
-	MaxAttempts int32 `protobuf:"varint,1,opt,name=max_attempts,json=maxAttempts,oneof"`
+	MaxAttempts int32 `protobuf:"varint,1,opt,name=max_attempts,json=maxAttempts,proto3,oneof"`
 }
 type RetryConfig_UnlimitedAttempts struct {
-	UnlimitedAttempts bool `protobuf:"varint,2,opt,name=unlimited_attempts,json=unlimitedAttempts,oneof"`
+	UnlimitedAttempts bool `protobuf:"varint,2,opt,name=unlimited_attempts,json=unlimitedAttempts,proto3,oneof"`
 }
 
 func (*RetryConfig_MaxAttempts) isRetryConfig_NumAttempts()       {}
@@ -731,10 +731,10 @@ func init() {
 }
 
 func init() {
-	proto.RegisterFile("google/cloud/tasks/v2beta2/queue.proto", fileDescriptor_queue_fcad6349d23af99b)
+	proto.RegisterFile("google/cloud/tasks/v2beta2/queue.proto", fileDescriptor_queue_2041daffc3c0cfe8)
 }
 
-var fileDescriptor_queue_fcad6349d23af99b = []byte{
+var fileDescriptor_queue_2041daffc3c0cfe8 = []byte{
 	// 702 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x94, 0xcb, 0x6e, 0xdb, 0x3a,
 	0x10, 0x86, 0xad, 0x24, 0xca, 0x65, 0xe4, 0x04, 0x0e, 0xcf, 0x05, 0x3e, 0x3e, 0x45, 0x62, 0x38,
