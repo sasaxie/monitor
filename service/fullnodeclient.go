@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
+	"github.com/astaxie/beego/logs"
 	"github.com/sasaxie/monitor/api"
 	"google.golang.org/grpc"
-	"log"
 	"time"
 )
 
@@ -27,7 +27,8 @@ func (g *FullNodeGrpcClient) Start() {
 	var err error
 	g.Conn, err = grpc.Dial(g.Address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("did not connect: %v\n", err)
+		logs.Warn("did not connect: %v\n", err)
+		return
 	}
 
 	g.WalletClient = api.NewWalletClient(g.Conn)
@@ -48,7 +49,7 @@ func (g *FullNodeGrpcClient) GetNowBlockNum() int64 {
 	result, err := g.WalletClient.GetNowBlock2(ctx, new(api.EmptyMessage))
 
 	if err != nil {
-		log.Printf("get now block error: %v\n", err)
+		logs.Warn("get now block error: %v\n", err)
 		return 0
 	}
 
@@ -66,7 +67,7 @@ func (g *FullNodeGrpcClient) GetLastSolidityBlockNum() int64 {
 	dynamicProperties, err := g.DatabaseClient.GetDynamicProperties(ctx, new(api.EmptyMessage))
 
 	if err != nil {
-		log.Printf("get last solidity block num error: %v", err)
+		logs.Warn("get last solidity block num error: %v", err)
 		return 0
 	}
 
@@ -86,7 +87,7 @@ func (g *FullNodeGrpcClient) GetPing() int64 {
 	end := time.Now().UnixNano() / 1000000
 
 	if err != nil {
-		log.Printf("get ping error: %v", err)
+		logs.Warn("get ping error: %v", err)
 		return 0
 	}
 
@@ -102,7 +103,7 @@ func (g *FullNodeGrpcClient) ListWitnesses() *api.WitnessList {
 		new(api.EmptyMessage))
 
 	if err != nil {
-		log.Printf("get witnesses error: %v\n", err)
+		logs.Warn("get witnesses error: %v\n", err)
 	}
 
 	return witnessList

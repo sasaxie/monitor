@@ -1,6 +1,8 @@
 package influxdb
 
 import (
+	"fmt"
+	"github.com/astaxie/beego/logs"
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/sasaxie/monitor/common/config"
 	"log"
@@ -33,6 +35,8 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	Client.InitDatabase()
 }
 
 func (i *InfluxDB) Write(pointName string, tags map[string]string,
@@ -54,4 +58,28 @@ func (i *InfluxDB) Write(pointName string, tags map[string]string,
 	if err := i.C.Write(bp); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (i *InfluxDB) InitDatabase() {
+	_, err := queryDB(i.C, fmt.Sprintf("CREATE DATABASE %s",
+		config.MonitorConfig.InfluxDB.Database))
+	if err != nil {
+		logs.Error(err)
+	}
+}
+
+func queryDB(clnt client.Client, cmd string) (res []client.Result, err error) {
+	q := client.Query{
+		Command:  cmd,
+		Database: config.MonitorConfig.InfluxDB.Database,
+	}
+	if response, err := clnt.Query(q); err == nil {
+		if response.Error() != nil {
+			return res, response.Error()
+		}
+		res = response.Results
+	} else {
+		return res, err
+	}
+	return res, nil
 }

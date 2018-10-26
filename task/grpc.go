@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"github.com/astaxie/beego/logs"
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
@@ -12,6 +13,7 @@ import (
 )
 
 func StartGrpcMonitor() {
+	logs.Info("start grpc monitor")
 	ticker := time.NewTicker(40 * time.Second)
 	defer ticker.Stop()
 
@@ -20,10 +22,10 @@ func StartGrpcMonitor() {
 		case <-ticker.C:
 			for _, address := range models.NodeList.Addresses {
 				if strings.EqualFold(config.FullNode.String(), address.Type) {
-					go dealGrpcMonitor(address.Type, address.Ip, address.Port)
+					go dealGrpcMonitor(address.Type, address.Ip, address.GrpcPort)
 				} else if strings.EqualFold(config.SolidityNode.String(),
 					address.Type) {
-					go dealGrpcMonitor(address.Type, address.Ip, address.Port)
+					go dealGrpcMonitor(address.Type, address.Ip, address.GrpcPort)
 				}
 			}
 		}
@@ -34,9 +36,7 @@ func dealGrpcMonitor(t, ip string, port int) {
 	address := fmt.Sprintf("%s:%d", ip, port)
 
 	cli := newGrpcClient(t, address)
-
 	cli.Start()
-
 	defer cli.Shutdown()
 
 	var wg sync.WaitGroup
@@ -53,14 +53,14 @@ func dealGrpcMonitor(t, ip string, port int) {
 	go getWitnessList(cli, &wg, witnessInfo)
 	wg.Wait()
 
-	nodeStatusTags := map[string]string{config.InfluxDBTagNode: ip}
+	nodeStatusTags := map[string]string{config.InfluxDBTagNode: address}
 	nodeStatusFields := map[string]interface{}{
 		config.InfluxDBFieldNowBlockNum:          num,
 		config.InfluxDBFieldPing:                 ping,
 		config.InfluxDBFieldLastSolidityBlockNum: lastSolidityBlockNum,
 	}
 
-	witnessTags := map[string]string{config.InfluxDBTagNode: ip}
+	witnessTags := map[string]string{config.InfluxDBTagNode: address}
 	witnessFields := make(map[string]interface{})
 	witnessInfo.Lock.Lock()
 	for k, v := range witnessInfo.Info {
@@ -70,7 +70,10 @@ func dealGrpcMonitor(t, ip string, port int) {
 
 	influxdb.Client.Write(config.InfluxDBPointNameNodeStatus, nodeStatusTags,
 		nodeStatusFields)
-	influxdb.Client.Write(config.InfluxDBPointNameWitness, witnessTags, witnessFields)
+
+	if len(witnessFields) > 0 {
+		influxdb.Client.Write(config.InfluxDBPointNameWitness, witnessTags, witnessFields)
+	}
 }
 
 func newGrpcClient(t, addr string) service.Client {
@@ -106,12 +109,15 @@ func getWitnessList(c service.Client,
 	defer wg.Done()
 	witnessList := c.ListWitnesses()
 
-	for _, witness := range witnessList.Witnesses {
-		if witness.IsJobs {
-			key := witness.Url
-			res.Lock.Lock()
-			res.Info[key] = witness.TotalMissed
-			res.Lock.Unlock()
+	if witnessList != nil {
+		for _, witness := range witnessList.Witnesses {
+			if witness.IsJobs {
+				key := witness.Url
+				res.Lock.Lock()
+				res.Info[key] = witness.TotalMissed
+				res.Lock.Unlock()
+			}
 		}
 	}
+
 }
