@@ -51,4 +51,4 @@ Port: 8086
 
 ## Show
 
-![1.png](images/1.png)
+![node-detail.png](images/node-detail.png)
