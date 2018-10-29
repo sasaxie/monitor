@@ -30,7 +30,7 @@ docker run -d \
 
 ## Grafana
 
-Open <http://localhost:3303>
+Open <http://localhost:3003>
 
 ```
 Username: root
