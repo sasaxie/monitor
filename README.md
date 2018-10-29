@@ -37,6 +37,8 @@ Username: root
 Password: root
 ```
 
+Modify /etc/grafana/grafana.ini root_url=http://[your ip]:3003
+
 ## InfluxDB
 
 ### Web Interface
