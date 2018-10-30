@@ -17,7 +17,7 @@ import (
 func StartHttpMonitor() {
 	logs.Info("start http monitor")
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(config.MonitorConfig.Task.GetHTTPDataInterval * time.Second)
 	defer ticker.Stop()
 
 	for {

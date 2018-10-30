@@ -30,3 +30,9 @@ level = "debug"
 
 [http]
 port = 8080
+
+[task]
+# gRPC Interval defalut 40 seconds
+getGRPCDataInterval = 40
+# HTTP Interval defalut 10 seconds
+getHTTPDataInterval = 10

@@ -8,6 +8,7 @@ import (
 	"github.com/sasaxie/monitor/util"
 	"log"
 	"os"
+	"time"
 )
 
 const configFilePath = "conf/monitor.toml"
@@ -22,6 +23,7 @@ type Config struct {
 	InfluxDB InfluxDB
 	Log      Log
 	Http     Http
+	Task     Task
 }
 
 type Node struct {
@@ -42,6 +44,11 @@ type Log struct {
 
 type Http struct {
 	Port int
+}
+
+type Task struct {
+	GetGRPCDataInterval time.Duration
+	GetHTTPDataInterval time.Duration
 }
 
 func init() {
@@ -147,6 +154,12 @@ level = "debug"
 
 [http]
 port = 8080
+
+[task]
+# gRPC Interval defalut 40 seconds
+gRPCInterval = 40
+# HTTP Interval defalut 10 seconds
+HTTPInterval = 10
 `
 
 	util.WriteToFile(filename, d)
