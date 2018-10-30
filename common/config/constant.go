@@ -23,22 +23,37 @@ func (n NodeType) String() string {
 }
 
 //=========== InfluxDB ===========//
+
+//------------ Tag ------------//
 const InfluxDBTagNode = "node"
 const InfluxDBTagMemoryDescInfoName = "memory_desc_info_name"
 const InfluxDBTagPeer = "peer"
+
+//------------ Point ------------//
 const InfluxDBPointNameNodeStatus = "node_status"
 const InfluxDBPointNameWitness = "witness"
 const InfluxDBPointNameNodeInfoDetail = "node_info_detail"
 const InfluxDBPointNamePeerInfo = "peer_info"
+
+//------------ node_status Field ------------//
 const InfluxDBFieldNowBlockNum = "NowBlockNum"
 const InfluxDBFieldPing = "ping"
 const InfluxDBFieldLastSolidityBlockNum = "LastSolidityBlockNum"
 
+//------------ node_info_detail Field ------------//
+
+// Basic information
 const InfluxDBFieldActiveConnectCount = "ActiveConnectCount"
 const InfluxDBFieldBeginSyncNum = "BeginSyncNum"
 const InfluxDBFieldBlockNum = "BlockNum"
 const InfluxDBFieldBlockID = "BlockID"
+const InfluxDBFieldCurrentConnectCount = "CurrentConnectCount"
+const InfluxDBFieldPassiveConnectCount = "PassiveConnectCount"
+const InfluxDBFieldSolidityBlockNum = "SolidityBlockNum"
+const InfluxDBFieldSolidityBlockID = "SolidityBlockID"
+const InfluxDBFieldTotalFlow = "TotalFlow"
 
+// Configuration information
 const InfluxDBFieldActiveNodeSize = "ActiveNodeSize"
 const InfluxDBFieldAllowCreationOfContracts = "AllowCreationOfContracts"
 const InfluxDBFieldBackupListenPort = "BackupListenPort"
@@ -58,8 +73,7 @@ const InfluxDBFieldSameIpMaxConnectCount = "SameIpMaxConnectCount"
 const InfluxDBFieldSendNodeSize = "SendNodeSize"
 const InfluxDBFieldSupportConstant = "SupportConstant"
 
-const InfluxDBFieldCurrentConnectCount = "CurrentConnectCount"
-
+// System information
 const InfluxDBFieldCpuCount = "CpuCount"
 const InfluxDBFieldCpuRate = "CpuRate"
 const InfluxDBFieldDeadLockThreadCount = "DeadLockThreadCount"
@@ -77,12 +91,6 @@ const InfluxDBFieldOsName = "OsName"
 const InfluxDBFieldProcessCpuRate = "ProcessCpuRate"
 const InfluxDBFieldThreadCount = "ThreadCount"
 const InfluxDBFieldTotalMemory = "TotalMemory"
-
-const InfluxDBFieldPassiveConnectCount = "PassiveConnectCount"
-
-const InfluxDBFieldSolidityBlockNum = "SolidityBlockNum"
-const InfluxDBFieldSolidityBlockID = "SolidityBlockID"
-const InfluxDBFieldTotalFlow = "TotalFlow"
 
 // peer
 const InfluxDBFieldPeerActive = "Active"
