@@ -23,11 +23,22 @@ func StartGrpcMonitor() {
 		select {
 		case <-ticker.C:
 			for _, address := range models.NodeList.Addresses {
-				if strings.EqualFold(config.FullNode.String(), address.Type) {
+				switch address.Type {
+				case config.FullNode.String():
+					fallthrough
+				case config.MtiFullNode.String():
+					fallthrough
+				case config.WitnessNode.String():
+					fallthrough
+				case config.SRWitnessNode.String():
+					fallthrough
+				case config.SRWitnessBNode.String():
+					fallthrough
+				case config.GRWitnessNode.String():
 					go dealGrpcMonitor(address.Type, address.Ip, address.GrpcPort)
-				} else if strings.EqualFold(config.SolidityNode.String(),
-					address.Type) {
+				case config.SolidityNode.String():
 					go dealGrpcMonitor(address.Type, address.Ip, address.GrpcPort)
+				default:
 				}
 			}
 		}

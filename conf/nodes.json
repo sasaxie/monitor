@@ -5,7 +5,7 @@
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node",
-      "tag": "主网"
+      "tag": "局域网"
     },
     {
       "ip": "54.236.37.243",
