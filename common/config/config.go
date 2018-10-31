@@ -156,9 +156,9 @@ port = 8080
 
 [task]
 # gRPC Interval defalut 40 seconds
-gRPCInterval = 40
+getGRPCDataInterval = 40
 # HTTP Interval defalut 10 seconds
-HTTPInterval = 10
+getHTTPDataInterval = 10
 `
 
 	util.WriteToFile(filename, d)
@@ -173,7 +173,7 @@ func createDefaultNodes(filename string) {
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node",
-      "tag": "主网"
+      "tag": "局域网"
     },
     {
       "ip": "54.236.37.243",
