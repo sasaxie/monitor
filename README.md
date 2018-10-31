@@ -25,7 +25,7 @@ docker run -d \
   -v $PWD/influxdb:/var/lib/influxdb \
   -v $PWD/grafana:/var/lib/grafana \
   -v $PWD/monitor:/root/go/bin/conf \
-  sasaxie/tron-monitor:1.0
+  sasaxie/tron-monitor
 ```
 
 ## Grafana
