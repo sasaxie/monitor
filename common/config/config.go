@@ -8,7 +8,6 @@ import (
 	"github.com/sasaxie/monitor/util"
 	"log"
 	"os"
-	"time"
 )
 
 const configFilePath = "conf/monitor.toml"
@@ -47,8 +46,8 @@ type Http struct {
 }
 
 type Task struct {
-	GetGRPCDataInterval time.Duration
-	GetHTTPDataInterval time.Duration
+	GetGRPCDataInterval int64
+	GetHTTPDataInterval int64
 }
 
 func init() {
@@ -173,241 +172,281 @@ func createDefaultNodes(filename string) {
       "ip": "172.16.21.39",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "54.236.37.243",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "52.53.189.99",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "18.196.99.16",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "34.253.187.192",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "52.56.56.149",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "35.180.51.163",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "54.252.224.209",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "18.228.15.36",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "52.15.93.92",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "34.220.77.106",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "13.127.47.162",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "13.124.62.58",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.74.149.206",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "35.182.37.246",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.90.215.84",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.254.77.146",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.74.242.55",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.75.249.119",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.90.201.118",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "34.250.140.143",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "35.176.192.130",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "52.47.197.188",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "52.62.210.100",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "13.231.4.243",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.254.27.69",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "35.154.90.144",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "13.125.210.234",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.88.174.175",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.75.249.4",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "full_node"
+      "type": "full_node",
+      "tag": "主网"
     },
     {
       "ip": "47.89.187.247",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "47.91.18.255",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "47.75.10.71",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "47.251.52.228",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "47.251.48.82",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "47.74.147.80",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "34.234.164.105",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "18.221.34.0",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "35.178.11.0",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     },
     {
       "ip": "35.180.18.107",
       "grpcPort": 50051,
       "httpPort": 8090,
-      "type": "solidity_node"
+      "type": "solidity_node",
+      "tag": "主网"
     }
   ]
 }

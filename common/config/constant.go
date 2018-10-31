@@ -26,6 +26,8 @@ func (n NodeType) String() string {
 
 //------------ Tag ------------//
 const InfluxDBTagNode = "node"
+const InfluxDBTagType = "type"
+const InfluxDBTagTag = "tag"
 const InfluxDBTagMemoryDescInfoName = "memory_desc_info_name"
 const InfluxDBTagPeer = "peer"
 
@@ -41,6 +43,10 @@ const InfluxDBFieldPing = "ping"
 const InfluxDBFieldLastSolidityBlockNum = "LastSolidityBlockNum"
 
 //------------ node_info_detail Field ------------//
+
+const InfluxDBFieldNode = "Node"
+const InfluxDBFieldType = "Type"
+const InfluxDBFieldTag = "Tag"
 
 // Basic information
 const InfluxDBFieldActiveConnectCount = "ActiveConnectCount"

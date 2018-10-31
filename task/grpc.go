@@ -14,7 +14,9 @@ import (
 
 func StartGrpcMonitor() {
 	logs.Info("start grpc monitor")
-	ticker := time.NewTicker(config.MonitorConfig.Task.GetGRPCDataInterval * time.Second)
+	ticker := time.NewTicker(
+		time.Duration(config.MonitorConfig.Task.GetGRPCDataInterval) *
+			time.Second)
 	defer ticker.Stop()
 
 	for {
