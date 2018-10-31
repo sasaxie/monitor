@@ -55,48 +55,9 @@ func dealHttpMonitor(ip string, port int) {
 			return
 		}
 
-		blockNum := 0
-		blockID := ""
-		if len(nodeInfoDetail.Block) > 0 && !strings.EqualFold(nodeInfoDetail.
-			Block, "") {
-			strs := strings.Split(nodeInfoDetail.Block, ",")
-			if len(strs) > 0 {
-				numStrs := strings.Split(strs[0], ":")
-				if len(numStrs) > 0 {
-					blockNum, err = strconv.Atoi(numStrs[1])
-					if err != nil {
-						logs.Warn(err)
-					}
-				}
+		blockNum, blockID := getBlockNumAndId(nodeInfoDetail.Block)
 
-				idStrs := strings.Split(strs[1], ":")
-				if len(idStrs) > 0 {
-					blockID = idStrs[1]
-				}
-			}
-		}
-
-		solidityBlockNum := 0
-		solidityBlockID := ""
-		if len(nodeInfoDetail.SolidityBlock) > 0 && !strings.EqualFold(
-			nodeInfoDetail.
-				SolidityBlock, "") {
-			strs := strings.Split(nodeInfoDetail.SolidityBlock, ",")
-			if len(strs) > 0 {
-				numStrs := strings.Split(strs[0], ":")
-				if len(numStrs) > 0 {
-					solidityBlockNum, err = strconv.Atoi(numStrs[1])
-					if err != nil {
-						logs.Warn(err)
-					}
-				}
-
-				idStrs := strings.Split(strs[1], ":")
-				if len(idStrs) > 0 {
-					solidityBlockID = idStrs[1]
-				}
-			}
-		}
+		solidityBlockNum, solidityBlockID := getBlockNumAndId(nodeInfoDetail.SolidityBlock)
 
 		nodeInfoDetailTags := map[string]string{config.InfluxDBTagNode: address}
 		nodeInfoDetailFields := map[string]interface{}{
@@ -168,47 +129,9 @@ func dealHttpMonitor(ip string, port int) {
 		}
 
 		for _, p := range nodeInfoDetail.PeerList {
-			hbn := 0
-			hbi := ""
-			if len(p.HeadBlockWeBothHave) > 0 && !strings.EqualFold(p.
-				HeadBlockWeBothHave, "") {
-				strs := strings.Split(p.HeadBlockWeBothHave, ",")
-				if len(strs) > 0 {
-					numStrs := strings.Split(strs[0], ":")
-					if len(numStrs) > 0 {
-						hbn, err = strconv.Atoi(numStrs[1])
-						if err != nil {
-							logs.Warn(err)
-						}
-					}
+			hbn, hbi := getBlockNumAndId(p.HeadBlockWeBothHave)
 
-					idStrs := strings.Split(strs[1], ":")
-					if len(idStrs) > 0 {
-						hbi = idStrs[1]
-					}
-				}
-			}
-
-			ln := 0
-			li := ""
-			if len(p.LastSyncBlock) > 0 && !strings.EqualFold(p.
-				LastSyncBlock, "") {
-				strs := strings.Split(p.LastSyncBlock, ",")
-				if len(strs) > 0 {
-					numStrs := strings.Split(strs[0], ":")
-					if len(numStrs) > 0 {
-						ln, err = strconv.Atoi(numStrs[1])
-						if err != nil {
-							logs.Warn(err)
-						}
-					}
-
-					idStrs := strings.Split(strs[1], ":")
-					if len(idStrs) > 0 {
-						li = idStrs[1]
-					}
-				}
-			}
+			ln, li := getBlockNumAndId(p.LastSyncBlock)
 
 			t := map[string]string{config.InfluxDBTagNode: address,
 				config.InfluxDBTagPeer: p.Host}
@@ -242,8 +165,32 @@ func dealHttpMonitor(ip string, port int) {
 				config.InfluxDBFieldPeerUnFetchSynNum:           p.UnFetchSynNum,
 			}
 
-			influxdb.Client.Write(config.InfluxDBPointNamePeerInfo, t,
-				f)
+			influxdb.Client.Write(config.InfluxDBPointNamePeerInfo, t, f)
 		}
 	}
+}
+
+func getBlockNumAndId(blockStr string) (int64, string) {
+	var num int64 = 0
+	var id = ""
+	var err error
+	if len(blockStr) > 0 && !strings.EqualFold(blockStr, "") {
+		strs := strings.Split(blockStr, ",")
+		if len(strs) > 0 {
+			numStrs := strings.Split(strs[0], ":")
+			if len(numStrs) > 0 {
+				num, err = strconv.ParseInt(numStrs[1], 10, 64)
+				if err != nil {
+					logs.Warn(err)
+				}
+			}
+
+			idStrs := strings.Split(strs[1], ":")
+			if len(idStrs) > 0 {
+				id = idStrs[1]
+			}
+		}
+	}
+
+	return num, id
 }
