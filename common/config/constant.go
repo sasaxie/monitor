@@ -1,13 +1,18 @@
 package config
 
 //=========== Monitor Info ===========//
-const MonitorVersion = "v1.0.0"
+const MonitorVersion = "v2.0"
 
 //=========== Node type ===========//
 type NodeType int
 
 const (
 	FullNode NodeType = iota
+	MtiFullNode
+	WitnessNode
+	SRWitnessNode
+	SRWitnessBNode
+	GRWitnessNode
 	SolidityNode
 )
 
@@ -15,6 +20,16 @@ func (n NodeType) String() string {
 	switch n {
 	case FullNode:
 		return "full_node"
+	case MtiFullNode:
+		return "mti_full_node"
+	case WitnessNode:
+		return "witness_node"
+	case SRWitnessNode:
+		return "sr_witness_node"
+	case SRWitnessBNode:
+		return "sr_witness_b_node"
+	case GRWitnessNode:
+		return "gr_witness_node"
 	case SolidityNode:
 		return "solidity_node"
 	default:
@@ -23,22 +38,43 @@ func (n NodeType) String() string {
 }
 
 //=========== InfluxDB ===========//
+
+//------------ Tag ------------//
 const InfluxDBTagNode = "node"
+const InfluxDBTagType = "type"
+const InfluxDBTagTag = "tag"
 const InfluxDBTagMemoryDescInfoName = "memory_desc_info_name"
 const InfluxDBTagPeer = "peer"
+
+//------------ Point ------------//
 const InfluxDBPointNameNodeStatus = "node_status"
 const InfluxDBPointNameWitness = "witness"
 const InfluxDBPointNameNodeInfoDetail = "node_info_detail"
 const InfluxDBPointNamePeerInfo = "peer_info"
+
+//------------ node_status Field ------------//
 const InfluxDBFieldNowBlockNum = "NowBlockNum"
 const InfluxDBFieldPing = "ping"
 const InfluxDBFieldLastSolidityBlockNum = "LastSolidityBlockNum"
 
+//------------ node_info_detail Field ------------//
+
+const InfluxDBFieldNode = "Node"
+const InfluxDBFieldType = "Type"
+const InfluxDBFieldTag = "Tag"
+
+// Basic information
 const InfluxDBFieldActiveConnectCount = "ActiveConnectCount"
 const InfluxDBFieldBeginSyncNum = "BeginSyncNum"
 const InfluxDBFieldBlockNum = "BlockNum"
 const InfluxDBFieldBlockID = "BlockID"
+const InfluxDBFieldCurrentConnectCount = "CurrentConnectCount"
+const InfluxDBFieldPassiveConnectCount = "PassiveConnectCount"
+const InfluxDBFieldSolidityBlockNum = "SolidityBlockNum"
+const InfluxDBFieldSolidityBlockID = "SolidityBlockID"
+const InfluxDBFieldTotalFlow = "TotalFlow"
 
+// Configuration information
 const InfluxDBFieldActiveNodeSize = "ActiveNodeSize"
 const InfluxDBFieldAllowCreationOfContracts = "AllowCreationOfContracts"
 const InfluxDBFieldBackupListenPort = "BackupListenPort"
@@ -58,8 +94,7 @@ const InfluxDBFieldSameIpMaxConnectCount = "SameIpMaxConnectCount"
 const InfluxDBFieldSendNodeSize = "SendNodeSize"
 const InfluxDBFieldSupportConstant = "SupportConstant"
 
-const InfluxDBFieldCurrentConnectCount = "CurrentConnectCount"
-
+// System information
 const InfluxDBFieldCpuCount = "CpuCount"
 const InfluxDBFieldCpuRate = "CpuRate"
 const InfluxDBFieldDeadLockThreadCount = "DeadLockThreadCount"
@@ -77,12 +112,6 @@ const InfluxDBFieldOsName = "OsName"
 const InfluxDBFieldProcessCpuRate = "ProcessCpuRate"
 const InfluxDBFieldThreadCount = "ThreadCount"
 const InfluxDBFieldTotalMemory = "TotalMemory"
-
-const InfluxDBFieldPassiveConnectCount = "PassiveConnectCount"
-
-const InfluxDBFieldSolidityBlockNum = "SolidityBlockNum"
-const InfluxDBFieldSolidityBlockID = "SolidityBlockID"
-const InfluxDBFieldTotalFlow = "TotalFlow"
 
 // peer
 const InfluxDBFieldPeerActive = "Active"

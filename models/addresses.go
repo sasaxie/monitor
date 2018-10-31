@@ -14,9 +14,10 @@ import (
 var NodeList = new(Nodes)
 
 func init() {
-	NodeList.Load(fmt.Sprintf("%s/conf/%s", util.GetCurrentDirectory(),
-		config.MonitorConfig.Node.
-			DataFile))
+	NodeList.Load(
+		fmt.Sprintf("%s/conf/%s",
+			util.GetCurrentDirectory(),
+			config.MonitorConfig.Node.DataFile))
 }
 
 type Nodes struct {
@@ -28,6 +29,7 @@ type Address struct {
 	GrpcPort int    `json:"grpcPort"`
 	HttpPort int    `json:"httpPort"`
 	Type     string `json:"type"`
+	Tag      string `json:"tag"`
 }
 
 func (s *Nodes) Load(filePath string) {

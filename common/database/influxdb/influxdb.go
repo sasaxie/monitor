@@ -39,8 +39,18 @@ func init() {
 	Client.InitDatabase()
 }
 
-func (i *InfluxDB) Write(pointName string, tags map[string]string,
+func (i *InfluxDB) Write(
+	pointName string,
+	tags map[string]string,
 	fields map[string]interface{}) {
+	i.WriteByTime(pointName, tags, fields, time.Now())
+}
+
+func (i *InfluxDB) WriteByTime(
+	pointName string,
+	tags map[string]string,
+	fields map[string]interface{},
+	t time.Time) {
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  config.MonitorConfig.InfluxDB.Database,
 		Precision: "s",
@@ -49,7 +59,7 @@ func (i *InfluxDB) Write(pointName string, tags map[string]string,
 		log.Fatal(err)
 	}
 
-	pt, err := client.NewPoint(pointName, tags, fields, time.Now())
+	pt, err := client.NewPoint(pointName, tags, fields, t)
 	if err != nil {
 		log.Fatal(err)
 	}
