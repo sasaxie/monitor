@@ -45,13 +45,13 @@ WORKDIR /root
 
 RUN mkdir -p /var/log/supervisor && \
     mkdir -p /var/run/sshd && \
-    mkdir -p /root/go/src/github.com/sasaxie/monitor && \
-    mkdir -p /root/go/bin/conf && \
     sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
     echo 'root:root' | chpasswd && \
     rm -rf .ssh && \
     rm -rf .profile && \
-    mkdir .ssh
+    mkdir .ssh  && \
+    mkdir -p /root/go/src/github.com/sasaxie/monitor && \
+    mkdir -p /root/go/bin/conf
 
 # Install InfluxDB
 RUN wget https://dl.influxdata.com/influxdb/releases/influxdb_${INFLUXDB_VERSION}_amd64.deb && \
