@@ -1,7 +1,7 @@
 package config
 
 //=========== Monitor Info ===========//
-const MonitorVersion = "v2.0"
+const MonitorVersion = "v2.1"
 
 //=========== Node type ===========//
 type NodeType int
@@ -73,6 +73,9 @@ const InfluxDBFieldPassiveConnectCount = "PassiveConnectCount"
 const InfluxDBFieldSolidityBlockNum = "SolidityBlockNum"
 const InfluxDBFieldSolidityBlockID = "SolidityBlockID"
 const InfluxDBFieldTotalFlow = "TotalFlow"
+
+// Cheat witness
+const InfluxDBFieldCheatWitnessInfoMap = "CheatWitnessInfoMap"
 
 // Configuration information
 const InfluxDBFieldActiveNodeSize = "ActiveNodeSize"

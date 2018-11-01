@@ -14,6 +14,7 @@ type NodeInfoDetail struct {
 	ActiveConnectCount  int64
 	BeginSyncNum        int64
 	Block               string
+	CheatWitnessInfoMap map[string]string
 	ConfigNodeInfo      *ConfigNodeInfo
 	CurrentConnectCount int64
 	MachineInfo         *MachineInfo

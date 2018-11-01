@@ -73,6 +73,8 @@ func dealHttpMonitor(address *models.Address) {
 		config.InfluxDBTagTag:  address.Tag,
 	}
 
+	cheatWitnessInfo := getCheatWitnessInfoStr(nodeInfoDetail.CheatWitnessInfoMap)
+
 	nodeInfoDetailFields := map[string]interface{}{
 		config.InfluxDBFieldNode: addr,
 		config.InfluxDBFieldType: address.Type,
@@ -82,6 +84,8 @@ func dealHttpMonitor(address *models.Address) {
 		config.InfluxDBFieldBeginSyncNum:       nodeInfoDetail.BeginSyncNum,
 		config.InfluxDBFieldBlockNum:           blockNum,
 		config.InfluxDBFieldBlockID:            blockID,
+
+		config.InfluxDBFieldCheatWitnessInfoMap: cheatWitnessInfo,
 
 		config.InfluxDBFieldActiveNodeSize:           nodeInfoDetail.ConfigNodeInfo.ActiveNodeSize,
 		config.InfluxDBFieldAllowCreationOfContracts: nodeInfoDetail.ConfigNodeInfo.AllowCreationOfContracts,
@@ -219,4 +223,13 @@ func getBlockNumAndId(blockStr string) (int64, string) {
 	}
 
 	return num, id
+}
+
+func getCheatWitnessInfoStr(cheatWitnessInfoMap map[string]string) string {
+	cheatWitnessInfo := ""
+	for k, v := range cheatWitnessInfoMap {
+		cheatWitnessInfo += k + ":" + v + " "
+	}
+
+	return cheatWitnessInfo
 }
