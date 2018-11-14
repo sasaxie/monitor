@@ -7,7 +7,6 @@ import (
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/service"
-	"strings"
 	"sync"
 	"time"
 )
@@ -90,13 +89,25 @@ func dealGrpcMonitor(t, ip string, port int) {
 }
 
 func newGrpcClient(t, addr string) service.Client {
-	if strings.EqualFold(t, config.FullNode.String()) {
+	switch t {
+	case config.FullNode.String():
+		fallthrough
+	case config.MtiFullNode.String():
+		fallthrough
+	case config.WitnessNode.String():
+		fallthrough
+	case config.SRWitnessNode.String():
+		fallthrough
+	case config.SRWitnessBNode.String():
+		fallthrough
+	case config.GRWitnessNode.String():
 		return service.NewFullNodeGrpcClient(addr)
-	} else if strings.EqualFold(t, config.SolidityNode.String()) {
+	case config.SolidityNode.String():
 		return service.NewSolidityNodeGrpcClient(addr)
+	default:
+		logs.Warn("( ", addr, ") unknow client type:", t)
+		return nil
 	}
-
-	return nil
 }
 
 func getNowBlockNum(c service.Client,
