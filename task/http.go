@@ -37,19 +37,20 @@ func dealHttpMonitor(address *models.Address) {
 	response, err := http.Get(fmt.Sprintf("http://%s/wallet/getnodeinfo", addr))
 
 	if err != nil {
-		logs.Debug(err)
+		logs.Debug("(", address, ")", err)
 		return
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("dealHttpMonitor response status code", response.StatusCode)
+		logs.Warn("dealHttpMonitor (", address, ") response status code",
+			response.StatusCode)
 		return
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		logs.Warn(err)
+		logs.Warn("(", address, ") ", err)
 		return
 	}
 
@@ -57,7 +58,7 @@ func dealHttpMonitor(address *models.Address) {
 	err = json.Unmarshal(body, &nodeInfoDetail)
 
 	if err != nil {
-		logs.Warn(err)
+		logs.Warn("(", address, ") ", err)
 		return
 	}
 

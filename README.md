@@ -13,7 +13,7 @@ Monitor is a open source monitor for java-tron. It's useful for monitoring nodes
 ## Getting Started
 
 ```shell
-docker pull sasaxie/tron-monitor:1.0
+docker pull sasaxie/tron-monitor
 
 docker run -d \
   --name docker-influxdb-grafana-monitor \
@@ -50,6 +50,34 @@ Username: root
 Password: root
 Port: 8086
 ```
+
+## Configuration
+
+nodes.json
+
+```json
+{
+  "addresses": [
+    {
+      "ip": "172.16.21.39",
+      "grpcPort": 50051,
+      "httpPort": 8090,
+      "type": "full_node",
+      "tag": "局域网"
+    }
+  ]
+}
+```
+
+Type:
+
+- full_node
+- mti_full_node
+- witness_node
+- sr_witness_node
+- sr_witness_b_node
+- gr_witness_node
+- solidity_node"
 
 ## Show
 
