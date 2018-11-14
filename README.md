@@ -77,7 +77,7 @@ Type:
 - sr_witness_node
 - sr_witness_b_node
 - gr_witness_node
-- solidity_node"
+- solidity_node
 
 ## Show
 
