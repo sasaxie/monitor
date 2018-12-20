@@ -3,19 +3,40 @@ package main
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
+	"github.com/sasaxie/monitor/datamanger"
 	_ "github.com/sasaxie/monitor/routers"
-	"github.com/sasaxie/monitor/task"
+	"time"
 )
 
 func main() {
 
 	logs.Info("start monitor")
 
-	go task.StartGrpcMonitor()
-	go task.StartHttpMonitor()
+	go start()
 
 	defer influxdb.Client.C.Close()
 
 	beego.Run()
+}
+
+func start() {
+	for _, r := range datamanger.Requests {
+		r.Load()
+	}
+
+	ticker := time.NewTicker(
+		time.Duration(config.MonitorConfig.Task.GetDataInterval) *
+			time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			for _, r := range datamanger.Requests {
+				go r.Request()
+			}
+		}
+	}
 }

@@ -25,11 +25,12 @@ type Nodes struct {
 }
 
 type Address struct {
-	Ip       string `json:"ip"`
-	GrpcPort int    `json:"grpcPort"`
-	HttpPort int    `json:"httpPort"`
-	Type     string `json:"type"`
-	Tag      string `json:"tag"`
+	Ip            string `json:"ip"`
+	GrpcPort      int    `json:"grpcPort"`
+	HttpPort      int    `json:"httpPort"`
+	Type          string `json:"type"`
+	Tag           string `json:"tag"`
+	MonitorConfig string `json:"monitorConfig"`
 }
 
 func (s *Nodes) Load(filePath string) {

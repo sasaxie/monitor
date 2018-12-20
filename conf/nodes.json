@@ -1,11 +1,11 @@
 {
   "addresses": [
     {
-      "ip": "172.16.21.39",
+      "ip": "54.236.37.243",
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node",
-      "tag": "局域网"
+      "tag": "主网"
     }
   ]
 }
