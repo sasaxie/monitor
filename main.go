@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/alerts"
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/datamanger"
@@ -26,6 +27,9 @@ func start() {
 		r.Load()
 	}
 
+	a := new(alerts.GetNowBlockAlert)
+	a.Load()
+
 	ticker := time.NewTicker(
 		time.Duration(config.MonitorConfig.Task.GetDataInterval) *
 			time.Second)
@@ -34,9 +38,14 @@ func start() {
 	for {
 		select {
 		case <-ticker.C:
+			logs.Debug("start")
+
 			for _, r := range datamanger.Requests {
 				go r.Request()
 			}
+
+			a.Start()
+			a.Alert()
 		}
 	}
 }

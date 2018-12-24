@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
 	"io/ioutil"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	urlTemplateGetNowBlock = "http://%s:%d/wallet/getnowblock"
+	urlTemplateGetNowBlock = "http://%s:%d/%s/getnowblock"
 
 	influxDBFieldNowBlockNode   = "Node"
 	influxDBFieldNowBlockType   = "Type"
@@ -44,7 +45,7 @@ func init() {
 
 func (g *GetNowBlockRequest) Load() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
-		panic("Get now block request load() error")
+		panic("get now block request load() error")
 	}
 
 	if g.Parameters == nil {
@@ -53,7 +54,11 @@ func (g *GetNowBlockRequest) Load() {
 
 	for _, node := range models.NodeList.Addresses {
 		param := new(Parameter)
-		param.RequestUrl = fmt.Sprintf(urlTemplateGetNowBlock, node.Ip, node.HttpPort)
+		param.RequestUrl = fmt.Sprintf(
+			urlTemplateGetNowBlock,
+			node.Ip,
+			node.HttpPort,
+			config.NewNodeType(node.Type).GetApiPathByNodeType())
 		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
 		param.Type = node.Type
 		param.Tag = node.Tag
@@ -62,7 +67,7 @@ func (g *GetNowBlockRequest) Load() {
 	}
 
 	logs.Info(
-		"Get now block request load() success, node size:",
+		"get now block request load() success, node size:",
 		len(g.Parameters),
 	)
 }
@@ -97,7 +102,8 @@ func (g *GetNowBlockRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("Get now block request (", param.RequestUrl, ") response status code",
+		logs.Warn("get now block request (", param.RequestUrl,
+			") response status code",
 			response.StatusCode)
 		return
 	}

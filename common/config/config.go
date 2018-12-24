@@ -47,6 +47,7 @@ type Http struct {
 
 type Task struct {
 	GetDataInterval int64
+	Dingding        string
 }
 
 func init() {
@@ -156,6 +157,7 @@ port = 8080
 [task]
 # Interval defalut 60 seconds
 getDataInterval = 60
+dingding = "https://oapi.dingtalk.com/robot/send?access_token=06e2dbc217811edaad00b5c684597902bf05a457a60759b5d3b3f249e0de9db7"
 `
 
 	util.WriteToFile(filename, d)
@@ -166,11 +168,36 @@ func createDefaultNodes(filename string) {
 {
   "addresses": [
     {
-      "ip": "54.236.37.243",
+      "ip": "127.0.0.1",
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node",
-      "tag": "主网"
+      "tag": "本地",
+      "monitor": "NowBlock,BlockMissed"
+    },
+    {
+      "ip": "127.0.0.1",
+      "grpcPort": 50052,
+      "httpPort": 8092,
+      "type": "full_node",
+      "tag": "本地",
+      "monitor": "NowBlock,BlockMissed"
+    },
+    {
+      "ip": "127.0.0.1",
+      "grpcPort": 50053,
+      "httpPort": 8094,
+      "type": "full_node",
+      "tag": "本地",
+      "monitor": "NowBlock,BlockMissed"
+    },
+    {
+      "ip": "127.0.0.1",
+      "grpcPort": 50054,
+      "httpPort": 8097,
+      "type": "solidity_node",
+      "tag": "本地",
+      "monitor": "NowBlock,BlockMissed"
     }
   ]
 }

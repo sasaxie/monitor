@@ -34,3 +34,4 @@ port = 8080
 [task]
 # Interval defalut 60 seconds
 getDataInterval = 60
+dingding = "https://oapi.dingtalk.com/robot/send?access_token=06e2dbc217811edaad00b5c684597902bf05a457a60759b5d3b3f249e0de9db7"

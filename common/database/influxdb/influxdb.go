@@ -71,14 +71,14 @@ func (i *InfluxDB) WriteByTime(
 }
 
 func (i *InfluxDB) InitDatabase() {
-	_, err := queryDB(i.C, fmt.Sprintf("CREATE DATABASE %s",
+	_, err := QueryDB(i.C, fmt.Sprintf("CREATE DATABASE %s",
 		config.MonitorConfig.InfluxDB.Database))
 	if err != nil {
 		logs.Error(err)
 	}
 }
 
-func queryDB(clnt client.Client, cmd string) (res []client.Result, err error) {
+func QueryDB(clnt client.Client, cmd string) (res []client.Result, err error) {
 	q := client.Query{
 		Command:  cmd,
 		Database: config.MonitorConfig.InfluxDB.Database,

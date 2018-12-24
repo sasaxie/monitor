@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
 	"io/ioutil"
@@ -15,7 +16,7 @@ import (
 )
 
 const (
-	urlTemplateGetNodeInfo = "http://%s:%d/wallet/getnodeinfo"
+	urlTemplateGetNodeInfo = "http://%s:%d/%s/getnodeinfo"
 
 	influxDBTagGetNodeInfoNode = "node"
 	influxDBTagGetNodeInfoType = "type"
@@ -125,7 +126,7 @@ func init() {
 
 func (g *GetNodeInfoRequest) Load() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
-		panic("Get node info request load() error")
+		panic("get node info request load() error")
 	}
 
 	if g.Parameters == nil {
@@ -133,8 +134,16 @@ func (g *GetNodeInfoRequest) Load() {
 	}
 
 	for _, node := range models.NodeList.Addresses {
+		if strings.EqualFold(node.Type, config.SolidityNode.String()) {
+			continue
+		}
+
 		param := new(Parameter)
-		param.RequestUrl = fmt.Sprintf(urlTemplateGetNodeInfo, node.Ip, node.HttpPort)
+		param.RequestUrl = fmt.Sprintf(
+			urlTemplateGetNodeInfo,
+			node.Ip,
+			node.HttpPort,
+			config.NewNodeType(node.Type).GetApiPathByNodeType())
 		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
 		param.Type = node.Type
 		param.Tag = node.Tag
@@ -143,7 +152,7 @@ func (g *GetNodeInfoRequest) Load() {
 	}
 
 	logs.Info(
-		"Get node info request load() success, node size:",
+		"get node info request load() success, node size:",
 		len(g.Parameters),
 	)
 }
@@ -178,7 +187,7 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("Get node info request (", param.RequestUrl,
+		logs.Warn("get node info request (", param.RequestUrl,
 			") response status code",
 			response.StatusCode)
 		return

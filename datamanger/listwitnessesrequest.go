@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
 	"io/ioutil"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	urlTemplateListWitnesses = "http://%s:%d/wallet/listwitnesses"
+	urlTemplateListWitnesses = "http://%s:%d/%s/listwitnesses"
 
 	influxDBFieldListWitnessesNode        = "Node"
 	influxDBFieldListWitnessesType        = "Type"
@@ -42,7 +43,7 @@ func init() {
 
 func (l *ListWitnessesRequest) Load() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
-		panic("List witnesses request load() error")
+		panic("list witnesses request load() error")
 	}
 
 	if l.Parameters == nil {
@@ -51,7 +52,11 @@ func (l *ListWitnessesRequest) Load() {
 
 	for _, node := range models.NodeList.Addresses {
 		param := new(Parameter)
-		param.RequestUrl = fmt.Sprintf(urlTemplateListWitnesses, node.Ip, node.HttpPort)
+		param.RequestUrl = fmt.Sprintf(
+			urlTemplateListWitnesses,
+			node.Ip,
+			node.HttpPort,
+			config.NewNodeType(node.Type).GetApiPathByNodeType())
 		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
 		param.Type = node.Type
 		param.Tag = node.Tag
@@ -60,7 +65,7 @@ func (l *ListWitnessesRequest) Load() {
 	}
 
 	logs.Info(
-		"List witnesses request load() success, node size:",
+		"list witnesses request load() success, node size:",
 		len(l.Parameters),
 	)
 }
@@ -95,7 +100,7 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("List witnesses request (", param.RequestUrl,
+		logs.Warn("list witnesses request (", param.RequestUrl,
 			") response status code",
 			response.StatusCode)
 		return

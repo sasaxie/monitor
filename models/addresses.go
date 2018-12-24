@@ -25,12 +25,12 @@ type Nodes struct {
 }
 
 type Address struct {
-	Ip            string `json:"ip"`
-	GrpcPort      int    `json:"grpcPort"`
-	HttpPort      int    `json:"httpPort"`
-	Type          string `json:"type"`
-	Tag           string `json:"tag"`
-	MonitorConfig string `json:"monitorConfig"`
+	Ip       string `json:"ip"`
+	GrpcPort int    `json:"grpcPort"`
+	HttpPort int    `json:"httpPort"`
+	Type     string `json:"type"`
+	Tag      string `json:"tag"`
+	Monitor  string `json:"monitor"`
 }
 
 func (s *Nodes) Load(filePath string) {
@@ -38,7 +38,7 @@ func (s *Nodes) Load(filePath string) {
 	defer file.Close()
 
 	if err != nil {
-		log.Fatalln("Initialization server config error: ", err.Error())
+		log.Fatalln("initialization server config error: ", err.Error())
 	}
 
 	r := bufio.NewReader(file)
@@ -46,13 +46,13 @@ func (s *Nodes) Load(filePath string) {
 	data, err := ioutil.ReadAll(r)
 
 	if err != nil {
-		log.Fatalln("Initialization server config error: ", err.Error())
+		log.Fatalln("initialization server config error: ", err.Error())
 	}
 
 	err = json.Unmarshal(data, s)
 
 	if err != nil {
-		log.Fatalln("Initialization server config error: ", err.Error())
+		log.Fatalln("initialization server config error: ", err.Error())
 	}
 }
 
@@ -60,7 +60,7 @@ func (s *Nodes) String() string {
 
 	b, err := json.MarshalIndent(s, "", "\t")
 	if err != nil {
-		log.Fatalln("Server config String() error:", err.Error())
+		log.Fatalln("server config String() error:", err.Error())
 	}
 
 	return string(b)
