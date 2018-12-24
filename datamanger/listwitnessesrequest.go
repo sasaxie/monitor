@@ -21,6 +21,7 @@ const (
 	influxDBFieldListWitnessesTag         = "Tag"
 	influxDBFieldListWitnessesTotalMissed = "TotalMissed"
 	influxDBFieldListWitnessesUrl         = "Url"
+	influxDBFieldListWitnessesIsJobs      = "IsJob"
 	influxDBPointNameListWitnesses        = "api_list_witnesses"
 )
 
@@ -35,6 +36,7 @@ type WitnessList struct {
 type Witness struct {
 	Url         string `json:"url"`
 	TotalMissed int64  `json:"totalMissed"`
+	IsJobs      bool   `json:"isJobs"`
 }
 
 func init() {
@@ -138,6 +140,7 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 
 				influxDBFieldListWitnessesTotalMissed: w.TotalMissed,
 				influxDBFieldListWitnessesUrl:         w.Url,
+				influxDBFieldListWitnessesIsJobs:      w.IsJobs,
 			}
 
 			influxdb.Client.WriteByTime(
