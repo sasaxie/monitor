@@ -13,7 +13,7 @@ import (
 )
 
 // ms: 5min
-const internal int64 = 1000 * 60 * 5
+const internal5min int64 = 1000 * 60 * 5
 
 type GetNowBlockAlert struct {
 	Nodes       []*Node
@@ -22,21 +22,14 @@ type GetNowBlockAlert struct {
 	MinBlockNum map[string]int64
 }
 
-type Node struct {
-	Ip       string
-	GrpcPort int
-	HttpPort int
-	Type     string
-	Tag      string
-}
-
 type GetNowBlockAlertMsg struct {
-	Ip        string
-	Port      int
-	Type      string
-	Tag       string
-	Num       int64
-	MaxNum    int64
+	Ip     string
+	Port   int
+	Type   string
+	Tag    string
+	Num    int64
+	MaxNum int64
+
 	StartTime time.Time
 	FreshTime time.Time
 	IsFresh   bool
@@ -112,8 +105,7 @@ func (g *GetNowBlockAlert) Start() {
 			if _, ok := g.Result[k]; ok {
 				logs.Debug(
 					"get now block alert [update result]:",
-					k,
-					err.Error())
+					k)
 				g.Result[k].MaxNum = maxBlockNum
 				g.Result[k].Num = num
 			} else {
@@ -128,7 +120,7 @@ func (g *GetNowBlockAlert) Start() {
 					FreshTime: time.Now(),
 					IsFresh:   true,
 					IsRecover: false,
-					Msg:       "出块异常",
+					Msg:       "块更新异常",
 				}
 
 				g.Result[k].FreshTime = time.Date(
@@ -143,8 +135,7 @@ func (g *GetNowBlockAlert) Start() {
 				logs.Debug("get now block alert [new result]:",
 					k,
 					g.Result[k],
-					g.Result[k].FreshTime,
-					err.Error())
+					g.Result[k].FreshTime)
 			}
 		} else {
 			if _, ok := g.Result[k]; ok {
@@ -172,7 +163,7 @@ func (g *GetNowBlockAlert) Alert() {
 		msg := ""
 
 		if v.IsRecover {
-			msg += k + "恢复正常\n"
+			msg += k + "块更新恢复正常\n"
 			delete(g.Result, k)
 		} else if v.IsFresh {
 			logs.Debug("get now block alert [alert result]:", k)
@@ -220,7 +211,7 @@ func (g *GetNowBlockAlert) getNodeBlockNum(ip string, port int,
 "Node" = '%s:%d')`,
 		"api_get_now_block",
 		fmt.Sprintf("%dms", queryTimeS),
-		fmt.Sprintf("%dms", queryTimeS-internal),
+		fmt.Sprintf("%dms", queryTimeS-internal5min),
 		ip,
 		port)
 
@@ -243,7 +234,7 @@ func (g *GetNowBlockAlert) getMaxBlockNum(
 			`SELECT max(Number) FROM %s WHERE time <= %s AND time >= %s AND
 "Tag" = '%s'`,
 			"api_get_now_block", fmt.Sprintf("%dms", queryTimeS),
-			fmt.Sprintf("%dms", queryTimeS-internal), k)
+			fmt.Sprintf("%dms", queryTimeS-internal5min), k)
 
 		num, _ := g.getBlockNum(q)
 		g.MaxBlockNum[k] = num
@@ -266,7 +257,7 @@ func (g *GetNowBlockAlert) getMinBlockNum(
 			`SELECT min(Number) FROM %s WHERE time <= %s AND time >= %s AND
 "Tag" = '%s'`,
 			"api_get_now_block", fmt.Sprintf("%dms", queryTimeS),
-			fmt.Sprintf("%dms", queryTimeS-internal), k)
+			fmt.Sprintf("%dms", queryTimeS-internal5min), k)
 
 		num, _ := g.getBlockNum(q)
 		g.MinBlockNum[k] = num
@@ -276,7 +267,7 @@ func (g *GetNowBlockAlert) getMinBlockNum(
 func (g *GetNowBlockAlert) getBlockNum(q string) (int64, error) {
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {
-		logs.Error(res)
+		logs.Error(err)
 		return 0, err
 	}
 

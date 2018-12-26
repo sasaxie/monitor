@@ -30,6 +30,9 @@ func start() {
 	a := new(alerts.GetNowBlockAlert)
 	a.Load()
 
+	b := new(alerts.ListWitnessesAlert)
+	b.Load()
+
 	ticker := time.NewTicker(
 		time.Duration(config.MonitorConfig.Task.GetDataInterval) *
 			time.Second)
@@ -44,8 +47,13 @@ func start() {
 				go r.Request()
 			}
 
+			time.Sleep(10 * time.Second)
+
 			a.Start()
 			a.Alert()
+
+			b.Start()
+			b.Alert()
 		}
 	}
 }
