@@ -27,16 +27,18 @@ func start() {
 		r.Load()
 	}
 
-	a := new(alerts.GetNowBlockAlert)
-	a.Load()
+	getNowBlockAlert := new(alerts.GetNowBlockAlert)
+	getNowBlockAlert.Load()
 
-	b := new(alerts.ListWitnessesAlert)
-	b.Load()
+	listWitnessAlert := new(alerts.ListWitnessesAlert)
+	listWitnessAlert.Load()
 
 	ticker := time.NewTicker(
 		time.Duration(config.MonitorConfig.Task.GetDataInterval) *
 			time.Second)
 	defer ticker.Stop()
+
+	startAlertCount := 0
 
 	for {
 		select {
@@ -48,12 +50,15 @@ func start() {
 			}
 
 			time.Sleep(10 * time.Second)
+			startAlertCount++
 
-			a.Start()
-			a.Alert()
+			if startAlertCount > 10 {
+				getNowBlockAlert.Start()
+				getNowBlockAlert.Alert()
 
-			b.Start()
-			b.Alert()
+				listWitnessAlert.Start()
+				listWitnessAlert.Alert()
+			}
 		}
 	}
 }
