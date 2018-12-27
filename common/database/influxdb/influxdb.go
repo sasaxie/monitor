@@ -56,17 +56,20 @@ func (i *InfluxDB) WriteByTime(
 		Precision: "s",
 	})
 	if err != nil {
-		log.Fatal(err)
+		logs.Error(err)
+		return
 	}
 
 	pt, err := client.NewPoint(pointName, tags, fields, t)
 	if err != nil {
-		log.Fatal(err)
+		logs.Error(err)
+		return
 	}
 	bp.AddPoint(pt)
 
 	if err := i.C.Write(bp); err != nil {
-		log.Fatal(err)
+		logs.Error(err)
+		return
 	}
 }
 
