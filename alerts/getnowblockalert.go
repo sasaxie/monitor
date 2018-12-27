@@ -306,7 +306,7 @@ func (g *GetNowBlockAlert) isOk(ip, tag string, port int,
 		return errors.New("block num is 0")
 	}
 
-	if (maxBlockNum - num) > 30 {
+	if (maxBlockNum - num) > 100 {
 		logs.Warn(fmt.Sprintf("get now block alert error: [slow]: [ip: %s, "+
 			"tag: %s, port: %d, "+
 			"maxBlockNum: %d, num: %d]", ip, tag, port, maxBlockNum, num))
