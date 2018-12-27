@@ -21,13 +21,21 @@ type ListWitnessesAlert struct {
 	WitnessesChangeResult *ListWitnessesAlertWitnessesChangeMsg
 	Witnesses1            map[string]bool
 	Witnesses2            map[string]bool
-	TotalMissed1          map[string]int64
-	TotalMissed2          map[string]int64
+	TotalMissed1          map[string]*TotalMissedInfo
+	TotalMissed2          map[string]*TotalMissedInfo
+}
+
+type TotalMissedInfo struct {
+	Address     string
+	Url         string
+	Tag         string
+	TotalMissed int64
 }
 
 type ListWitnessesAlertTotalMissedMsg struct {
 	Address      string
 	Url          string
+	Tag          string
 	TotalMissed1 int64
 	TotalMissed2 int64
 
@@ -39,15 +47,22 @@ type ListWitnessesAlertTotalMissedMsg struct {
 }
 
 type ListWitnessesAlertWitnessesChangeMsg struct {
-	OldWitnesses []string
-	NewWitnesses []string
+	OldWitnesses []*WitnessesChangeInfo
+	NewWitnesses []*WitnessesChangeInfo
 	Msg          string
+}
+
+type WitnessesChangeInfo struct {
+	Address string
+	Url     string
+	Tag     string
 }
 
 func (l ListWitnessesAlertTotalMissedMsg) TotalMissedChangeString() string {
 	return fmt.Sprintf(`address: %s
+url: %s
 totalMissed: [%d] -> [%d]
-msg: %s`, l.Address, l.TotalMissed1, l.TotalMissed2, l.Msg)
+msg: %s`, l.Address, l.Url, l.TotalMissed1, l.TotalMissed2, l.Msg)
 }
 
 func (l ListWitnessesAlertWitnessesChangeMsg) WitnessChangeString() string {
@@ -58,7 +73,7 @@ func (l ListWitnessesAlertWitnessesChangeMsg) WitnessChangeString() string {
 			res += "SR列表更新\n"
 			res += "旧SR\n"
 		}
-		res += v + "\n"
+		res += fmt.Sprintf("[%s, %s]\n", v.Url, v.Address)
 	}
 
 	for i, v := range l.NewWitnesses {
@@ -71,7 +86,7 @@ func (l ListWitnessesAlertWitnessesChangeMsg) WitnessChangeString() string {
 			res += "新SR\n"
 		}
 
-		res += v + "\n"
+		res += fmt.Sprintf("[%s, %s]\n", v.Url, v.Address)
 	}
 
 	return res
@@ -111,10 +126,10 @@ func (l *ListWitnessesAlert) Load() {
 func (l *ListWitnessesAlert) Start() {
 	l.TotalMissedResult = make(map[string]*ListWitnessesAlertTotalMissedMsg)
 	l.WitnessesChangeResult = new(ListWitnessesAlertWitnessesChangeMsg)
-	l.WitnessesChangeResult.OldWitnesses = make([]string, 0)
-	l.WitnessesChangeResult.NewWitnesses = make([]string, 0)
-	l.TotalMissed1 = make(map[string]int64)
-	l.TotalMissed2 = make(map[string]int64)
+	l.WitnessesChangeResult.OldWitnesses = make([]*WitnessesChangeInfo, 0)
+	l.WitnessesChangeResult.NewWitnesses = make([]*WitnessesChangeInfo, 0)
+	l.TotalMissed1 = make(map[string]*TotalMissedInfo)
+	l.TotalMissed2 = make(map[string]*TotalMissedInfo)
 	l.Witnesses1 = make(map[string]bool)
 	l.Witnesses2 = make(map[string]bool)
 
@@ -133,16 +148,26 @@ func (l *ListWitnessesAlert) Start() {
 
 	for k, v := range l.Witnesses1 {
 		if !v {
+			u, _ := l.getWitnessUrl(k, t)
+
 			l.WitnessesChangeResult.OldWitnesses = append(l.
-				WitnessesChangeResult.OldWitnesses, k)
+				WitnessesChangeResult.OldWitnesses, &WitnessesChangeInfo{
+				Address: k,
+				Url:     u,
+			})
 			l.WitnessesChangeResult.Msg = "SR改变"
 		}
 	}
 
 	for k, v := range l.Witnesses2 {
+		u, _ := l.getWitnessUrl(k, t)
+
 		if !v {
 			l.WitnessesChangeResult.NewWitnesses = append(l.
-				WitnessesChangeResult.NewWitnesses, k)
+				WitnessesChangeResult.NewWitnesses, &WitnessesChangeInfo{
+				Address: k,
+				Url:     u,
+			})
 			l.WitnessesChangeResult.Msg = "SR改变"
 		}
 	}
@@ -152,11 +177,13 @@ func (l *ListWitnessesAlert) Start() {
 	for k, v := range l.TotalMissed1 {
 		vv := l.TotalMissed2[k]
 
-		if v != vv {
+		if v.TotalMissed != vv.TotalMissed {
 			l.TotalMissedResult[k] = &ListWitnessesAlertTotalMissedMsg{
 				Address:      k,
-				TotalMissed1: v,
-				TotalMissed2: vv,
+				Url:          v.Url,
+				Tag:          v.Tag,
+				TotalMissed1: v.TotalMissed,
+				TotalMissed2: vv.TotalMissed,
 				Msg:          "出块超时",
 			}
 		}
@@ -168,10 +195,52 @@ func (l *ListWitnessesAlert) Start() {
 func (l *ListWitnessesAlert) updateTotalMissed(t int64) {
 	for a, isWitness := range l.Witnesses2 {
 		if isWitness {
-			l.TotalMissed1[a], _ = l.getTotalMissed(a, t-internal1min)
-			l.TotalMissed2[a], _ = l.getTotalMissed(a, t)
+			totalMissed, u := l.getTotalMissedInfo(a, t-internal1min)
+			l.TotalMissed1[a] = &TotalMissedInfo{
+				TotalMissed: totalMissed,
+				Url:         u,
+				Address:     a,
+			}
+
+			totalMissed2, u2 := l.getTotalMissedInfo(a, t)
+			l.TotalMissed2[a] = &TotalMissedInfo{
+				TotalMissed: totalMissed2,
+				Url:         u2,
+				Address:     a,
+			}
 		}
 	}
+}
+
+func (l *ListWitnessesAlert) getTotalMissedInfo(a string, t int64) (int64,
+	string) {
+	totalMissed, _ := l.getTotalMissed(a, t)
+	u, _ := l.getWitnessUrl(a, t)
+
+	return totalMissed, u
+}
+
+func (l *ListWitnessesAlert) getWitnessUrl(a string, t int64) (string,
+	error) {
+	q := fmt.Sprintf(`SELECT Url FROM api_list_witnesses WHERE
+Address='%s' AND time <= %s AND time > %s ORDER BY time DESC LIMIT 1`, a,
+		fmt.Sprintf("%dms", t),
+		fmt.Sprintf("%dms", t-internal5min))
+
+	res, err := influxdb.QueryDB(influxdb.Client.C, q)
+	if err != nil {
+		return "", err
+	}
+
+	if res == nil || len(res) == 0 ||
+		res[0].Series == nil || len(res[0].Series) == 0 ||
+		res[0].Series[0].Values == nil || len(res[0].Series[0].Values) < 1 {
+		return "", errors.New("get total missed url error: no data")
+	}
+
+	val := res[0].Series[0].Values[0][1].(string)
+
+	return val, nil
 }
 
 func (l *ListWitnessesAlert) getTotalMissed(a string, t int64) (int64,
