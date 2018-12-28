@@ -188,8 +188,6 @@ func (l *ListWitnessesAlert) Start() {
 			}
 		}
 	}
-
-	logs.Debug("list witnesses alert finished")
 }
 
 func (l *ListWitnessesAlert) updateTotalMissed(t int64) {

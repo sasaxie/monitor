@@ -93,15 +93,13 @@ func (g *GetNowBlockAlert) Start() {
 	queryTimeS := time.Now().UnixNano() / 1000000
 
 	g.getMaxBlockNum(queryTimeS)
-	g.getMinBlockNum(queryTimeS)
 
 	for _, n := range g.Nodes {
 		maxBlockNum := g.MaxBlockNum[n.Tag]
-		minBlockNum := g.MinBlockNum[n.Tag]
 		num, _ := g.getNodeBlockNum(n.Ip, n.HttpPort, queryTimeS)
 		err := g.isOk(n.Ip, n.Tag, n.HttpPort, queryTimeS, maxBlockNum, num)
 		k := fmt.Sprintf("%s:%d", n.Ip, n.HttpPort)
-		if err != nil || (maxBlockNum == minBlockNum) {
+		if err != nil {
 			if _, ok := g.Result[k]; ok {
 				logs.Debug(
 					"get now block alert [update result]:",
@@ -148,15 +146,9 @@ func (g *GetNowBlockAlert) Start() {
 		}
 	}
 
-	logs.Debug("now block alert finished")
-
 }
 
 func (g *GetNowBlockAlert) Alert() {
-	if len(g.Result) == 0 {
-		return
-	}
-
 	logs.Info("now block alert")
 
 	for k, v := range g.Result {
@@ -188,7 +180,7 @@ func (g *GetNowBlockAlert) Alert() {
 		}
 
 		if len(msg) == 0 || strings.EqualFold(msg, "") {
-			return
+			continue
 		}
 
 		bodyContent := fmt.Sprintf(`

@@ -39,6 +39,7 @@ func start() {
 	defer ticker.Stop()
 
 	startAlertCount := 0
+	alertFinish := true
 
 	for {
 		select {
@@ -52,12 +53,14 @@ func start() {
 			time.Sleep(10 * time.Second)
 			startAlertCount++
 
-			if startAlertCount > 10 {
+			if startAlertCount > 10 && alertFinish {
+				alertFinish = false
 				getNowBlockAlert.Start()
 				getNowBlockAlert.Alert()
 
 				listWitnessAlert.Start()
 				listWitnessAlert.Alert()
+				alertFinish = true
 			}
 		}
 	}
