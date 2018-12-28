@@ -1,23 +1,32 @@
 package platform
 
-import "context"
+import (
+	"context"
+)
+
+const (
+	TaskDefaultPageSize = 100
+	TaskMaxPageSize     = 500
+)
 
 // Task is a task. 🎊
 type Task struct {
-	ID           ID     `json:"id,omitempty"`
-	Organization ID     `json:"organizationId"`
-	Name         string `json:"name"`
-	Status       string `json:"status"`
-	Owner        User   `json:"owner"`
-	Flux         string `json:"flux"`
-	Every        string `json:"every,omitempty"`
-	Cron         string `json:"cron,omitempty"`
+	ID              ID     `json:"id,omitempty"`
+	Organization    ID     `json:"organizationId"`
+	Name            string `json:"name"`
+	Status          string `json:"status"`
+	Owner           User   `json:"owner"`
+	Flux            string `json:"flux"`
+	Every           string `json:"every,omitempty"`
+	Cron            string `json:"cron,omitempty"`
+	Offset          string `json:"offset,omitempty"`
+	LatestCompleted string `json:"latest_completed,omitempty"`
 }
 
 // Run is a record created when a run of a task is scheduled.
 type Run struct {
 	ID           ID     `json:"id,omitempty"`
-	TaskID       ID     `json:"taskId"`
+	TaskID       ID     `json:"taskID"`
 	Status       string `json:"status"`
 	ScheduledFor string `json:"scheduledFor"`
 	StartedAt    string `json:"startedAt,omitempty"`
@@ -31,33 +40,40 @@ type Log string
 
 // TaskService represents a service for managing one-off and recurring tasks.
 type TaskService interface {
-	// Returns a single task
+	// FindTaskByID returns a single task
 	FindTaskByID(ctx context.Context, id ID) (*Task, error)
 
-	// Returns a list of tasks that match a filter (limit 100) and the total count
+	// FindTasks returns a list of tasks that match a filter (limit 100) and the total count
 	// of matching tasks.
 	FindTasks(ctx context.Context, filter TaskFilter) ([]*Task, int, error)
 
-	// Creates a new task
+	// CreateTask creates a new task.
 	CreateTask(ctx context.Context, t *Task) error
 
-	// Updates a single task with changeset
+	// UpdateTask updates a single task with changeset.
 	UpdateTask(ctx context.Context, id ID, upd TaskUpdate) (*Task, error)
 
-	// Removes a task by ID and purges all associated data and scheduled runs
+	// DeleteTask removes a task by ID and purges all associated data and scheduled runs.
 	DeleteTask(ctx context.Context, id ID) error
 
-	// Returns logs for a run.
+	// FindLogs returns logs for a run.
 	FindLogs(ctx context.Context, filter LogFilter) ([]*Log, int, error)
 
-	// Returns a list of runs that match a filter and the total count of returned runs.
+	// FindRuns returns a list of runs that match a filter and the total count of returned runs.
 	FindRuns(ctx context.Context, filter RunFilter) ([]*Run, int, error)
 
-	// Returns a single run
-	FindRunByID(ctx context.Context, orgID, runID ID) (*Run, error)
+	// FindRunByID returns a single run.
+	FindRunByID(ctx context.Context, taskID, runID ID) (*Run, error)
 
-	// Creates and returns a new run (which is a retry of another run)
-	RetryRun(ctx context.Context, id ID) (*Run, error)
+	// CancelRun cancels a currently running run.
+	CancelRun(ctx context.Context, taskID, runID ID) error
+
+	// RetryRun creates and returns a new run (which is a retry of another run).
+	RetryRun(ctx context.Context, taskID, runID ID) (*Run, error)
+
+	// ForceRun forces a run to occur with unix timestamp scheduledFor, to be executed as soon as possible.
+	// The value of scheduledFor may or may not align with the task's schedule.
+	ForceRun(ctx context.Context, taskID ID, scheduledFor int64) (*Run, error)
 }
 
 // TaskUpdate represents updates to a task
@@ -71,6 +87,7 @@ type TaskFilter struct {
 	After        *ID
 	Organization *ID
 	User         *ID
+	Limit        int
 }
 
 // RunFilter represents a set of filters that restrict the returned results

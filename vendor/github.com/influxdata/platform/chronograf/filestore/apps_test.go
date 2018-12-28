@@ -14,7 +14,6 @@ import (
 
 	"github.com/influxdata/platform/chronograf"
 	"github.com/influxdata/platform/chronograf/filestore"
-	clog "github.com/influxdata/platform/chronograf/log"
 )
 
 func TestAll(t *testing.T) {
@@ -40,7 +39,7 @@ func TestAll(t *testing.T) {
 		},
 		{
 			Existing: nil,
-			Err:      errors.New("Error"),
+			Err:      errors.New("error"),
 		},
 	}
 	for i, test := range tests {
@@ -92,7 +91,7 @@ func TestAdd(t *testing.T) {
 				Application: "newbie",
 			},
 			ExpectedID: "",
-			Err:        errors.New("Error"),
+			Err:        errors.New("error"),
 		},
 	}
 	for i, test := range tests {
@@ -143,7 +142,7 @@ func TestDelete(t *testing.T) {
 			Existing: nil,
 			DeleteID: "1",
 			Expected: map[string]chronograf.Layout{},
-			Err:      errors.New("Error"),
+			Err:      errors.New("error"),
 		},
 	}
 	for i, test := range tests {
@@ -374,6 +373,6 @@ func MockApps(existing []chronograf.Layout, expected error) (filestore.Apps, *ma
 		IDs: &MockID{
 			id: len(existing),
 		},
-		Logger: clog.New(clog.ParseLevel("debug")),
+		Logger: &chronograf.NoopLogger{},
 	}, &layouts
 }

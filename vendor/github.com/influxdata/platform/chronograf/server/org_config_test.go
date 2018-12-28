@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/influxdata/platform/chronograf"
-	"github.com/influxdata/platform/chronograf/log"
 	"github.com/influxdata/platform/chronograf/mocks"
 	"github.com/influxdata/platform/chronograf/organizations"
 )
@@ -171,7 +170,7 @@ func TestOrganizationConfig(t *testing.T) {
 				Store: &mocks.Store{
 					OrganizationConfigStore: tt.fields.organizationConfigStore,
 				},
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 			}
 
 			w := httptest.NewRecorder()
@@ -273,7 +272,7 @@ func TestLogViewerOrganizationConfig(t *testing.T) {
 				Store: &mocks.Store{
 					OrganizationConfigStore: tt.fields.organizationConfigStore,
 				},
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 			}
 
 			w := httptest.NewRecorder()
@@ -462,7 +461,7 @@ func TestReplaceLogViewerOrganizationConfig(t *testing.T) {
 			wants: wants{
 				statusCode:  400,
 				contentType: "application/json",
-				body:        `{"code":400,"message":"Invalid log viewer config: must have at least 1 column"}`,
+				body:        `{"code":400,"message":"invalid log viewer config: must have at least 1 column"}`,
 			},
 		},
 		{
@@ -527,7 +526,7 @@ func TestReplaceLogViewerOrganizationConfig(t *testing.T) {
 			wants: wants{
 				statusCode:  400,
 				contentType: "application/json",
-				body:        `{"code":400,"message":"Invalid log viewer config: Duplicate column name procid"}`,
+				body:        `{"code":400,"message":"invalid log viewer config: Duplicate column name procid"}`,
 			},
 		},
 		{
@@ -592,7 +591,7 @@ func TestReplaceLogViewerOrganizationConfig(t *testing.T) {
 			wants: wants{
 				statusCode:  400,
 				contentType: "application/json",
-				body:        `{"code":400,"message":"Invalid log viewer config: Multiple columns with same position value"}`,
+				body:        `{"code":400,"message":"invalid log viewer config: Multiple columns with same position value"}`,
 			},
 		},
 		{
@@ -662,7 +661,7 @@ func TestReplaceLogViewerOrganizationConfig(t *testing.T) {
 			wants: wants{
 				statusCode:  400,
 				contentType: "application/json",
-				body:        `{"code":400,"message":"Invalid log viewer config: missing visibility encoding in column severity"}`,
+				body:        `{"code":400,"message":"invalid log viewer config: missing visibility encoding in column severity"}`,
 			},
 		},
 	}
@@ -673,7 +672,7 @@ func TestReplaceLogViewerOrganizationConfig(t *testing.T) {
 				Store: &mocks.Store{
 					OrganizationConfigStore: tt.fields.organizationConfigStore,
 				},
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 			}
 
 			w := httptest.NewRecorder()
@@ -1069,7 +1068,7 @@ func Test_validLogViewerConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := validLogViewerConfig(tt.args.LogViewer)
 
-			if (tt.wantErr == true && got == nil) || (tt.wantErr == false && got != nil) {
+			if (tt.wantErr && got == nil) || (!tt.wantErr && got != nil) {
 				t.Errorf("%q. validLogViewerConfig().\ngot: %v\nwantErr: %v", tt.name, got, tt.wantErr)
 			}
 		})

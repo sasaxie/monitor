@@ -7,7 +7,6 @@
 package tsm1
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/influxdata/platform/tsdb"
@@ -30,29 +29,6 @@ func (a Values) Size() int {
 		sz += v.Size()
 	}
 	return sz
-}
-
-func (a Values) ordered() bool {
-	if len(a) <= 1 {
-		return true
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			return false
-		}
-	}
-	return true
-}
-
-func (a Values) assertOrdered() {
-	if len(a) <= 1 {
-		return
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			panic(fmt.Sprintf("not ordered: %d %d >= %d", i, av, ab))
-		}
-	}
 }
 
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
@@ -258,29 +234,6 @@ func (a FloatValues) Size() int {
 	return sz
 }
 
-func (a FloatValues) ordered() bool {
-	if len(a) <= 1 {
-		return true
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			return false
-		}
-	}
-	return true
-}
-
-func (a FloatValues) assertOrdered() {
-	if len(a) <= 1 {
-		return
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			panic(fmt.Sprintf("not ordered: %d %d >= %d", i, av, ab))
-		}
-	}
-}
-
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
 // The Value that appears last in the slice is the one that is kept.  The returned
 // Values are sorted if necessary.
@@ -455,6 +408,29 @@ func (a FloatValues) Encode(buf []byte) ([]byte, error) {
 	return encodeFloatValuesBlock(buf, a)
 }
 
+func EncodeFloatArrayBlock(a *tsdb.FloatArray, b []byte) ([]byte, error) {
+	if a.Len() == 0 {
+		return nil, nil
+	}
+
+	// TODO(edd): These need to be pooled.
+	var vb []byte
+	var tb []byte
+	var err error
+
+	if vb, err = FloatArrayEncodeAll(a.Values, vb); err != nil {
+		return nil, err
+	}
+
+	if tb, err = TimeArrayEncodeAll(a.Timestamps, tb); err != nil {
+		return nil, err
+	}
+
+	// Prepend the first timestamp of the block in the first 8 bytes and the block
+	// in the next byte, followed by the block
+	return packBlock(b, BlockFloat64, tb, vb), nil
+}
+
 func encodeFloatValuesBlock(buf []byte, values []FloatValue) ([]byte, error) {
 	if len(values) == 0 {
 		return nil, nil
@@ -526,29 +502,6 @@ func (a IntegerValues) Size() int {
 		sz += v.Size()
 	}
 	return sz
-}
-
-func (a IntegerValues) ordered() bool {
-	if len(a) <= 1 {
-		return true
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			return false
-		}
-	}
-	return true
-}
-
-func (a IntegerValues) assertOrdered() {
-	if len(a) <= 1 {
-		return
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			panic(fmt.Sprintf("not ordered: %d %d >= %d", i, av, ab))
-		}
-	}
 }
 
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
@@ -725,6 +678,29 @@ func (a IntegerValues) Encode(buf []byte) ([]byte, error) {
 	return encodeIntegerValuesBlock(buf, a)
 }
 
+func EncodeIntegerArrayBlock(a *tsdb.IntegerArray, b []byte) ([]byte, error) {
+	if a.Len() == 0 {
+		return nil, nil
+	}
+
+	// TODO(edd): These need to be pooled.
+	var vb []byte
+	var tb []byte
+	var err error
+
+	if vb, err = IntegerArrayEncodeAll(a.Values, vb); err != nil {
+		return nil, err
+	}
+
+	if tb, err = TimeArrayEncodeAll(a.Timestamps, tb); err != nil {
+		return nil, err
+	}
+
+	// Prepend the first timestamp of the block in the first 8 bytes and the block
+	// in the next byte, followed by the block
+	return packBlock(b, BlockInteger, tb, vb), nil
+}
+
 func encodeIntegerValuesBlock(buf []byte, values []IntegerValue) ([]byte, error) {
 	if len(values) == 0 {
 		return nil, nil
@@ -796,29 +772,6 @@ func (a UnsignedValues) Size() int {
 		sz += v.Size()
 	}
 	return sz
-}
-
-func (a UnsignedValues) ordered() bool {
-	if len(a) <= 1 {
-		return true
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			return false
-		}
-	}
-	return true
-}
-
-func (a UnsignedValues) assertOrdered() {
-	if len(a) <= 1 {
-		return
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			panic(fmt.Sprintf("not ordered: %d %d >= %d", i, av, ab))
-		}
-	}
 }
 
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
@@ -995,6 +948,29 @@ func (a UnsignedValues) Encode(buf []byte) ([]byte, error) {
 	return encodeUnsignedValuesBlock(buf, a)
 }
 
+func EncodeUnsignedArrayBlock(a *tsdb.UnsignedArray, b []byte) ([]byte, error) {
+	if a.Len() == 0 {
+		return nil, nil
+	}
+
+	// TODO(edd): These need to be pooled.
+	var vb []byte
+	var tb []byte
+	var err error
+
+	if vb, err = UnsignedArrayEncodeAll(a.Values, vb); err != nil {
+		return nil, err
+	}
+
+	if tb, err = TimeArrayEncodeAll(a.Timestamps, tb); err != nil {
+		return nil, err
+	}
+
+	// Prepend the first timestamp of the block in the first 8 bytes and the block
+	// in the next byte, followed by the block
+	return packBlock(b, BlockUnsigned, tb, vb), nil
+}
+
 func encodeUnsignedValuesBlock(buf []byte, values []UnsignedValue) ([]byte, error) {
 	if len(values) == 0 {
 		return nil, nil
@@ -1066,29 +1042,6 @@ func (a StringValues) Size() int {
 		sz += v.Size()
 	}
 	return sz
-}
-
-func (a StringValues) ordered() bool {
-	if len(a) <= 1 {
-		return true
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			return false
-		}
-	}
-	return true
-}
-
-func (a StringValues) assertOrdered() {
-	if len(a) <= 1 {
-		return
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			panic(fmt.Sprintf("not ordered: %d %d >= %d", i, av, ab))
-		}
-	}
 }
 
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
@@ -1265,6 +1218,29 @@ func (a StringValues) Encode(buf []byte) ([]byte, error) {
 	return encodeStringValuesBlock(buf, a)
 }
 
+func EncodeStringArrayBlock(a *tsdb.StringArray, b []byte) ([]byte, error) {
+	if a.Len() == 0 {
+		return nil, nil
+	}
+
+	// TODO(edd): These need to be pooled.
+	var vb []byte
+	var tb []byte
+	var err error
+
+	if vb, err = StringArrayEncodeAll(a.Values, vb); err != nil {
+		return nil, err
+	}
+
+	if tb, err = TimeArrayEncodeAll(a.Timestamps, tb); err != nil {
+		return nil, err
+	}
+
+	// Prepend the first timestamp of the block in the first 8 bytes and the block
+	// in the next byte, followed by the block
+	return packBlock(b, BlockString, tb, vb), nil
+}
+
 func encodeStringValuesBlock(buf []byte, values []StringValue) ([]byte, error) {
 	if len(values) == 0 {
 		return nil, nil
@@ -1336,29 +1312,6 @@ func (a BooleanValues) Size() int {
 		sz += v.Size()
 	}
 	return sz
-}
-
-func (a BooleanValues) ordered() bool {
-	if len(a) <= 1 {
-		return true
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			return false
-		}
-	}
-	return true
-}
-
-func (a BooleanValues) assertOrdered() {
-	if len(a) <= 1 {
-		return
-	}
-	for i := 1; i < len(a); i++ {
-		if av, ab := a[i-1].UnixNano(), a[i].UnixNano(); av >= ab {
-			panic(fmt.Sprintf("not ordered: %d %d >= %d", i, av, ab))
-		}
-	}
 }
 
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
@@ -1533,6 +1486,29 @@ func (a BooleanValues) Merge(b BooleanValues) BooleanValues {
 
 func (a BooleanValues) Encode(buf []byte) ([]byte, error) {
 	return encodeBooleanValuesBlock(buf, a)
+}
+
+func EncodeBooleanArrayBlock(a *tsdb.BooleanArray, b []byte) ([]byte, error) {
+	if a.Len() == 0 {
+		return nil, nil
+	}
+
+	// TODO(edd): These need to be pooled.
+	var vb []byte
+	var tb []byte
+	var err error
+
+	if vb, err = BooleanArrayEncodeAll(a.Values, vb); err != nil {
+		return nil, err
+	}
+
+	if tb, err = TimeArrayEncodeAll(a.Timestamps, tb); err != nil {
+		return nil, err
+	}
+
+	// Prepend the first timestamp of the block in the first 8 bytes and the block
+	// in the next byte, followed by the block
+	return packBlock(b, BlockBoolean, tb, vb), nil
 }
 
 func encodeBooleanValuesBlock(buf []byte, values []BooleanValue) ([]byte, error) {

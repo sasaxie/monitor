@@ -10,6 +10,8 @@ paths:
       summary: Exchange basic auth credentials for session
       security:
         - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '204':
           description: succesfully authenticated
@@ -22,6 +24,8 @@ paths:
   /signout:
     post:
       summary: Expire the current session
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '204':
           description: session successfully expired
@@ -34,6 +38,8 @@ paths:
   /:
     get:
       summary: Map of all top level routes available
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         default:
           description: All routes
@@ -46,6 +52,8 @@ paths:
       tags:
         - Setup
       summary: check if database has default user, org, bucket created, returns true if not.
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '200':
           description:
@@ -58,6 +66,8 @@ paths:
       tags:
         - Setup
       summary: post onboarding request, to setup initial user, org and bucket
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       requestBody:
         description: source to create
         required: true
@@ -77,12 +87,13 @@ paths:
       tags:
         - Telegrafs
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
             required: true
             schema:
-              type: string  
+              type: string
       responses:
         '200':
           description: a list of telegraf configs
@@ -95,12 +106,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"  
+                $ref: "#/components/schemas/Error"
     post:
       tags:
         - Telegrafs
       summary: Create a telegraf config
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
@@ -126,13 +138,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error" 
+                $ref: "#/components/schemas/Error"
   '/telegrafs/{telegrafID}':
     get:
       tags:
         - Telegrafs
       summary: Retrieve a telegraf config
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: telegrafID
           schema:
@@ -165,6 +178,7 @@ paths:
         - Telegrafs
       summary: Update a telegraf config
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: telegrafID
           schema:
@@ -191,6 +205,151 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  '/telegrafs/{telegrafID}/labels':
+    get:
+      tags:
+        - Telegrafs
+      summary: list all labels for a telegraf config
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: telegrafID
+          schema:
+            type: string
+          required: true
+          description: ID of the telegraf config
+      responses:
+        '200':
+          description: a list of all labels for a telegraf config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Telegrafs
+      summary: add a label to a telegraf config
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: telegrafID
+          schema:
+            type: string
+          required: true
+          description: ID of the telegraf config
+      requestBody:
+        description: label to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: a list of all labels for a telegraf config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/telegrafs/{telegrafID}/labels/{label}':
+    delete:
+      tags:
+        - Telegrafs
+      summary: delete a label from a telegraf config
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: telegrafID
+          schema:
+            type: string
+          required: true
+          description: ID of the telegraf config
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: telegraf config not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - Telegrafs
+      summary: update a label from a telegraf config
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: telegrafID
+          schema:
+            type: string
+          required: true
+          description: ID of the telegraf config
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      requestBody:
+        description: label update to apply
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Label"
+      responses:
+        '200':
+          description: updated successfully
+        '404':
+          description: telegraf config not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   '/telegrafs/{telegrafID}/members':
     get:
       tags:
@@ -198,6 +357,7 @@ paths:
         - Telegrafs
       summary: List all users with member privileges for a telegraf config
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: telegrafID
           schema:
@@ -210,7 +370,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceMembers"
         default:
           description: unexpected error
           content:
@@ -223,6 +383,7 @@ paths:
         - Telegrafs
       summary: Add telegraf config member
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: telegrafID
           schema:
@@ -235,14 +396,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: member added to telegraf
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceMember"
         default:
           description: unexpected error
           content:
@@ -256,6 +417,7 @@ paths:
         - Telegrafs
       summary: removes a member from a telegraf config
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -284,6 +446,7 @@ paths:
         - Telegrafs
       summary: List all owners of a telegraf config
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: telegrafID
           schema:
@@ -296,7 +459,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceOwners"
         default:
           description: unexpected error
           content:
@@ -309,6 +472,7 @@ paths:
         - Telegrafs
       summary: Add telegraf config owner
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: telegrafID
           schema:
@@ -321,14 +485,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: telegraf config owner added
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceOwner"
         default:
           description: unexpected error
           content:
@@ -342,6 +506,7 @@ paths:
         - Telegrafs
       summary: removes an owner from a telegraf config
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -367,14 +532,9 @@ paths:
     get:
       tags:
         - Macros
-      summary: keywords that specify how input data gets mapped to a replacement output sequence
+      summary: get all macros
       parameters:
-        - in: header
-          name: Authorization
-          description: the authorization header should be in the format of `Token <key>`
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/TraceSpan'
         - in: query
           name: org
           required: true
@@ -388,6 +548,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Macros"
+        '400':
+          description: invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: internal server error
           content:
@@ -395,29 +561,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     post:
-      summary: keywords that specify how input data gets mapped to a replacement output sequence
+      summary: create a macro
       tags:
         - Macros
       parameters:
-        - in: header
-          name: Authorization
-          description: the authorization header should be in the format of `Token <key>`
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: org
-          required: true
-          schema:
-            type: string
-          description: filter macros to a specific organization name
+        - $ref: '#/components/parameters/TraceSpan'
+      requestBody:
+        description: macro to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Macro"
       responses:
         '201':
           description: macro created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Macros"
+                $ref: "#/components/schemas/Macro"
         default:
           description: internal server error
           content:
@@ -428,26 +590,15 @@ paths:
     delete:
       tags:
         - Macros
-      summary: keywords that specify how input data gets mapped to a replacement output sequence
+      summary: delete a macro
       parameters:
-        - in: header
-          name: Authorization
-          description: the authorization header should be in the format of `Token <key>`
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: macroID
           required: true
           schema:
             type: string
           description: id of the macro
-        - in: query
-          name: org
-          required: true
-          schema:
-            type: string
-          description: filter macros to a specific organization name
       responses:
         '204':
           description: macro deleted
@@ -458,35 +609,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     patch:
-      summary: keywords that specify how input data gets mapped to a replacement output sequence
+      summary: update a macro
       tags:
         - Macros
       parameters:
-        - in: header
-          name: Authorization
-          description: the authorization header should be in the format of `Token <key>`
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: macroID
           required: true
           schema:
             type: string
           description: id of the macro
-        - in: query
-          name: org
-          required: true
-          schema:
-            type: string
-          description: filter macros to a specific organization name
+      requestBody:
+        description: macro update to apply
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Macro"
       responses:
         '200':
           description: macro updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Macros"
+                $ref: "#/components/schemas/Macro"
+        default:
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: replace a macro
+      tags:
+        - Macros
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: macroID
+          required: true
+          schema:
+            type: string
+          description: id of the macro
+      requestBody:
+        description: macro to replace
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Macro"
+      responses:
+        '200':
+          description: macro updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Macro"
         default:
           description: internal server error
           content:
@@ -499,6 +678,7 @@ paths:
         - Write
       summary: write time-series data into influxdb
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: header
           name: Content-Encoding
           description: when present, its value indicates to the database that compression is applied to the line-protocol body.
@@ -559,7 +739,6 @@ paths:
             enum:
               - ns
               - us
-              - u
               - ms
               - s
       responses:
@@ -611,18 +790,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /ready:
+    get:
+      tags:
+        - Ready
+      summary: Get the readiness of a instance at startup. Allow us to confirm the instance is prepared to accept requests.
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+      responses:
+        '200':
+          description: the instance is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Check"
+        '503':
+          description: the instance is not ready yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Check"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /health:
     get:
       tags:
         - Health
-      summary: Get the health of an instance
+      summary: Get the health of an instance anytime during execution. Allow us to check if the instance is still healthy.
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '200':
           description: the instance is healthy
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Health"
+                $ref: "#/components/schemas/Check"
+        '503':
+          description: the instance is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Check"
         default:
           description: unexpected error
           content:
@@ -635,6 +848,7 @@ paths:
         - Sources
       summary: Creates a Source
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
@@ -666,6 +880,7 @@ paths:
         - Sources
       summary: Get all sources
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
@@ -691,6 +906,7 @@ paths:
         - Sources
       summary: Updates a Source
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: sourceID
             schema:
@@ -728,6 +944,7 @@ paths:
         - Sources
       summary: Get a source
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: sourceID
             schema:
@@ -759,6 +976,7 @@ paths:
         - Sources
       summary: Get a sources health
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: sourceID
             schema:
@@ -767,17 +985,17 @@ paths:
             description: ID of the source
       responses:
         '200':
-          description: a source
+          description: the source is healthy
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Source"
-        '404':
-          description: source not found
+                $ref: "#/components/schemas/Check"
+        '503':
+          description: the source is not healthy
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/Check"
         default:
           description: unexpected error
           content:
@@ -791,6 +1009,7 @@ paths:
         - Buckets
       summary: Get a sources buckets (will return dbrps in the form of buckets if it is a v1 source)
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: sourceID
             schema:
@@ -828,6 +1047,7 @@ paths:
         - Views
       summary: A view contains information about the visual representation of data
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
@@ -859,12 +1079,26 @@ paths:
         - Views
       summary: Get all views
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
             required: true
             schema:
               type: string
+          - in: query
+            name: type
+            description: filters results to a specified type. Can be used multiple times in a request, to filter to multiple types.
+            schema:
+              type: string
+              enum:
+                - "xy"
+                - "single-stat"
+                - "gauge"
+                - "table"
+                - "markdown"
+                - "log-viewer"
+                - "line-plus-single-stat"
       responses:
         '200':
           description: all views
@@ -884,6 +1118,7 @@ paths:
       - Views
     summary: Get a single View
     parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: viewID
           schema:
@@ -921,6 +1156,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/View"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: viewID
           schema:
@@ -951,6 +1187,7 @@ paths:
         - Views
       summary: Delete a view
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: viewID
           schema:
@@ -972,12 +1209,336 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  '/views/{viewID}/labels':
+    get:
+      tags:
+        - Views
+      summary: list all labels for a view
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+      responses:
+        '200':
+          description: a list of all labels for a view
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Views
+      summary: add a label to a view
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+      requestBody:
+        description: label to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: a list of all labels for a view
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/views/{viewID}/labels/{label}':
+    delete:
+      tags:
+        - Views
+      summary: delete a label from a view
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: view not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - Views
+      summary: update a label from a view
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      requestBody:
+        description: label update to apply
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Label"
+      responses:
+        '200':
+          description: updated successfully
+        '404':
+          description: view not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/views/{viewID}/members':
+    get:
+      tags:
+        - Users
+        - Views
+      summary: List all view members
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+      responses:
+        '200':
+          description: a list of users who have member privileges for a view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceMembers"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Users
+        - Views
+      summary: Add view member
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+      requestBody:
+        description: user to add as member
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
+      responses:
+        '201':
+          description: added to view members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceMember"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/views/{viewID}/members/{userID}':
+    delete:
+      tags:
+        - Users
+        - Views
+      summary: removes a member from an view
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: userID
+          schema:
+            type: string
+          required: true
+          description: ID of member to remove
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+      responses:
+        '204':
+          description: member removed
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/views/{viewID}/owners':
+      get:
+        tags:
+          - Users
+          - Views
+        summary: List all view owners
+        parameters:
+          - $ref: '#/components/parameters/TraceSpan'
+          - in: path
+            name: viewID
+            schema:
+              type: string
+            required: true
+            description: ID of the view
+        responses:
+          '200':
+            description: a list of users who have owner privileges for a view
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ResourceOwners"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+      post:
+        tags:
+          - Users
+          - Views
+        summary: Add view owner
+        parameters:
+          - $ref: '#/components/parameters/TraceSpan'
+          - in: path
+            name: viewID
+            schema:
+              type: string
+            required: true
+            description: ID of the view
+        requestBody:
+          description: user to add as owner
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddResourceMemberRequestBody"
+        responses:
+          '201':
+            description: added to view owners
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ResourceOwner"
+          default:
+            description: unexpected error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Error"
+  '/views/{viewID}/owners/{userID}':
+    delete:
+      tags:
+        - Users
+        - Views
+      summary: removes an owner from a view
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: userID
+          schema:
+            type: string
+          required: true
+          description: ID of owner to remove
+        - in: path
+          name: viewID
+          schema:
+            type: string
+          required: true
+          description: ID of the view
+      responses:
+        '204':
+          description: owner removed
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /dashboards:
     post:
       tags:
         - Dashboards
       summary: Create a dashboard
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
@@ -1009,11 +1570,21 @@ paths:
         - Dashboards
       summary: Get all dashboards
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: owner
             description: specifies the owner id to return resources for
             schema:
               type: string
+          - in: query
+            name: sortBy
+            description: specifies the owner id to return resources for
+            schema:
+              type: string
+              enum:
+                - "ID"
+                - "CreatedAt"
+                - "UpdatedAt"
           - in: query
             name: id
             description: ID list of dashboards to return. If both this and owner are specified, only ids is used.
@@ -1040,6 +1611,7 @@ paths:
       - Dashboards
     summary: Get a single Dashboard
     parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1077,6 +1649,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Dashboard"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1107,6 +1680,7 @@ paths:
         - Dashboards
       summary: Delete a dashboard
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1142,6 +1716,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Cells"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1180,6 +1755,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CreateCell"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1219,6 +1795,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CellUpdate"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1256,6 +1833,7 @@ paths:
         - Dashboards
       summary: Delete a dashboard cell
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1283,6 +1861,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  '/dashboards/{dashboardID}/labels':
+    get:
+      tags:
+        - Dashboards
+      summary: list all labels for a dashboard
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: dashboardID
+          schema:
+            type: string
+          required: true
+          description: ID of the dashboard
+      responses:
+        '200':
+          description: a list of all labels for a dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Dashboards
+      summary: add a label to a dashboard
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: dashboardID
+          schema:
+            type: string
+          required: true
+          description: ID of the dashboard
+      requestBody:
+        description: tag to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: a list of all labels for a dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   '/dashboards/{dashboardID}/members':
     get:
       tags:
@@ -1290,6 +1939,7 @@ paths:
         - Dashboards
       summary: List all dashboard members
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1302,7 +1952,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceMembers"
         default:
           description: unexpected error
           content:
@@ -1315,6 +1965,7 @@ paths:
         - Dashboards
       summary: Add dashboard member
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: dashboardID
           schema:
@@ -1327,14 +1978,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: added to dashboard members
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceMember"
         default:
           description: unexpected error
           content:
@@ -1348,6 +1999,7 @@ paths:
         - Dashboards
       summary: removes a member from an dashboard
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -1376,6 +2028,7 @@ paths:
           - Dashboards
         summary: List all dashboard owners
         parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: dashboardID
             schema:
@@ -1388,7 +2041,7 @@ paths:
             content:
               application/json:
                 schema:
-                  $ref: "#/components/schemas/Users"
+                  $ref: "#/components/schemas/ResourceOwners"
           default:
             description: unexpected error
             content:
@@ -1401,6 +2054,7 @@ paths:
           - Dashboards
         summary: Add dashboard owner
         parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: dashboardID
             schema:
@@ -1413,14 +2067,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/AddResourceMemberRequestBody"
         responses:
           '201':
             description: added to dashboard owners
             content:
               application/json:
                 schema:
-                  $ref: "#/components/schemas/User"
+                  $ref: "#/components/schemas/ResourceOwner"
           default:
             description: unexpected error
             content:
@@ -1434,6 +2088,7 @@ paths:
         - Dashboards
       summary: removes an owner from an dashboard
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -1457,12 +2112,64 @@ paths:
                 $ref: "#/components/schemas/Error"
   /query/ast:
     post:
-      description: not currently documented # TODO(desa): document ast endpoint
+      description: analyzes flux query and generates a query specification.
       tags:
         - Query
+      parameters:
+      - $ref: '#/components/parameters/TraceSpan'
+      - in: header
+        name: Content-Type
+        schema:
+          type: string
+          enum:
+            - application/json
+      requestBody:
+        description: analyzed flux query to generate abstract syntax tree.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LanguageRequest"
       responses:
         '200':
-          description: Suggestions for next functions in call chain
+          description: Abstract syntax tree of flux query.
+          content:
+            application/json: #TODO(goller): document the AST JSON schema
+              schema:
+                properties:
+                  todo:
+                    type: string # swagger editor was yelling at me here
+        default:
+          description: Any response other than 200 is an internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /query/spec:
+    post:
+      description: analyzes flux query and generates a query specification.
+      tags:
+        - Query
+      parameters:
+      - $ref: '#/components/parameters/TraceSpan'
+      - in: header
+        name: Content-Type
+        schema:
+          type: string
+          enum:
+            - application/json
+      requestBody:
+        description: analyzed flux query to generate specification.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LanguageRequest"
+      responses:
+        '200':
+          description: Specification of flux query.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuerySpecification"
         default:
           description: Any response other than 200 is an internal server error
           content:
@@ -1473,6 +2180,8 @@ paths:
     get:
       tags:
         - Query
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '200':
           description: Suggestions for next functions in call chain
@@ -1488,6 +2197,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /query/suggestions/{name}:
     parameters:
+      - $ref: '#/components/parameters/TraceSpan'
       - in: path
         name: name
         schema:
@@ -1516,6 +2226,7 @@ paths:
         - Authorizations
       summary: List all authorizations
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: query
           name: userID
           schema:
@@ -1543,6 +2254,8 @@ paths:
       tags:
         - Authorizations
       summary: Create an authorization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       requestBody:
         description: authorization to create
         required: true
@@ -1557,6 +2270,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Authorization"
+        '400':
+          description: invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: unexpected error
           content:
@@ -1569,6 +2288,7 @@ paths:
         - Authorizations
       summary: Retrieve an authorization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: authID
           schema:
@@ -1600,6 +2320,7 @@ paths:
             schema:
               $ref: "#/components/schemas/Authorization"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: authID
           schema:
@@ -1624,6 +2345,7 @@ paths:
         - Authorizations
       summary: Delete a authorization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: authID
           schema:
@@ -1639,12 +2361,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /query/analyze:
+   post:
+    tags:
+      - Query
+    summary: analyze an influxql or flux query
+    parameters:
+      - $ref: '#/components/parameters/TraceSpan'
+      - in: header
+        name: Content-Type
+        schema:
+          type: string
+          enum:
+            - application/json
+    requestBody:
+        description: flux or influxql query to analyze
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Query"
+    responses:
+        '200':
+          description: query analyze results. Errors will be empty if the query is valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeQueryResponse"
+        default:
+          description: internal server error
+          headers:
+            X-Influx-Error:
+              description: error string describing the problem
+              schema:
+                type: string
+            X-Influx-Reference:
+              description: reference code unique to the error type
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /query:
    get:
     tags:
       - Query
     summary: query influx with specified return formatting. The spec and query fields are mutually exclusive.
     parameters:
+      - $ref: '#/components/parameters/TraceSpan'
       - in: query
         name: org
         description: specifies the organization of the resource
@@ -1655,11 +2419,6 @@ paths:
         name: query
         description: query script to execute.
         required: true
-        schema:
-          type: string
-      - in: header
-        name: Authorization
-        description: the authorization header should be in the format of `Token <key>`
         schema:
           type: string
     responses:
@@ -1715,6 +2474,7 @@ paths:
       - Query
     summary: query an influx
     parameters:
+      - $ref: '#/components/parameters/TraceSpan'
       - in: header
         name: Accept
         description: specifies the return content format. Each response content type will have its own dialect options.
@@ -1731,14 +2491,14 @@ paths:
           type: string
           enum:
             - application/json
-      - in: header
-        name: Authorization
-        description: the authorization header should be in the format of `Token <key>`
-        schema:
-          type: string
       - in: query
         name: org
         description: specifies the name of the organization executing the query.
+        schema:
+          type: string
+      - in: query
+        name: orgID
+        description: specifies the ID of the organization executing the query.
         schema:
           type: string
     requestBody:
@@ -1813,10 +2573,22 @@ paths:
         - Buckets
       summary: List all buckets
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
+          - $ref: "#/components/parameters/Offset"
+          - $ref: "#/components/parameters/Limit"
           - in: query
             name: org
-            description: specifies the organization of the resource
-            required: true
+            description: specifies the organization name of the resource
+            schema:
+              type: string
+          - in: query
+            name: orgID
+            description: specifies the organization id of the resource
+            schema:
+              type: string
+          - in: query
+            name: name
+            description: only returns buckets with the specified name
             schema:
               type: string
       responses:
@@ -1837,6 +2609,7 @@ paths:
         - Buckets
       summary: Create a bucket
       parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: query
             name: org
             description: specifies the organization of the resource
@@ -1869,6 +2642,7 @@ paths:
         - Buckets
       summary: Retrieve a bucket
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: bucketID
           schema:
@@ -1900,6 +2674,7 @@ paths:
             schema:
               $ref: "#/components/schemas/Bucket"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: bucketID
           schema:
@@ -1919,6 +2694,178 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    delete:
+      tags:
+        - Buckets
+      summary: Delete a bucket
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: bucketID
+          schema:
+            type: string
+          required: true
+          description: ID of bucket to delete
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: bucket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/buckets/{bucketID}/labels':
+    get:
+      tags:
+        - Buckets
+      summary: list all labels for a bucket
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: bucketID
+          schema:
+            type: string
+          required: true
+          description: ID of the bucket
+      responses:
+        '200':
+          description: a list of all labels for a bucket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Buckets
+      summary: add a label to a bucket
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: bucketID
+          schema:
+            type: string
+          required: true
+          description: ID of the bucket
+      requestBody:
+        description: label to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: a list of all labels for a bucket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/buckets/{bucketID}/labels/{label}':
+    delete:
+      tags:
+        - Buckets
+      summary: delete a label from a bucket
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: bucketID
+          schema:
+            type: string
+          required: true
+          description: ID of the bucket
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: bucket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - Buckets
+      summary: update a label from a bucket
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: bucketID
+          schema:
+            type: string
+          required: true
+          description: ID of the bucket
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      requestBody:
+        description: label update to apply
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Label"
+      responses:
+        '200':
+          description: updated successfully
+        '404':
+          description: bucket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   '/buckets/{bucketID}/members':
     get:
       tags:
@@ -1926,6 +2873,7 @@ paths:
         - Buckets
       summary: List all users with member privileges for a bucket
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: bucketID
           schema:
@@ -1938,7 +2886,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceOwners"
         default:
           description: unexpected error
           content:
@@ -1951,6 +2899,7 @@ paths:
         - Buckets
       summary: Add bucket member
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: bucketID
           schema:
@@ -1963,14 +2912,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: member added to bucket
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceMember"
         default:
           description: unexpected error
           content:
@@ -1984,6 +2933,7 @@ paths:
         - Buckets
       summary: removes a member from an bucket
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2012,6 +2962,7 @@ paths:
         - Buckets
       summary: List all owners of a bucket
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: bucketID
           schema:
@@ -2024,7 +2975,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceMembers"
         default:
           description: unexpected error
           content:
@@ -2037,6 +2988,7 @@ paths:
         - Buckets
       summary: Add bucket owner
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: bucketID
           schema:
@@ -2049,14 +3001,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: bucket owner added
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceOwner"
         default:
           description: unexpected error
           content:
@@ -2070,6 +3022,7 @@ paths:
         - Buckets
       summary: removes an owner from a bucket
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2113,6 +3066,8 @@ paths:
       tags:
         - Organizations
       summary: Create an organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       requestBody:
         description: organization to create
         required: true
@@ -2139,6 +3094,7 @@ paths:
         - Organizations
       summary: Retrieve an organization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: orgID
           schema:
@@ -2170,6 +3126,7 @@ paths:
             schema:
               $ref: "#/components/schemas/Organization"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: orgID
           schema:
@@ -2189,6 +3146,264 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    delete:
+      tags:
+        - Organizations
+      summary: Delete an organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of organization to delete
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/orgs/{orgID}/labels':
+    get:
+      tags:
+        - Organizations
+      summary: list all labels for a organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+      responses:
+        '200':
+          description: a list of all labels for an organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Organizations
+      summary: add a label to an organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+      requestBody:
+        description: label to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: a list of all labels for an organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    $ref: "#/components/schemas/Labels"
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/orgs/{orgID}/labels/{label}':
+    delete:
+      tags:
+        - Organizations
+      summary: delete a label from an organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - Organizations
+      summary: update a label from an organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      requestBody:
+        description: label update to apply
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Label"
+      responses:
+        '200':
+          description: updated successfully
+        '404':
+          description: organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/orgs/{orgID}/secrets':
+    get:
+      tags:
+        - Secrets
+        - Organizations
+      summary: List all secret keys for an organization
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+      responses:
+        '200':
+          description: a list of all secret keys
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretKeys"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - Secrets
+        - Organizations
+      summary: Apply patch to the provided secrets
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+      requestBody:
+        description: secret key value pairs to update/add
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Secrets"
+      responses:
+        '204':
+          description: keys successfully patched
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/orgs/{orgID}/secrets/delete': # had to make this because swagger wouldn't let me have a request body with a DELETE
+    post:
+      tags:
+        - Secrets
+        - Organizations
+      summary: delete provided secrets
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: orgID
+          schema:
+            type: string
+          required: true
+          description: ID of the organization
+      requestBody:
+        description: secret key to deleted
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecretKeys"
+      responses:
+        '204':
+          description: keys successfully patched
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   '/orgs/{orgID}/members':
     get:
       tags:
@@ -2196,6 +3411,7 @@ paths:
         - Organizations
       summary: List all members of an organization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: orgID
           schema:
@@ -2208,7 +3424,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceOwners"
         default:
           description: unexpected error
           content:
@@ -2221,6 +3437,7 @@ paths:
         - Organizations
       summary: Add organization member
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: orgID
           schema:
@@ -2233,14 +3450,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: added to organization created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceMember"
         default:
           description: unexpected error
           content:
@@ -2254,6 +3471,7 @@ paths:
         - Organizations
       summary: removes a member from an organization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2282,6 +3500,7 @@ paths:
         - Organizations
       summary: List all owners of an organization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: orgID
           schema:
@@ -2294,7 +3513,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceMembers"
         default:
           description: unexpected error
           content:
@@ -2307,6 +3526,7 @@ paths:
         - Organizations
       summary: Add organization owner
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: orgID
           schema:
@@ -2319,14 +3539,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: organization owner added
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceOwner"
         default:
           description: unexpected error
           content:
@@ -2340,6 +3560,7 @@ paths:
         - Organizations
       summary: removes an owner from an organization
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2366,8 +3587,8 @@ paths:
       tags:
         - Tasks
       summary: List tasks.
-      description: Lists tasks, limit 100
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: query
           name: after
           schema:
@@ -2377,26 +3598,27 @@ paths:
           name: user
           schema:
             type: string
-          description: filter tasks to a specific user name
+          description: filter tasks to a specific user ID
         - in: query
           name: org
           schema:
             type: string
-          description: filter tasks to a specific organization name
+          description: filter tasks to a specific organization ID
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+          description: the number of tasks to return
       responses:
         '200':
           description: A list of tasks
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  runs:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Tasks"
-                  links:
-                    $ref: "#/components/schemas/Links"
+                 $ref: "#/components/schemas/Tasks"
         default:
           description: unexpected error
           content:
@@ -2408,11 +3630,7 @@ paths:
         - Tasks
       summary: Create a new task
       parameters:
-        - in: query
-          name: org
-          schema:
-            type: string
-          description: filter tasks to a specific organization name
+        - $ref: '#/components/parameters/TraceSpan'
       requestBody:
         description: task to create
         required: true
@@ -2439,6 +3657,7 @@ paths:
         - Tasks
       summary: Retrieve an task
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2471,6 +3690,7 @@ paths:
             schema:
               $ref: "#/components/schemas/Task"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2496,6 +3716,7 @@ paths:
       summary: Delete a task
       description: Deletes a task and all associated records
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2517,6 +3738,7 @@ paths:
         - Tasks
       summary: Retrieve list of run records for a task
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2568,12 +3790,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Tasks
+      summary: manually start a run of the task now overriding the current schedule.
+      parameters:
+        - in: path
+          name: taskID
+          schema:
+            type: string
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunManually"
+      responses:
+        '201':
+          description: Run scheduled to start
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   '/tasks/{taskID}/runs/{runID}':
     get:
       tags:
         - Tasks
       summary: Retrieve a single run record for a task
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2605,6 +3856,7 @@ paths:
         - Tasks
       summary: Retry a task run
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2619,7 +3871,7 @@ paths:
           description: run ID
       responses:
         '200':
-          description: The newly created retry run
+          description: run that has been queued
           content:
             application/json:
               schema:
@@ -2636,6 +3888,7 @@ paths:
         - Tasks
       summary: Retrieve all logs for a task
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2661,6 +3914,7 @@ paths:
         - Tasks
       summary: Retrieve all logs for a run
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2686,11 +3940,162 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  '/tasks/{taskID}/labels':
+    get:
+      tags:
+        - Tasks
+      summary: list all labels for a task
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: taskID
+          schema:
+            type: string
+          required: true
+          description: ID of the task
+      responses:
+        '200':
+          description: a list of all labels for a task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    type: array
+                    items:
+                      type: string
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Tasks
+      summary: add a label to a task
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: taskID
+          schema:
+            type: string
+          required: true
+          description: ID of the task
+      requestBody:
+        description: label to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+      responses:
+        '200':
+          description: a list of all labels for a task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labels:
+                    type: array
+                    items:
+                      type: string
+                  links:
+                    $ref: "#/components/schemas/Links"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  '/tasks/{taskID}/labels/{label}':
+    delete:
+      tags:
+        - Tasks
+      summary: delete a label from a task
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: taskID
+          schema:
+            type: string
+          required: true
+          description: ID of the task
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      responses:
+        '204':
+          description: delete has been accepted
+        '404':
+          description: task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - Tasks
+      summary: update a label from a task
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+        - in: path
+          name: taskID
+          schema:
+            type: string
+          required: true
+          description: ID of the task
+        - in: path
+          name: label
+          schema:
+            type: string
+          required: true
+          description: the label name
+      requestBody:
+        description: label update to apply
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Label"
+      responses:
+        '200':
+          description: updated successfully
+        '404':
+          description: task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /me:
     get:
       tags:
         - Users
       summary: Returns currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '200':
           description: currently authenticated user
@@ -2704,6 +4109,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /me/password:
+    put:
+      tags:
+        - Users
+      summary: Update password
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
+      requestBody:
+        description: new password
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetBody"
+      responses:
+        '204':
+          description: password succesfully updated
+        default:
+          description: unsuccessful authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   '/tasks/{taskID}/members':
     get:
       tags:
@@ -2711,6 +4141,7 @@ paths:
         - Tasks
       summary: List all task members
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2723,7 +4154,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Users"
+                $ref: "#/components/schemas/ResourceMembers"
         default:
           description: unexpected error
           content:
@@ -2736,6 +4167,7 @@ paths:
         - Tasks
       summary: Add task member
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: taskID
           schema:
@@ -2748,14 +4180,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/AddResourceMemberRequestBody"
       responses:
         '201':
           description: added to task members
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/ResourceMember"
         default:
           description: unexpected error
           content:
@@ -2769,6 +4201,7 @@ paths:
         - Tasks
       summary: removes a member from an task
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2797,6 +4230,7 @@ paths:
           - Tasks
         summary: List all task owners
         parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: taskID
             schema:
@@ -2809,7 +4243,7 @@ paths:
             content:
               application/json:
                 schema:
-                  $ref: "#/components/schemas/Users"
+                  $ref: "#/components/schemas/ResourceOwners"
           default:
             description: unexpected error
             content:
@@ -2822,6 +4256,7 @@ paths:
           - Tasks
         summary: Add task owner
         parameters:
+          - $ref: '#/components/parameters/TraceSpan'
           - in: path
             name: taskID
             schema:
@@ -2834,14 +4269,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/AddResourceMemberRequestBody"
         responses:
           '201':
             description: added to task owners
             content:
               application/json:
                 schema:
-                  $ref: "#/components/schemas/User"
+                  $ref: "#/components/schemas/ResourceOwner"
           default:
             description: unexpected error
             content:
@@ -2855,6 +4290,7 @@ paths:
         - Tasks
       summary: removes an owner from an task
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2881,6 +4317,8 @@ paths:
       tags:
         - Users
       summary: List all users
+      parameters:
+        - $ref: '#/components/parameters/TraceSpan'
       responses:
         '200':
           description: a list of users
@@ -2924,6 +4362,7 @@ paths:
         - Users
       summary: Retrieve a user
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2955,6 +4394,7 @@ paths:
             schema:
               $ref: "#/components/schemas/User"
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2979,6 +4419,7 @@ paths:
         - Users
       summary: deletes a user
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
           name: userID
           schema:
@@ -2994,180 +4435,94 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  '/views/{viewID}/members':
-    get:
+  '/users/{userID}/password':
+    put:
       tags:
         - Users
-        - Views
-      summary: List all view members
+      summary: Update password
+      security:
+        - basicAuth: []
       parameters:
+        - $ref: '#/components/parameters/TraceSpan'
         - in: path
-          name: viewID
+          name: userID
           schema:
             type: string
           required: true
-          description: ID of the view
-      responses:
-        '200':
-          description: a list of users who have member privileges for a view
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Users"
-        default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-    post:
-      tags:
-        - Users
-        - Views
-      summary: Add view member
-      parameters:
-        - in: path
-          name: viewID
-          schema:
-            type: string
-          required: true
-          description: ID of the view
+          description: ID of the user
       requestBody:
-        description: user to add as member
+        description: new password
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/PasswordResetBody"
       responses:
-        '201':
-          description: added to view members
+        '200':
+          description: user details
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
         default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-  '/views/{viewID}/members/{userID}':
-    delete:
-      tags:
-        - Users
-        - Views
-      summary: removes a member from an view
-      parameters:
-        - in: path
-          name: userID
-          schema:
-            type: string
-          required: true
-          description: ID of member to remove
-        - in: path
-          name: viewID
-          schema:
-            type: string
-          required: true
-          description: ID of the view
-      responses:
-        '204':
-          description: member removed
-        default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-  '/views/{viewID}/owners':
-      get:
-        tags:
-          - Users
-          - Views
-        summary: List all view owners
-        parameters:
-          - in: path
-            name: viewID
-            schema:
-              type: string
-            required: true
-            description: ID of the view
-        responses:
-          '200':
-            description: a list of users who have owner privileges for a view
-            content:
-              application/json:
-                schema:
-                  $ref: "#/components/schemas/Users"
-          default:
-            description: unexpected error
-            content:
-              application/json:
-                schema:
-                  $ref: "#/components/schemas/Error"
-      post:
-        tags:
-          - Users
-          - Views
-        summary: Add view owner
-        parameters:
-          - in: path
-            name: viewID
-            schema:
-              type: string
-            required: true
-            description: ID of the view
-        requestBody:
-          description: user to add as owner
-          required: true
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        responses:
-          '201':
-            description: added to view owners
-            content:
-              application/json:
-                schema:
-                  $ref: "#/components/schemas/User"
-          default:
-            description: unexpected error
-            content:
-              application/json:
-                schema:
-                  $ref: "#/components/schemas/Error"
-  '/views/{viewID}/owners/{userID}':
-    delete:
-      tags:
-        - Users
-        - Views
-      summary: removes an owner from a view
-      parameters:
-        - in: path
-          name: userID
-          schema:
-            type: string
-          required: true
-          description: ID of owner to remove
-        - in: path
-          name: viewID
-          schema:
-            type: string
-          required: true
-          description: ID of the view
-      responses:
-        '204':
-          description: owner removed
-        default:
-          description: unexpected error
+          description: unsuccessful authentication
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
 components:
+  parameters:
+    Offset:
+      in: query
+      name: offset
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+    Limit:
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Descending:
+      in: query
+      name: descending
+      required: false
+      schema:
+        type: boolean
+        default: false
+    SortBy:
+      in: query
+      name: sortBy
+      required: false
+      schema:
+        type: string
+    TraceSpan:
+      in: header
+      name: Zap-Trace-Span
+      description: OpenTracing span context
+      example:
+        trace_id: '1'
+        span_id: '1'
+        baggage:
+          key: value
+      required: false
+      schema:
+        type: string
   schemas:
+    LanguageRequest:
+      description: flux query to be analyzed.
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          description: flux query script to be analyzed
+          type: string
     Query:
       description: query influx with specified return formatting. The spec and query fields are mutually exclusive.
       type: object
@@ -3324,11 +4679,11 @@ components:
             self:
               readOnly: true
               type: string
-              format: url
+              format: uri
             user:
               readOnly: true
               type: string
-              format: url
+              format: uri
         id:
           readOnly: true
           type: string
@@ -3342,13 +4697,19 @@ components:
         token:
           readOnly: true
           type: string
+        userID:
+          type: string
+          description: ID of user.
+        user:
+          type: string
+          description: name of user.
+        description:
+          type: string
+          description: a description of the token.
         permissions:
           type: array
           items:
             $ref: "#/components/schemas/Permission"
-        owner:
-          $ref: "#/components/schemas/Owners"
-      required: [owner]
     Authorizations:
       type: object
       properties:
@@ -3372,27 +4733,29 @@ components:
             self:
               readOnly: true
               type: string
-              format: url
+              format: uri
             org:
               readOnly: true
               type: string
-              format: url
+              format: uri
             write:
               readOnly: true
               type: string
-              format: url
+              format: uri
         id:
           readOnly: true
           type: string
-        owners:
-          $ref: "#/components/schemas/Owners"
         name:
           type: string
-        retentionPeriods:
+        organizationID:
+          type: string
+        organization:
+          type: string
+        rp:
+          type: string
+        retentionRules:
           type: array
-          default:
-            type: expire
-            duration: "infinite"
+          description: rules to expire or retain data.  No rules means data never expires.
           items:
             type: object
             properties:
@@ -3401,12 +4764,13 @@ components:
                 default: expire
                 enum:
                   - expire
-              duration:
-                type: string
-                description: durations are an extension of the golang duration syntax
-                example: 1d
-                default: "infinite"
-      required: [organizationID, name, retentionPeriod]
+              everySeconds:
+                type: integer
+                description: duration in seconds for how long data will be kept in the database.
+                example: 86400
+                minimum: 1
+            required: [type, everySeconds]
+      required: [name, retentionRules]
     Buckets:
       type: object
       properties:
@@ -3418,14 +4782,10 @@ components:
           items:
             $ref: "#/components/schemas/Bucket"
     Link:
-      type: object
+      type: string
       readOnly: true
+      format: uri
       description: URI of resource.
-      properties:
-        href:
-          type: string
-          format: url
-      required: [href]
     Links:
       type: object
       properties:
@@ -3472,23 +4832,23 @@ components:
             self:
               readOnly: true
               type: string
-              format: url
+              format: uri
             users:
               readOnly: true
               type: string
-              format: url
+              format: uri
             buckets:
               readOnly: true
               type: string
-              format: url
+              format: uri
             tasks:
               readOnly: true
               type: string
-              format: url
+              format: uri
             dashboards:
               readOnly: true
               type: string
-              format: url
+              format: uri
         id:
           readOnly: true
           type: string
@@ -3532,9 +4892,10 @@ components:
           type: string
           enum: [
             "scheduled",
-            "executing",
+            "started",
             "failed",
-            "success"
+            "success",
+            "canceled"
           ]
         scheduledFor:
           description: Time used for run's "now" option, RFC3339.
@@ -3555,18 +4916,41 @@ components:
           description: Time run was manually requested, RFC3339Nano.
           type: string
           format: date-time
-        error:
-          $ref: "#/components/schemas/Error"
-        log:
+        links:
+          type: object
           readOnly: true
-          description: Link to the full logs for a run.
+          example:
+            self: "/api/v2/tasks/1/runs/1"
+            task: "/api/v2/tasks/1"
+            retry: "/api/v2/tasks/1/runs/1/retry"
+            logs: "/api/v2/tasks/1/runs/1/logs"
+          properties:
+            self:
+              type: string
+              format: uri
+            task:
+              type: string
+              format: uri
+            logs:
+              type: string
+              format: uri
+            retry:
+              type: string
+              format: uri
+    RunManually:
+      properties:
+        scheduledFor:
+          nullable: true
+          description: Time used for run's "now" option, RFC3339.  Default is the server's now time.
           type: string
+          format: date-time
     Task:
+      type: object
       properties:
         id:
           readOnly: true
           type: string
-        organization:
+        organizationId:
           description: The ID of the organization that owns this Task.
           type: string
         name:
@@ -3579,8 +4963,6 @@ components:
           enum:
             - active
             - inactive
-        owners:
-          $ref: "#/components/schemas/Owners"
         flux:
           description: The Flux script to run for this task.
           type: string
@@ -3590,6 +4972,39 @@ components:
         cron:
           description: A task repetition schedule in the form '* * * * * *'; parsed from Flux.
           type: string
+        offset:
+          description: Duration to delay after the schedule, before executing the task; parsed from flux.
+          type: string
+        latest_completed:
+          description: Timestamp of latest scheduled, completed run, RFC3339.
+          type: string
+          format: date-time
+          readOnly: true
+        links:
+          type: object
+          readOnly: true
+          example:
+            self: "/api/v2/tasks/1"
+            owners: "/api/v2/tasks/1/owners"
+            members: "/api/v2/tasks/1/members"
+            runs: "/api/v2/tasks/1/runs"
+            logs: "/api/v2/tasks/1/logs"
+          properties:
+            self:
+              type: string
+              format: uri
+            owners:
+              type: string
+              format: uri
+            members:
+              type: string
+              format: uri
+            runs:
+              type: string
+              format: uri
+            logs:
+              type: string
+              format: uri
       required: [name, organization, flux]
     Tasks:
       type: array
@@ -3609,11 +5024,79 @@ components:
           enum:
             - active
             - inactive
+        links:
+          type: object
+          readOnly: true
+          example:
+            self: "/api/v2/users/1"
+            log: "/api/v2/users/1/log"
+          properties:
+            self:
+              type: string
+              format: uri
+            log:
+              type: string
+              format: uri
       required: [name]
     Users:
-      type: array
-      items:
-        $ref: "#/components/schemas/User"
+      type: object
+      properties:
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+              format: uri
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+    ResourceMember:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            role:
+              type: string
+              default: member
+              enum:
+                - member
+    ResourceMembers:
+      type: object
+      properties:
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+              format: uri
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceMember"
+    ResourceOwner:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            role:
+              type: string
+              default: owner
+              enum:
+                - owner
+    ResourceOwners:
+      type: object
+      properties:
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+              format: uri
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceOwner"
     FluxSuggestions:
       type: object
       properties:
@@ -3629,62 +5112,96 @@ components:
       properties:
         ast:
           type: string
-          format: url
+          format: uri
         self:
           type: string
-          format: url
+          format: uri
         suggestions:
           type: string
-          format: url
+          format: uri
     Routes:
       properties:
-        sources:
+        authorizations:
           type: string
-          format: url
-        dashboards:
-          type: string
-          format: url
-        query:
-          type: string
-          format: url
-        write:
-          type: string
-          format: url
-        orgs:
-          type: string
-          format: url
-        auths:
-          type: string
-          format: url
+          format: uri
         buckets:
           type: string
-          format: url
-        users:
+          format: uri
+        dashboards:
           type: string
-          format: url
-        tasks:
-          type: string
-          format: url
-        system:
-          type: object
-          properties:
-            metrics:
-              type: string
-              format: url
-            debug:
-              type: string
-              format: url
-            health:
-              type: string
-              format: url
+          format: uri
         external:
           type: object
           properties:
             statusFeed:
               type: string
-              format: url
-        flux:
-          $ref: "#/components/schemas/FluxLinks"
+              format: uri
+        macros:
+          type: string
+          format: uri
+        me:
+          type: string
+          format: uri
+        orgs:
+          type: string
+          format: uri
+        query:
+          type: object
+          properties:
+            self:
+              type: string
+              format: uri
+            ast:
+              type: string
+              format: uri
+            analyze:
+              type: string
+              format: uri
+            spec:
+              type: string
+              format: uri
+            suggestions:
+              type: string
+              format: uri
+        setup:
+          type: string
+          format: uri
+        signin:
+          type: string
+          format: uri
+        signout:
+          type: string
+          format: uri
+        sources:
+          type: string
+          format: uri
+        system:
+          type: object
+          properties:
+            metrics:
+              type: string
+              format: uri
+            debug:
+              type: string
+              format: uri
+            health:
+              type: string
+              format: uri
+        tasks:
+          type: string
+          format: uri
+        telegrafs:
+          type: string
+          format: uri
+        users:
+          type: string
+          format: uri
+        write:
+          type: string
+          format: uri
+        views:
+          type: string
+          format: uri
     Error:
       properties:
         code:
@@ -3697,6 +5214,7 @@ components:
             - conflict
             - invalid
             - empty value
+            - unavailable
         message:
           readOnly: true
           description: message is a human-readable message.
@@ -3709,7 +5227,7 @@ components:
           readOnly: true
           description: err is a stack of errors that occurred during processing of the request. Useful for debugging.
           type: string
-      required: [code, message, op, err]
+      required: [code, message]
     LineProtocolError:
       properties:
         code:
@@ -3722,6 +5240,7 @@ components:
             - conflict
             - invalid
             - empty value
+            - unavailable
         message:
           readOnly: true
           description: message is a human-readable message.
@@ -3935,7 +5454,7 @@ components:
           type: string
         source:
           type: string
-          format: url
+          format: uri
           description: Optional URI for data source for this query
         queryConfig:
           $ref: '#/components/schemas/QueryConfig'
@@ -4235,10 +5754,11 @@ components:
       properties:
         links:
           type: object
+          readOnly: true
           properties:
             self:
               type: string
-              format: url
+              format: uri
         id:
           readOnly: true
           type: string
@@ -4349,6 +5869,22 @@ components:
         usingView:
           type: string
           description: makes a copy of the provided view
+    AnalyzeQueryResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              column:
+                type: integer
+              character:
+                type: integer
+              message:
+                type: string
     Cell:
       type: object
       properties:
@@ -4380,6 +5916,24 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Cell"
+    Secrets:
+      additionalProperties:
+        type: string
+      example:
+        apikey: abc123xyz
+    SecretKeys:
+      properties:
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+            org:
+              type: string
+        secrets:
+          type: array
+          items:
+            type: string
     Dashboard:
       properties:
         links:
@@ -4394,6 +5948,19 @@ components:
           type: string
         name:
           type: string
+          description: user-facing name of the dashboard
+        description:
+          type: string
+          description: user-facing description of the dashboard
+        meta:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              format: date
+            updatedAt:
+              type: string
+              format: date
         cells:
             $ref: "#/components/schemas/Cells"
     Dashboards:
@@ -4426,6 +5993,7 @@ components:
           enum: ["v1","v2","self"]
         url:
           type: string
+          format: uri
         insecureSkipVerify:
           type: boolean
         telegraf:
@@ -4440,9 +6008,8 @@ components:
           type: string
         metaUrl:
           type: string
+          format: uri
         defaultRP:
-          type: string
-        fluxURL:
           type: string
         languages:
           type: array
@@ -4461,7 +6028,7 @@ components:
           properties:
             self:
               type: string
-              format: url
+              format: uri
         sources:
           type: array
           items:
@@ -4474,34 +6041,538 @@ components:
         agent:
           type: object
           properties:
-            interval:
+            collectionInterval:
               type: integer
         plugins:
           type: array
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                enum: [cpu, disk, diskio, docker, file, kernel, kubernetes, logparser, mem, net_response, net, ngnix, processes, procstats, prometheus, redis, swap, syslog, system, tail, influxdb_v2]
-              type:
-                type: string
-                enum: [input, output, processor, aggregator]
-              comment: 
-                type: string
-              configs:
-                oneOf:
-                - $ref: '#/components/schemas/TelegrafPluginInput'
-                - $ref: '#/components/schemas/TelegrafPluginInputDocker'
-                - $ref: '#/components/schemas/TelegrafPluginInputFile'
-                - $ref: '#/components/schemas/TelegrafPluginInputKubernetes'
-                - $ref: '#/components/schemas/TelegrafPluginInputLogParser'
-                - $ref: '#/components/schemas/TelegrafPluginInputProcstat'
-                - $ref: '#/components/schemas/TelegrafPluginInputPrometheus'
-                - $ref: '#/components/schemas/TelegrafPluginInputRedis'
-                - $ref: '#/components/schemas/TelegrafPluginInputSyslog'
-                - $ref: '#/components/schemas/TelegrafPluginOutputFile'
-                - $ref: '#/components/schemas/TelegrafPluginOutputInfluxDBV2'
+            $ref: "#/components/schemas/TelegrafRequestPlugin"
+    TelegrafRequestPlugin:
+      type: object
+      discriminator:
+        propertyName: "name"
+      required:
+        - name
+      properties:
+        name:
+          type: string
+    TelegrafPluginInputCpu:
+      type: object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["cpu"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputCpuRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputCpu"
+    TelegrafPluginInputDisk:
+      type: object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["disk"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputDiskRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputDisk"
+    TelegrafPluginInputDiskio:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["diskio"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputDiskioRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputDiskio"
+    TelegrafPluginInputDocker:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["docker"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputDockerConfig'
+    TelegrafPluginInputDockerRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputDocker"
+    TelegrafPluginInputFile:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["file"]
+        type:
+          type: string
+          enum: [input]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputFileConfig'
+    TelegrafPluginInputFileRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputFile"
+    TelegrafPluginInputKernel:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["kernel"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputKernelRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputKernel"
+    TelegrafPluginInputKubernetes:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["kubernetes"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputKubernetesConfig'
+    TelegrafPluginInputKubernetesRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputKubernetes"
+    TelegrafPluginInputLogParser:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["logparser"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputLogParserConfig'
+    TelegrafPluginInputLogParserRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputLogParser"
+    TelegrafPluginInputMem:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["mem"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputMemRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputMem"
+    TelegrafPluginInputNetResponse:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["net_response"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputNetResponseRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputNetResponse"
+    TelegrafPluginInputNet:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["net"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputNetRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputNet"
+    TelegrafPluginInputNgnix:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["ngnix"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputNgnixRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputNgnix"
+    TelegrafPluginInputProcesses:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["processes"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: "#/components/schemas/TelegrafPluginConfig"
+    TelegrafPluginInputProcessesRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputProcesses"
+    TelegrafPluginInputProcstat:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["procstat"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputProcstatConfig'
+    TelegrafPluginInputProcstatRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputProcstat"
+    TelegrafPluginInputPrometheus:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["prometheus"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputPrometheusConfig'
+    TelegrafPluginInputPrometheusRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputPrometheus"
+    TelegrafPluginInputRedis:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["redis"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputRedisConfig'
+    TelegrafPluginInputRedisRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputRedis"
+    TelegrafPluginInputSyslog:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["syslog"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginInputSyslogConfig'
+    TelegrafPluginInputSyslogRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputSyslog"
+    TelegrafPluginInputSwap:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["swap"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginConfig'
+    TelegrafPluginInputSwapRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputSwap"
+    TelegrafPluginInputSystem:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["system"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginConfig'
+    TelegrafPluginInputSystemRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputSystem"
+    TelegrafPluginInputTail:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["tail"]
+        type:
+          type: string
+          enum: ["input"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginConfig'
+    TelegrafPluginInputTailRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginInputTail"
+    TelegrafPluginOutputFile:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["file"]
+        type:
+          type: string
+          enum: ["output"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginOutputFileConfig'
+    TelegrafPluginOutputFileRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginOutputFile"
+    TelegrafPluginOutputInfluxDBV2:
+      type:
+        object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          enum: ["influxdb_v2"]
+        type:
+          type: string
+          enum: ["output"]
+        comment:
+          type: string
+        config:
+          $ref: '#/components/schemas/TelegrafPluginOutputInfluxDBV2Config'
+    TelegrafPluginOutputInfluxDBV2Request:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/TelegrafRequestPlugin"
+        - $ref: "#/components/schemas/TelegrafPluginOutputInfluxDBV2"
+    TelegrafRequestConfig:
+      oneOf:
+        - $ref: '#/components/schemas/TelegrafPluginConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputDockerConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputFileConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputKubernetesConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputLogParserConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputProcstatConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputPrometheusConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputRedisConfig'
+        - $ref: '#/components/schemas/TelegrafPluginInputSyslogConfig'
+        - $ref: '#/components/schemas/TelegrafPluginOutputFileConfig'
+        - $ref: '#/components/schemas/TelegrafPluginOutputInfluxDBV2Config'
     Telegraf:
       type: object
       allOf:
@@ -4520,62 +6591,53 @@ components:
     Telegrafs:
       type: object
       properties:
-        links:
-          type: object
-          properties:
-            self:
-              type: string
-              format: url
-        sources:
+        configurations:
           type: array
           items:
             $ref: "#/components/schemas/Telegraf"
-    TelegrafPluginInput:
+    TelegrafPluginConfig:
       type: object
-    TelegrafPluginInputDocker:
+    TelegrafPluginInputDockerConfig:
       type: object
+      required:
+        - endpoint
       properties:
         endpoint:
           type: string
-    TelegrafPluginInputFile:
+    TelegrafPluginInputFileConfig:
       type: object
       properties:
         files:
           type: array
           items:
-            type: string   
-    TelegrafPluginInputKubernetes:
+            type: string
+    TelegrafPluginInputKubernetesConfig:
       type: object
       properties:
         url:
           type: string
-    TelegrafPluginInputLogParser:
+          format: uri
+    TelegrafPluginInputLogParserConfig:
       type: object
       properties:
         files:
           type: array
           items:
-            type: string   
-    TelegrafPluginInputNginx:
-      type: object
-      properties:
-        urls:
-          type: array
-          items:
-            type: string   
-    TelegrafPluginInputProcstat:
+            type: string
+    TelegrafPluginInputProcstatConfig:
       type: object
       properties:
         exe:
           type: string
-    TelegrafPluginInputPrometheus:
+    TelegrafPluginInputPrometheusConfig:
       type: object
       properties:
         urls:
           type: array
           items:
-            type: string   
-    TelegrafPluginInputRedis:
+            type: string
+            format: uri
+    TelegrafPluginInputRedisConfig:
       type: object
       properties:
         servers:
@@ -4583,20 +6645,20 @@ components:
           items:
             type: string
         password:
-          type: string     
-    TelegrafPluginInputSyslog:
+          type: string
+    TelegrafPluginInputSyslogConfig:
       type: object
       properties:
         server:
-          type: string     
-    TelegrafPluginOutputFile:
+          type: string
+    TelegrafPluginOutputFileConfig:
       type: object
       required:
         - files
       properties:
         files:
           type: array
-          items: 
+          items:
             type: object
             properties:
               type:
@@ -4604,7 +6666,7 @@ components:
                 enum: [stdout, path]
               path:
                 type: string
-    TelegrafPluginOutputInfluxDBV2:
+    TelegrafPluginOutputInfluxDBV2Config:
       type: object
       required:
         - urls
@@ -4616,12 +6678,13 @@ components:
           type: array
           items:
             type: string
+            format: uri
         token:
           type: string
         organization:
           type: string
         bucket:
-          type: string           
+          type: string
     IsOnboarding:
       type: object
       properties:
@@ -4638,6 +6701,13 @@ components:
           type: string
         bucket:
           type: string
+        retentionPeriodHrs:
+          type: integer
+      required:
+        - username
+        - password
+        - org
+        - bucket
     OnboardingResponse:
       type: object
       properties:
@@ -4649,8 +6719,26 @@ components:
           $ref: "#/components/schemas/Bucket"
         auth:
           $ref: "#/components/schemas/Authorization"
-    Health:
+    PasswordResetBody:
+      properties:
+        password:
+          type: string
+      required:
+        - password
+    AddResourceMemberRequestBody:
       type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+    Check:
+      type: object
+      required:
+        - name
+        - status
       properties:
         name:
           type: string
@@ -4659,9 +6747,22 @@ components:
         checks:
           type: array
           items:
-            $ref: "#/components/schemas/Health"
+            $ref: "#/components/schemas/Check"
         status:
           type: string
           enum:
-            - unhealthy
-            - healthy
+            - pass
+            - fail
+    Labels:
+      type: array
+      items:
+        $ref: "#/components/schemas/Label"
+    Label:
+      type: object
+      properties:
+        name:
+          type: string
+        properties:
+          type: object
+          description: Key/Value pairs associated with this label. Keys can be removed by sending an update with an empty value.
+          example: {"color": "ffb3b3", "description": "this is a description"}

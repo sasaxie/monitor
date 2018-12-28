@@ -71,10 +71,6 @@ func (r *rpResponse) WithLinks(srcID int, db string) {
 	}
 }
 
-type rpsResponse struct {
-	RetentionPolicies []rpResponse `json:"retentionPolicies"`
-}
-
 type measurementLinks struct {
 	Self  string `json:"self"`
 	First string `json:"first"`
@@ -119,7 +115,7 @@ func (h *Service) GetDatabases(w http.ResponseWriter, r *http.Request) {
 
 	dbsvc := h.Databases
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -166,7 +162,7 @@ func (h *Service) NewDatabase(w http.ResponseWriter, r *http.Request) {
 	dbsvc := h.Databases
 
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -216,7 +212,7 @@ func (h *Service) DropDatabase(w http.ResponseWriter, r *http.Request) {
 	dbsvc := h.Databases
 
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -250,7 +246,7 @@ func (h *Service) RetentionPolicies(w http.ResponseWriter, r *http.Request) {
 
 	dbsvc := h.Databases
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -258,7 +254,7 @@ func (h *Service) RetentionPolicies(w http.ResponseWriter, r *http.Request) {
 	db := httprouter.ParamsFromContext(ctx).ByName("db")
 	res, err := h.allRPs(ctx, dbsvc, srcID, db)
 	if err != nil {
-		msg := fmt.Sprintf("Unable to connect get RPs %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect get RPs %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -304,7 +300,7 @@ func (h *Service) NewRetentionPolicy(w http.ResponseWriter, r *http.Request) {
 
 	dbsvc := h.Databases
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -354,7 +350,7 @@ func (h *Service) UpdateRetentionPolicy(w http.ResponseWriter, r *http.Request) 
 
 	dbsvc := h.Databases
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}
@@ -408,7 +404,7 @@ func (s *Service) DropRetentionPolicy(w http.ResponseWriter, r *http.Request) {
 
 	dbsvc := s.Databases
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, s.Logger)
 		return
 	}
@@ -449,7 +445,7 @@ func (h *Service) Measurements(w http.ResponseWriter, r *http.Request) {
 
 	dbsvc := h.Databases
 	if err = dbsvc.Connect(ctx, &src); err != nil {
-		msg := fmt.Sprintf("Unable to connect to source %d: %v", srcID, err)
+		msg := fmt.Sprintf("unable to connect to source %d: %v", srcID, err)
 		Error(w, http.StatusBadRequest, msg, h.Logger)
 		return
 	}

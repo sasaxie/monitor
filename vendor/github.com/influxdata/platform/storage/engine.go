@@ -5,11 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/influxdata/influxql"
+	"github.com/influxdata/platform/logger"
 	"github.com/influxdata/platform/models"
 	"github.com/influxdata/platform/tsdb"
 	"github.com/influxdata/platform/tsdb/tsi1"
@@ -36,7 +36,10 @@ type Engine struct {
 	index             *tsi1.Index
 	sfile             *tsdb.SeriesFile
 	engine            *tsm1.Engine
+	wal               *tsm1.WAL
 	retentionEnforcer *retentionEnforcer
+
+	defaultMetricLabels prometheus.Labels
 
 	// Tracks all goroutines started by the Engine.
 	wg sync.WaitGroup
@@ -49,7 +52,7 @@ type Option func(*Engine)
 
 // WithTSMFilenameFormatter sets a function on the underlying tsm1.Engine to specify
 // how TSM files are named.
-var WithTSMFilenameFormatter = func(fn tsm1.FormatFileNameFunc) Option {
+func WithTSMFilenameFormatter(fn tsm1.FormatFileNameFunc) Option {
 	return func(e *Engine) {
 		e.engine.WithFormatFileNameFunc(fn)
 	}
@@ -57,37 +60,42 @@ var WithTSMFilenameFormatter = func(fn tsm1.FormatFileNameFunc) Option {
 
 // WithEngineID sets an engine id, which can be useful for logging when multiple
 // engines are in use.
-var WithEngineID = func(id int) Option {
+func WithEngineID(id int) Option {
 	return func(e *Engine) {
 		e.engineID = &id
+		e.defaultMetricLabels["engine_id"] = fmt.Sprint(*e.engineID)
 	}
 }
 
 // WithNodeID sets a node id on the engine, which can be useful for logging
 // when a system has engines running on multiple nodes.
-var WithNodeID = func(id int) Option {
+func WithNodeID(id int) Option {
 	return func(e *Engine) {
 		e.nodeID = &id
+		e.defaultMetricLabels["node_id"] = fmt.Sprint(*e.nodeID)
 	}
 }
 
 // WithRetentionEnforcer initialises a retention enforcer on the engine.
 // WithRetentionEnforcer must be called after other options to ensure that all
 // metrics are labelled correctly.
-var WithRetentionEnforcer = func(finder BucketFinder) Option {
+func WithRetentionEnforcer(finder BucketFinder) Option {
 	return func(e *Engine) {
 		e.retentionEnforcer = newRetentionEnforcer(e, finder)
+	}
+}
 
-		if e.engineID != nil {
-			e.retentionEnforcer.defaultMetricLabels["engine_id"] = fmt.Sprint(*e.engineID)
-		}
+// WithFileStoreObserver makes the engine have the provided file store observer.
+func WithFileStoreObserver(obs tsm1.FileStoreObserver) Option {
+	return func(e *Engine) {
+		e.engine.WithFileStoreObserver(obs)
+	}
+}
 
-		if e.nodeID != nil {
-			e.retentionEnforcer.defaultMetricLabels["node_id"] = fmt.Sprint(*e.nodeID)
-		}
-
-		// As new labels may have been set, set the new metrics on the enforcer.
-		e.retentionEnforcer.retentionMetrics = newRetentionMetrics(e.retentionEnforcer.defaultMetricLabels)
+// WithCompactionPlanner makes the engine have the provided compaction planner.
+func WithCompactionPlanner(planner tsm1.CompactionPlanner) Option {
+	return func(e *Engine) {
+		e.engine.WithCompactionPlanner(planner)
 	}
 }
 
@@ -95,29 +103,42 @@ var WithRetentionEnforcer = func(finder BucketFinder) Option {
 // TSM engine.
 func NewEngine(path string, c Config, options ...Option) *Engine {
 	e := &Engine{
-		config: c,
-		path:   path,
-		sfile:  tsdb.NewSeriesFile(filepath.Join(path, tsdb.SeriesFileDirectory)),
-		logger: zap.NewNop(),
+		config:              c,
+		path:                path,
+		defaultMetricLabels: prometheus.Labels{},
+		logger:              zap.NewNop(),
 	}
 
+	// Initialize series file.
+	e.sfile = tsdb.NewSeriesFile(c.GetSeriesFilePath(path))
+
 	// Initialise index.
-	index := tsi1.NewIndex(e.sfile, "remove me", c.Index,
-		tsi1.WithPath(filepath.Join(path, tsi1.DefaultIndexDirectoryName)),
-	)
-	e.index = index
+	e.index = tsi1.NewIndex(e.sfile, c.Index,
+		tsi1.WithPath(c.GetIndexPath(path)))
+
+	// Initialize WAL
+	var wal tsm1.Log = new(tsm1.NopWAL)
+	if c.WAL.Enabled {
+		e.wal = tsm1.NewWAL(c.GetWALPath(path))
+		e.wal.WithFsyncDelay(time.Duration(c.WAL.FsyncDelay))
+		e.wal.EnableTraceLogging(c.TraceLoggingEnabled)
+		wal = e.wal
+	}
 
 	// Initialise Engine
-	// TODO(edd): should just be able to use the config values for data/wal.
-	engine := tsm1.NewEngine(0, tsdb.Index(e.index), filepath.Join(path, "data"), filepath.Join(path, "wal"), e.sfile, c.EngineOptions)
-
-	// TODO(edd): Once the tsdb.Engine abstraction is gone, this won't be needed.
-	e.engine = engine.(*tsm1.Engine)
+	e.engine = tsm1.NewEngine(c.GetEnginePath(path), e.index, c.Engine,
+		tsm1.WithWAL(wal),
+		tsm1.WithTraceLogging(c.TraceLoggingEnabled))
 
 	// Apply options.
 	for _, option := range options {
 		option(e)
 	}
+	// Set default metrics labels.
+	e.engine.SetDefaultMetricLabels(e.defaultMetricLabels)
+	e.sfile.SetDefaultMetricLabels(e.defaultMetricLabels)
+	e.index.SetDefaultMetricLabels(e.defaultMetricLabels)
+
 	return e
 }
 
@@ -129,7 +150,7 @@ func (e *Engine) WithLogger(log *zap.Logger) {
 	}
 
 	if e.engineID != nil {
-		fields = append(fields, zap.Int("engine_id", *e.nodeID))
+		fields = append(fields, zap.Int("engine_id", *e.engineID))
 	}
 	fields = append(fields, zap.String("service", "storage-engine"))
 
@@ -144,9 +165,9 @@ func (e *Engine) WithLogger(log *zap.Logger) {
 // the engine and its components.
 func (e *Engine) PrometheusCollectors() []prometheus.Collector {
 	var metrics []prometheus.Collector
-	// TODO(edd): Get prom metrics for TSM.
-	// TODO(edd): Get prom metrics for index.
-	// TODO(edd): Get prom metrics for series file.
+	metrics = append(metrics, tsdb.PrometheusCollectors()...)
+	metrics = append(metrics, tsi1.PrometheusCollectors()...)
+	metrics = append(metrics, tsm1.PrometheusCollectors()...)
 	metrics = append(metrics, e.retentionEnforcer.PrometheusCollectors()...)
 	return metrics
 }
@@ -175,6 +196,7 @@ func (e *Engine) Open() error {
 	e.engine.SetCompactionsEnabled(true) // TODO(edd):is this needed?
 
 	e.closing = make(chan struct{})
+
 	// TODO(edd) background tasks will be run in priority order via a scheduler.
 	// For now we will just run on an interval as we only have the retention
 	// policy enforcer.
@@ -189,19 +211,23 @@ func (e *Engine) Open() error {
 // ability to reschedule the retention enforcement if there are not enough
 // resources available.
 func (e *Engine) runRetentionEnforcer() {
-	if e.config.RetentionInterval == 0 {
+	interval := time.Duration(e.config.RetentionInterval)
+
+	if interval == 0 {
 		e.logger.Info("Retention enforcer disabled")
 		return // Enforcer disabled.
-	}
-
-	if e.config.RetentionInterval < 0 {
-		e.logger.Error("Negative retention interval", zap.Int64("interval", e.config.RetentionInterval))
+	} else if interval < 0 {
+		e.logger.Error("Negative retention interval", logger.DurationLiteral("check_interval", interval))
 		return
 	}
 
-	interval := time.Duration(e.config.RetentionInterval) * time.Second
-	logger := e.logger.With(zap.String("component", "retention_enforcer"), zap.Duration("check_interval", interval))
-	logger.Info("Starting")
+	if e.retentionEnforcer != nil {
+		// Set default metric labels on retention enforcer.
+		e.retentionEnforcer.metrics = newRetentionMetrics(e.defaultMetricLabels)
+	}
+
+	l := e.logger.With(zap.String("component", "retention_enforcer"), logger.DurationLiteral("check_interval", interval))
+	l.Info("Starting")
 
 	ticker := time.NewTicker(interval)
 	e.wg.Add(1)
@@ -212,7 +238,7 @@ func (e *Engine) runRetentionEnforcer() {
 			// modified if this goroutine is active.
 			select {
 			case <-e.closing:
-				logger.Info("Stopping")
+				l.Info("Stopping")
 				return
 			case <-ticker.C:
 				e.retentionEnforcer.run()
@@ -256,8 +282,7 @@ func (e *Engine) CreateSeriesCursor(ctx context.Context, req SeriesCursorRequest
 	if e.closing == nil {
 		return nil, ErrEngineClosed
 	}
-	// TODO(edd): remove IndexSet
-	return newSeriesCursor(req, tsdb.IndexSet{Indexes: []tsdb.Index{e.index}, SeriesFile: e.sfile}, cond)
+	return newSeriesCursor(req, e.index, cond)
 }
 
 func (e *Engine) CreateCursorIterator(ctx context.Context) (tsdb.CursorIterator, error) {
@@ -288,6 +313,7 @@ func (e *Engine) WritePoints(points []models.Point) error {
 			}
 			collection.Dropped++
 			collection.DroppedKeys = append(collection.DroppedKeys, iter.Key())
+			continue
 		}
 
 		// Filter out any tags with key equal to "time": they are invalid.
@@ -373,4 +399,14 @@ func (e *Engine) ApplyFnToSeriesIDSet(fn func(*tsdb.SeriesIDSet)) {
 		return
 	}
 	fn(e.index.SeriesIDSet())
+}
+
+// MeasurementCardinalityStats returns cardinality stats for all measurements.
+func (e *Engine) MeasurementCardinalityStats() tsi1.MeasurementCardinalityStats {
+	return e.index.MeasurementCardinalityStats()
+}
+
+// MeasurementStats returns the current measurement stats for the engine.
+func (e *Engine) MeasurementStats() (tsm1.MeasurementStats, error) {
+	return e.engine.MeasurementStats()
 }

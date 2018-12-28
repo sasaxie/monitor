@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/csv"
@@ -16,6 +18,7 @@ import (
 	"github.com/influxdata/platform"
 	"github.com/influxdata/platform/mock"
 	"github.com/influxdata/platform/query"
+	_ "github.com/influxdata/platform/query/builtin"
 )
 
 func TestQueryRequest_WithDefaults(t *testing.T) {
@@ -52,7 +55,7 @@ func TestQueryRequest_WithDefaults(t *testing.T) {
 				Query:   tt.fields.Query,
 				Type:    tt.fields.Type,
 				Dialect: tt.fields.Dialect,
-				org:     tt.fields.org,
+				Org:     tt.fields.org,
 			}
 			if got := r.WithDefaults(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("QueryRequest.WithDefaults() = %v, want %v", got, tt.want)
@@ -167,7 +170,7 @@ func TestQueryRequest_Validate(t *testing.T) {
 				Query:   tt.fields.Query,
 				Type:    tt.fields.Type,
 				Dialect: tt.fields.Dialect,
-				org:     tt.fields.org,
+				Org:     tt.fields.org,
 			}
 			if err := r.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("QueryRequest.Validate() error = %v, wantErr %v", err, tt.wantErr)
@@ -177,7 +180,6 @@ func TestQueryRequest_Validate(t *testing.T) {
 }
 
 func Test_toSpec(t *testing.T) {
-	flux.FinalizeBuiltIns()
 	type args struct {
 		p   *ast.Program
 		now func() time.Time
@@ -266,7 +268,7 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 						Query: "howdy",
 					},
 				},
-				Dialect: csv.Dialect{
+				Dialect: &csv.Dialect{
 					ResultEncoderConfig: csv.ResultEncoderConfig{
 						NoHeader:  false,
 						Delimiter: ',',
@@ -294,7 +296,7 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 						},
 					},
 				},
-				Dialect: csv.Dialect{
+				Dialect: &csv.Dialect{
 					ResultEncoderConfig: csv.ResultEncoderConfig{
 						NoHeader:  false,
 						Delimiter: ',',
@@ -323,7 +325,7 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 						},
 					},
 				},
-				Dialect: csv.Dialect{
+				Dialect: &csv.Dialect{
 					ResultEncoderConfig: csv.ResultEncoderConfig{
 						NoHeader:  false,
 						Delimiter: ',',
@@ -340,7 +342,7 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 				Query:   tt.fields.Query,
 				Type:    tt.fields.Type,
 				Dialect: tt.fields.Dialect,
-				org:     tt.fields.org,
+				Org:     tt.fields.org,
 			}
 			got, err := r.proxyRequest(tt.now)
 			if (err != nil) != tt.wantErr {
@@ -348,7 +350,7 @@ func TestQueryRequest_proxyRequest(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("QueryRequest.ProxyRequest() = %v, want %v", got, tt.want)
+				t.Errorf("QueryRequest.ProxyRequest() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -386,7 +388,7 @@ func Test_decodeQueryRequest(t *testing.T) {
 					DateTimeFormat: "RFC3339",
 					Header:         func(x bool) *bool { return &x }(true),
 				},
-				org: &platform.Organization{
+				Org: &platform.Organization{
 					ID: func() platform.ID { s, _ := platform.IDFromString("deadbeefdeadbeef"); return *s }(),
 				},
 			},
@@ -452,7 +454,7 @@ func Test_decodeProxyQueryRequest(t *testing.T) {
 						Query: "from()",
 					},
 				},
-				Dialect: csv.Dialect{
+				Dialect: &csv.Dialect{
 					ResultEncoderConfig: csv.ResultEncoderConfig{
 						NoHeader:  false,
 						Delimiter: ',',
@@ -461,6 +463,11 @@ func Test_decodeProxyQueryRequest(t *testing.T) {
 			},
 		},
 	}
+	var cmpOptions = cmp.Options{
+		cmpopts.IgnoreUnexported(query.ProxyRequest{}),
+		cmpopts.IgnoreUnexported(query.Request{}),
+		cmpopts.EquateEmpty(),
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decodeProxyQueryRequest(tt.args.ctx, tt.args.r, tt.args.auth, tt.args.svc)
@@ -468,8 +475,8 @@ func Test_decodeProxyQueryRequest(t *testing.T) {
 				t.Errorf("decodeProxyQueryRequest() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("decodeProxyQueryRequest() = %v, want %v", got, tt.want)
+			if diff := cmp.Diff(got, tt.want, cmpOptions...); diff != "" {
+				t.Errorf("decodeProxyQueryRequest() = got/want %v", diff)
 			}
 		})
 	}

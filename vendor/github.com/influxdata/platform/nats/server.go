@@ -9,7 +9,7 @@ import (
 
 const ServerName = "platform"
 
-var ErrNoNatsConnection = errors.New("Nats connection has not been established. Call Open() first.")
+var ErrNoNatsConnection = errors.New("nats connection has not been established. Call Open() first")
 
 // Server wraps a connection to a NATS streaming server
 type Server struct {
@@ -31,6 +31,11 @@ func (s *Server) Open() error {
 	s.Server = server
 
 	return nil
+}
+
+// Close stops the embedded NATS server.
+func (s *Server) Close() {
+	s.Server.Shutdown()
 }
 
 // Config is the configuration for the NATS streaming server

@@ -6,8 +6,17 @@ import (
 	"fmt"
 )
 
-// ErrViewNotFound is the error for a missing View.
-const ErrViewNotFound = ChronografError("View not found")
+// ErrViewNotFound is the error msg for a missing View.
+const ErrViewNotFound = "view not found"
+
+// ops for view.
+const (
+	OpFindViewByID = "FindViewByID"
+	OpFindViews    = "FindViews"
+	OpCreateView   = "CreateView"
+	OpUpdateView   = "UpdateView"
+	OpDeleteView   = "DeleteView"
+)
 
 // ViewService represents a service for managing View data.
 type ViewService interface {
@@ -36,10 +45,13 @@ type ViewUpdate struct {
 }
 
 // Valid validates the update struct. It expects minimal values to be set.
-func (u ViewUpdate) Valid() error {
+func (u ViewUpdate) Valid() *Error {
 	_, ok := u.Properties.(EmptyViewProperties)
 	if u.Name == nil && ok {
-		return fmt.Errorf("expected at least one attribute to be updated")
+		return &Error{
+			Code: EInvalid,
+			Msg:  "expected at least one attribute to be updated",
+		}
 	}
 
 	return nil
@@ -52,7 +64,8 @@ type ViewContentsUpdate struct {
 
 // ViewFilter represents a set of filter that restrict the returned results.
 type ViewFilter struct {
-	ID *ID
+	ID    *ID
+	Types []string
 }
 
 // View holds positional and visual information for a View.
@@ -70,12 +83,15 @@ type ViewContents struct {
 // ViewProperties is used to mark other structures as conforming to a View.
 type ViewProperties interface {
 	viewProperties()
+	GetType() string
 }
 
 // EmptyViewProperties is visualization that has no values
 type EmptyViewProperties struct{}
 
 func (v EmptyViewProperties) viewProperties() {}
+
+func (v EmptyViewProperties) GetType() string { return "" }
 
 // UnmarshalViewPropertiesJSON unmarshals JSON bytes into a ViewProperties.
 func UnmarshalViewPropertiesJSON(b []byte) (ViewProperties, error) {
@@ -105,12 +121,12 @@ func UnmarshalViewPropertiesJSON(b []byte) (ViewProperties, error) {
 	switch t.Shape {
 	case "chronograf-v2":
 		switch t.Type {
-		case "line":
-			var lv LineViewProperties
-			if err := json.Unmarshal(v.B, &lv); err != nil {
+		case "xy":
+			var xyv XYViewProperties
+			if err := json.Unmarshal(v.B, &xyv); err != nil {
 				return nil, err
 			}
-			vis = lv
+			vis = xyv
 		case "single-stat":
 			var ssv SingleStatViewProperties
 			if err := json.Unmarshal(v.B, &ssv); err != nil {
@@ -123,24 +139,18 @@ func UnmarshalViewPropertiesJSON(b []byte) (ViewProperties, error) {
 				return nil, err
 			}
 			vis = gv
-		case "step-plot":
-			var spv StepPlotViewProperties
-			if err := json.Unmarshal(v.B, &spv); err != nil {
-				return nil, err
-			}
-			vis = spv
-		case "stacked":
-			var sv StackedViewProperties
-			if err := json.Unmarshal(v.B, &sv); err != nil {
-				return nil, err
-			}
-			vis = sv
 		case "table":
 			var tv TableViewProperties
 			if err := json.Unmarshal(v.B, &tv); err != nil {
 				return nil, err
 			}
 			vis = tv
+		case "markdown":
+			var mv MarkdownViewProperties
+			if err := json.Unmarshal(v.B, &mv); err != nil {
+				return nil, err
+			}
+			vis = mv
 		case "log-viewer": // happens in log viewer stays in log viewer.
 			var lv LogViewProperties
 			if err := json.Unmarshal(v.B, &lv); err != nil {
@@ -195,13 +205,13 @@ func MarshalViewPropertiesJSON(v ViewProperties) ([]byte, error) {
 			Shape:               "chronograf-v2",
 			GaugeViewProperties: vis,
 		}
-	case LineViewProperties:
+	case XYViewProperties:
 		s = struct {
 			Shape string `json:"shape"`
-			LineViewProperties
+			XYViewProperties
 		}{
-			Shape:              "chronograf-v2",
-			LineViewProperties: vis,
+			Shape:            "chronograf-v2",
+			XYViewProperties: vis,
 		}
 	case LinePlusSingleStatProperties:
 		s = struct {
@@ -211,21 +221,13 @@ func MarshalViewPropertiesJSON(v ViewProperties) ([]byte, error) {
 			Shape:                        "chronograf-v2",
 			LinePlusSingleStatProperties: vis,
 		}
-	case StepPlotViewProperties:
+	case MarkdownViewProperties:
 		s = struct {
 			Shape string `json:"shape"`
-			StepPlotViewProperties
+			MarkdownViewProperties
 		}{
 			Shape:                  "chronograf-v2",
-			StepPlotViewProperties: vis,
-		}
-	case StackedViewProperties:
-		s = struct {
-			Shape string `json:"shape"`
-			StackedViewProperties
-		}{
-			Shape:                 "chronograf-v2",
-			StackedViewProperties: vis,
+			MarkdownViewProperties: vis,
 		}
 	case LogViewProperties:
 		s = struct {
@@ -309,72 +311,70 @@ func (u ViewUpdate) MarshalJSON() ([]byte, error) {
 
 // LinePlusSingleStatProperties represents options for line plus single stat view in Chronograf
 type LinePlusSingleStatProperties struct {
-	Queries       []DashboardQuery `json:"queries"`
-	Axes          map[string]Axis  `json:"axes"`
-	Type          string           `json:"type"`
-	Legend        Legend           `json:"legend"`
-	ViewColors    []ViewColor      `json:"colors"`
-	Prefix        string           `json:"prefix"`
-	Suffix        string           `json:"suffix"`
-	DecimalPlaces DecimalPlaces    `json:"decimalPlaces"`
+	Queries           []DashboardQuery `json:"queries"`
+	Axes              map[string]Axis  `json:"axes"`
+	Type              string           `json:"type"`
+	Legend            Legend           `json:"legend"`
+	ViewColors        []ViewColor      `json:"colors"`
+	Prefix            string           `json:"prefix"`
+	Suffix            string           `json:"suffix"`
+	DecimalPlaces     DecimalPlaces    `json:"decimalPlaces"`
+	Note              string           `json:"note"`
+	ShowNoteWhenEmpty bool             `json:"showNoteWhenEmpty"`
 }
 
-// LineViewProperties represents options for line view in Chronograf
-type LineViewProperties struct {
-	Queries    []DashboardQuery `json:"queries"`
-	Axes       map[string]Axis  `json:"axes"`
-	Type       string           `json:"type"`
-	Legend     Legend           `json:"legend"`
-	ViewColors []ViewColor      `json:"colors"`
-}
-
-// StepPlotViewProperties represents options for step plot view in Chronograf
-type StepPlotViewProperties struct {
-	Queries    []DashboardQuery `json:"queries"`
-	Axes       map[string]Axis  `json:"axes"`
-	Type       string           `json:"type"`
-	Legend     Legend           `json:"legend"`
-	ViewColors []ViewColor      `json:"colors"`
-}
-
-// StackedViewProperties represents options for stacked view in Chronograf
-type StackedViewProperties struct {
-	Queries    []DashboardQuery `json:"queries"`
-	Axes       map[string]Axis  `json:"axes"`
-	Type       string           `json:"type"`
-	Legend     Legend           `json:"legend"`
-	ViewColors []ViewColor      `json:"colors"`
+// XYViewProperties represents options for line, bar, step, or stacked view in Chronograf
+type XYViewProperties struct {
+	Queries           []DashboardQuery `json:"queries"`
+	Axes              map[string]Axis  `json:"axes"`
+	Type              string           `json:"type"`
+	Legend            Legend           `json:"legend"`
+	Geom              string           `json:"geom"` // Either "line", "step", "stacked", or "bar"
+	ViewColors        []ViewColor      `json:"colors"`
+	Note              string           `json:"note"`
+	ShowNoteWhenEmpty bool             `json:"showNoteWhenEmpty"`
 }
 
 // SingleStatViewProperties represents options for single stat view in Chronograf
 type SingleStatViewProperties struct {
-	Type          string           `json:"type"`
-	Queries       []DashboardQuery `json:"queries"`
-	Prefix        string           `json:"prefix"`
-	Suffix        string           `json:"suffix"`
-	ViewColors    []ViewColor      `json:"colors"`
-	DecimalPlaces DecimalPlaces    `json:"decimalPlaces"`
+	Type              string           `json:"type"`
+	Queries           []DashboardQuery `json:"queries"`
+	Prefix            string           `json:"prefix"`
+	Suffix            string           `json:"suffix"`
+	ViewColors        []ViewColor      `json:"colors"`
+	DecimalPlaces     DecimalPlaces    `json:"decimalPlaces"`
+	Note              string           `json:"note"`
+	ShowNoteWhenEmpty bool             `json:"showNoteWhenEmpty"`
 }
 
 // GaugeViewProperties represents options for gauge view in Chronograf
 type GaugeViewProperties struct {
-	Type          string           `json:"type"`
-	Queries       []DashboardQuery `json:"queries"`
-	Prefix        string           `json:"prefix"`
-	Suffix        string           `json:"suffix"`
-	ViewColors    []ViewColor      `json:"colors"`
-	DecimalPlaces DecimalPlaces    `json:"decimalPlaces"`
+	Type              string           `json:"type"`
+	Queries           []DashboardQuery `json:"queries"`
+	Prefix            string           `json:"prefix"`
+	Suffix            string           `json:"suffix"`
+	ViewColors        []ViewColor      `json:"colors"`
+	DecimalPlaces     DecimalPlaces    `json:"decimalPlaces"`
+	Note              string           `json:"note"`
+	ShowNoteWhenEmpty bool             `json:"showNoteWhenEmpty"`
 }
 
 // TableViewProperties represents options for table view in Chronograf
 type TableViewProperties struct {
-	Type          string           `json:"type"`
-	Queries       []DashboardQuery `json:"queries"`
-	ViewColors    []ViewColor      `json:"colors"`
-	TableOptions  TableOptions     `json:"tableOptions"`
-	FieldOptions  []RenamableField `json:"fieldOptions"`
-	TimeFormat    string           `json:"timeFormat"`
-	DecimalPlaces DecimalPlaces    `json:"decimalPlaces"`
+	Type              string           `json:"type"`
+	Queries           []DashboardQuery `json:"queries"`
+	ViewColors        []ViewColor      `json:"colors"`
+	TableOptions      TableOptions     `json:"tableOptions"`
+	FieldOptions      []RenamableField `json:"fieldOptions"`
+	TimeFormat        string           `json:"timeFormat"`
+	DecimalPlaces     DecimalPlaces    `json:"decimalPlaces"`
+	Note              string           `json:"note"`
+	ShowNoteWhenEmpty bool             `json:"showNoteWhenEmpty"`
+}
+
+type MarkdownViewProperties struct {
+	Type string `json:"type"`
+	Note string `json:"note"`
 }
 
 // LogViewProperties represents options for log viewer in Chronograf.
@@ -397,61 +397,41 @@ type LogColumnSetting struct {
 	Name  string `json:"name,omitempty"`
 }
 
-func (LineViewProperties) viewProperties()           {}
+func (XYViewProperties) viewProperties()             {}
 func (LinePlusSingleStatProperties) viewProperties() {}
-func (StepPlotViewProperties) viewProperties()       {}
 func (SingleStatViewProperties) viewProperties()     {}
-func (StackedViewProperties) viewProperties()        {}
 func (GaugeViewProperties) viewProperties()          {}
 func (TableViewProperties) viewProperties()          {}
+func (MarkdownViewProperties) viewProperties()       {}
 func (LogViewProperties) viewProperties()            {}
+
+func (v XYViewProperties) GetType() string             { return v.Type }
+func (v LinePlusSingleStatProperties) GetType() string { return v.Type }
+func (v SingleStatViewProperties) GetType() string     { return v.Type }
+func (v GaugeViewProperties) GetType() string          { return v.Type }
+func (v TableViewProperties) GetType() string          { return v.Type }
+func (v MarkdownViewProperties) GetType() string       { return v.Type }
+func (v LogViewProperties) GetType() string            { return v.Type }
 
 /////////////////////////////
 // Old Chronograf Types
 /////////////////////////////
 
-// DashboardQuery includes state for the query builder.  This is a transition
-// struct while we move to the full InfluxQL AST
-// TODO(desa): this should be platform.ID
+// DashboardQuery represents a query used in a dashboard cell
 type DashboardQuery struct {
-	Label  string `json:"label,omitempty"` // Label is the Y-Axis label for the data
-	Range  *Range `json:"range,omitempty"` // Range is the default Y-Axis range for the data
-	Text   string `json:"text"`
-	Type   string `json:"type"`
-	Source string `json:"source"` // Source is the optional URI to the data source for this queryConfig
+	Text          string        `json:"text"`
+	Type          string        `json:"type"`
+	SourceID      string        `json:"sourceID"`
+	EditMode      string        `json:"editMode"` // Either "builder" or "advanced"
+	Name          string        `json:"name"`     // Term or phrase that refers to the query
+	BuilderConfig BuilderConfig `json:"builderConfig"`
 }
 
-// Range represents an upper and lower bound for data
-type Range struct {
-	Upper int64 `json:"upper"` // Upper is the upper bound
-	Lower int64 `json:"lower"` // Lower is the lower bound
-}
-
-// TimeShift represents a shift to apply to an influxql query's time range
-type TimeShift struct {
-	Label    string `json:"label"`    // Label user facing description
-	Unit     string `json:"unit"`     // Unit influxql time unit representation i.e. ms, s, m, h, d
-	Quantity string `json:"quantity"` // Quantity number of units
-}
-
-// Field represent influxql fields and functions from the UI
-type Field struct {
-	Value interface{} `json:"value"`
-	Type  string      `json:"type"`
-	Alias string      `json:"alias"`
-	Args  []Field     `json:"args,omitempty"`
-}
-
-// GroupBy represents influxql group by tags from the UI
-type GroupBy struct {
-	Time string   `json:"time"`
-	Tags []string `json:"tags"`
-}
-
-// DurationRange represents the lower and upper durations of the query config
-type DurationRange struct {
-	Upper string `json:"upper"`
-	Lower string `json:"lower"`
+type BuilderConfig struct {
+	Buckets      []string `json:"buckets"`
+	Measurements []string `json:"measurements"`
+	Fields       []string `json:"fields"`
+	Functions    []string `json:"functions"`
 }
 
 // Axis represents the visible extents of a visualization
@@ -467,11 +447,11 @@ type Axis struct {
 
 // ViewColor represents the encoding of data into visualizations
 type ViewColor struct {
-	ID    string `json:"id"`    // ID is the unique id of the View color
-	Type  string `json:"type"`  // Type is how the color is used. Accepted (min,max,threshold)
-	Hex   string `json:"hex"`   // Hex is the hex number of the color
-	Name  string `json:"name"`  // Name is the user-facing name of the hex color
-	Value string `json:"value"` // Value is the data value mapped to this color
+	ID    string  `json:"id"`    // ID is the unique id of the View color
+	Type  string  `json:"type"`  // Type is how the color is used. Accepted (min,max,threshold)
+	Hex   string  `json:"hex"`   // Hex is the hex number of the color
+	Name  string  `json:"name"`  // Name is the user-facing name of the hex color
+	Value float64 `json:"value"` // Value is the data value mapped to this color
 }
 
 // Legend represents the encoding of data into a legend

@@ -1,6 +1,14 @@
 package platform
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	// ErrAuthorizerNotSupported notes that the provided authorizer is not supported for the action you are trying to perform.
+	ErrAuthorizerNotSupported = errors.New("your authorizer is not supported, please use *platform.Authorization as authorizer")
+)
 
 // Authorizer will authorize a permission.
 type Authorizer interface {
@@ -9,6 +17,9 @@ type Authorizer interface {
 
 	// ID returns an identifier used for auditing.
 	Identifier() ID
+
+	// GetUserID returns the user id.
+	GetUserID() ID
 
 	// Kind metadata for auditing.
 	Kind() string

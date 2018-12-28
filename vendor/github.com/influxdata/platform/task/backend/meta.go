@@ -6,10 +6,39 @@ import (
 	"time"
 
 	"github.com/influxdata/platform"
+	"github.com/influxdata/platform/task/options"
 	cron "gopkg.in/robfig/cron.v2"
 )
 
 // This file contains helper methods for the StoreTaskMeta type defined in protobuf.
+
+// NewStoreTaskMeta returns a new StoreTaskMeta based on the given request and parsed options.
+func NewStoreTaskMeta(req CreateTaskRequest, o options.Options) StoreTaskMeta {
+	stm := StoreTaskMeta{
+		MaxConcurrency:  int32(o.Concurrency),
+		Status:          string(req.Status),
+		LatestCompleted: req.ScheduleAfter,
+		EffectiveCron:   o.EffectiveCronString(),
+		Offset:          int32(o.Offset / time.Second),
+	}
+
+	if stm.Status == "" {
+		stm.Status = string(DefaultTaskStatus)
+	}
+
+	if o.Every != 0 {
+		t := time.Unix(stm.LatestCompleted, 0).Truncate(o.Every).Unix()
+		if t == stm.LatestCompleted {
+			// For example, every 1m truncates to exactly on the minute.
+			// But the input request is schedule after, not "on or after".
+			// Add one interval.
+			t += int64(o.Every / time.Second)
+		}
+		stm.LatestCompleted = t
+	}
+
+	return stm
+}
 
 // FinishRun removes the run matching runID from m's CurrentlyRunning slice,
 // and if that run's Now value is greater than m's LatestCompleted value,
@@ -76,7 +105,7 @@ func (stm *StoreTaskMeta) CreateNextRun(now int64, makeID func() (platform.ID, e
 
 	nextScheduled := sch.Next(time.Unix(latest, 0))
 	nextScheduledUnix := nextScheduled.Unix()
-	if dueAt := nextScheduledUnix + int64(stm.Delay); dueAt > now {
+	if dueAt := nextScheduledUnix + int64(stm.Offset); dueAt > now {
 		// Can't schedule yet.
 		if len(stm.ManualRuns) > 0 {
 			return stm.createNextRunFromQueue(now, dueAt, sch, makeID)
@@ -100,7 +129,7 @@ func (stm *StoreTaskMeta) CreateNextRun(now int64, makeID func() (platform.ID, e
 			RunID: id,
 			Now:   nextScheduledUnix,
 		},
-		NextDue:  sch.Next(nextScheduled).Unix() + int64(stm.Delay),
+		NextDue:  sch.Next(nextScheduled).Unix() + int64(stm.Offset),
 		HasQueue: len(stm.ManualRuns) > 0,
 	}, nil
 }
@@ -127,10 +156,16 @@ func (stm *StoreTaskMeta) createNextRunFromQueue(now, nextDue int64, sch cron.Sc
 	runNow := sch.Next(time.Unix(latest, 0)).Unix()
 
 	// Already validated that we have room to create another run, in CreateNextRun.
-	id, err := makeID()
-	if err != nil {
-		return RunCreation{}, err
+	id := platform.ID(q.RunID)
+
+	if !id.Valid() {
+		var err error
+		id, err = makeID()
+		if err != nil {
+			return RunCreation{}, err
+		}
 	}
+
 	stm.CurrentlyRunning = append(stm.CurrentlyRunning, &StoreTaskMetaRun{
 		Now:   runNow,
 		Try:   1,
@@ -174,7 +209,7 @@ func (stm *StoreTaskMeta) NextDueRun() (int64, error) {
 		}
 	}
 
-	return sch.Next(time.Unix(latest, 0)).Unix() + int64(stm.Delay), nil
+	return sch.Next(time.Unix(latest, 0)).Unix() + int64(stm.Offset), nil
 }
 
 // ManuallyRunTimeRange requests a manual run covering the approximate range specified by the Unix timestamps start and end.
@@ -182,8 +217,11 @@ func (stm *StoreTaskMeta) NextDueRun() (int64, error) {
 // if start does not land on the task's schedule; and as late as, but not necessarily equal to, end.
 // requestedAt is the Unix timestamp indicating when this run range was requested.
 //
+// There is no schedule validation in this method,
+// so ManuallyRunTimeRange can be used to create a run at a specific time that isn't aligned with the task's schedule.
+//
 // If adding the range would exceed the queue size, ManuallyRunTimeRange returns ErrManualQueueFull.
-func (stm *StoreTaskMeta) ManuallyRunTimeRange(start, end, requestedAt int64) error {
+func (stm *StoreTaskMeta) ManuallyRunTimeRange(start, end, requestedAt int64, makeID func() (platform.ID, error)) error {
 	// Arbitrarily chosen upper limit that seems unlikely to be reached except in pathological cases.
 	const maxQueueSize = 32
 	if len(stm.ManualRuns) >= maxQueueSize {
@@ -195,13 +233,66 @@ func (stm *StoreTaskMeta) ManuallyRunTimeRange(start, end, requestedAt int64) er
 		// Don't roll over in pathological case of starting at minimum int64.
 		lc = start
 	}
+	for _, mr := range stm.ManualRuns {
+		if mr.Start == start && mr.End == end {
+			return RequestStillQueuedError{Start: start, End: end}
+		}
+	}
 	run := &StoreTaskMetaManualRun{
 		Start:           start,
 		End:             end,
 		LatestCompleted: lc,
 		RequestedAt:     requestedAt,
 	}
+	if start == end && makeID != nil {
+		id, err := makeID()
+		if err != nil {
+			return err
+		}
+		run.RunID = uint64(id)
+	}
 	stm.ManualRuns = append(stm.ManualRuns, run)
-
 	return nil
+}
+
+// Equal returns true if all of stm's fields compare equal to other.
+// Note that this method operates on values, unlike the other methods which operate on pointers.
+//
+// Equal is probably not very useful outside of test.
+func (stm StoreTaskMeta) Equal(other StoreTaskMeta) bool {
+	if stm.MaxConcurrency != other.MaxConcurrency ||
+		stm.LatestCompleted != other.LatestCompleted ||
+		stm.Status != other.Status ||
+		stm.EffectiveCron != other.EffectiveCron ||
+		stm.Offset != other.Offset ||
+		len(stm.CurrentlyRunning) != len(other.CurrentlyRunning) ||
+		len(stm.ManualRuns) != len(other.ManualRuns) {
+		return false
+	}
+
+	for i, o := range other.CurrentlyRunning {
+		s := stm.CurrentlyRunning[i]
+
+		if s.Now != o.Now ||
+			s.Try != o.Try ||
+			s.RunID != o.RunID ||
+			s.RangeStart != o.RangeStart ||
+			s.RangeEnd != o.RangeEnd ||
+			s.RequestedAt != o.RequestedAt {
+			return false
+		}
+	}
+
+	for i, o := range other.ManualRuns {
+		s := stm.ManualRuns[i]
+
+		if s.Start != o.Start ||
+			s.End != o.End ||
+			s.LatestCompleted != o.LatestCompleted ||
+			s.RequestedAt != o.RequestedAt {
+			return false
+		}
+	}
+
+	return true
 }

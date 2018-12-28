@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path"
 
@@ -20,19 +21,56 @@ type UserResourceMappingService struct {
 	BasePath           string
 }
 
+type resourceUserResponse struct {
+	Role platform.UserType `json:"role"`
+	*userResponse
+}
+
+func newResourceUserResponse(u *platform.User, userType platform.UserType) *resourceUserResponse {
+	return &resourceUserResponse{
+		Role:         userType,
+		userResponse: newUserResponse(u),
+	}
+}
+
+type resourceUsersResponse struct {
+	Links map[string]string       `json:"links"`
+	Users []*resourceUserResponse `json:"users"`
+}
+
+func newResourceUsersResponse(opts platform.FindOptions, f platform.UserResourceMappingFilter, users []*platform.User) *resourceUsersResponse {
+	rs := resourceUsersResponse{
+		Links: map[string]string{
+			"self": fmt.Sprintf("/api/v2/%ss/%s/%ss", f.ResourceType, f.ResourceID, f.UserType),
+		},
+		Users: make([]*resourceUserResponse, 0, len(users)),
+	}
+
+	for _, user := range users {
+		rs.Users = append(rs.Users, newResourceUserResponse(user, f.UserType))
+	}
+	return &rs
+}
+
 // newPostMemberHandler returns a handler func for a POST to /members or /owners endpoints
-func newPostMemberHandler(s platform.UserResourceMappingService, resourceType platform.ResourceType, userType platform.UserType) http.HandlerFunc {
+func newPostMemberHandler(s platform.UserResourceMappingService, userService platform.UserService, resourceType platform.ResourceType, userType platform.UserType) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		req, err := decodePostOrgMemberRequest(ctx, r)
+		req, err := decodePostMemberRequest(ctx, r)
+		if err != nil {
+			EncodeError(ctx, err, w)
+			return
+		}
+
+		user, err := userService.FindUserByID(ctx, req.MemberID)
 		if err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
 
 		mapping := &platform.UserResourceMapping{
-			ResourceID:   req.OrgID,
+			ResourceID:   req.ResourceID,
 			ResourceType: resourceType,
 			UserID:       req.MemberID,
 			UserType:     userType,
@@ -43,27 +81,27 @@ func newPostMemberHandler(s platform.UserResourceMappingService, resourceType pl
 			return
 		}
 
-		if err := encodeResponse(ctx, w, http.StatusCreated, mapping); err != nil {
+		if err := encodeResponse(ctx, w, http.StatusCreated, newResourceUserResponse(user, userType)); err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
 	}
 }
 
-type postOrgMemberRequest struct {
-	MemberID platform.ID
-	OrgID    platform.ID
+type postMemberRequest struct {
+	MemberID   platform.ID
+	ResourceID platform.ID
 }
 
-func decodePostOrgMemberRequest(ctx context.Context, r *http.Request) (*postOrgMemberRequest, error) {
+func decodePostMemberRequest(ctx context.Context, r *http.Request) (*postMemberRequest, error) {
 	params := httprouter.ParamsFromContext(ctx)
 	id := params.ByName("id")
 	if id == "" {
 		return nil, kerrors.InvalidDataf("url missing id")
 	}
 
-	var oid platform.ID
-	if err := oid.DecodeFromString(id); err != nil {
+	var rid platform.ID
+	if err := rid.DecodeFromString(id); err != nil {
 		return nil, err
 	}
 
@@ -76,38 +114,76 @@ func decodePostOrgMemberRequest(ctx context.Context, r *http.Request) (*postOrgM
 		return nil, kerrors.InvalidDataf("user id missing or invalid")
 	}
 
-	return &postOrgMemberRequest{
-		MemberID: u.ID,
-		OrgID:    oid,
+	return &postMemberRequest{
+		MemberID:   u.ID,
+		ResourceID: rid,
 	}, nil
 }
 
-// newPostMemberHandler returns a handler func for a GET to /members or /owners endpoints
-func newGetMembersHandler(s platform.UserResourceMappingService, userType platform.UserType) http.HandlerFunc {
+// newGetMembersHandler returns a handler func for a GET to /members or /owners endpoints
+func newGetMembersHandler(s platform.UserResourceMappingService, userService platform.UserService, resourceType platform.ResourceType, userType platform.UserType) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		req, err := decodeGetOrgRequest(ctx, r)
+		req, err := decodeGetMembersRequest(ctx, r)
 		if err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
 
 		filter := platform.UserResourceMappingFilter{
-			ResourceID: req.OrgID,
-			UserType:   platform.Member,
+			ResourceID:   req.ResourceID,
+			ResourceType: resourceType,
+			UserType:     userType,
 		}
+
+		opts := platform.FindOptions{}
 		mappings, _, err := s.FindUserResourceMappings(ctx, filter)
 		if err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
 
-		if err := encodeResponse(ctx, w, http.StatusOK, mappings); err != nil {
+		users := make([]*platform.User, 0, len(mappings))
+		for _, m := range mappings {
+			user, err := userService.FindUserByID(ctx, m.UserID)
+			if err != nil {
+				EncodeError(ctx, err, w)
+				return
+			}
+
+			users = append(users, user)
+		}
+
+		if err := encodeResponse(ctx, w, http.StatusOK, newResourceUsersResponse(opts, filter, users)); err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
 	}
+}
+
+type getMembersRequest struct {
+	MemberID   platform.ID
+	ResourceID platform.ID
+}
+
+func decodeGetMembersRequest(ctx context.Context, r *http.Request) (*getMembersRequest, error) {
+	params := httprouter.ParamsFromContext(ctx)
+	id := params.ByName("id")
+	if id == "" {
+		return nil, kerrors.InvalidDataf("url missing id")
+	}
+
+	var i platform.ID
+	if err := i.DecodeFromString(id); err != nil {
+		return nil, err
+	}
+
+	req := &getMembersRequest{
+		ResourceID: i,
+	}
+
+	return req, nil
 }
 
 // newDeleteMemberHandler returns a handler func for a DELETE to /members or /owners endpoints
@@ -115,13 +191,13 @@ func newDeleteMemberHandler(s platform.UserResourceMappingService, userType plat
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		req, err := decodeDeleteOrgMemberRequest(ctx, r)
+		req, err := decodeDeleteMemberRequest(ctx, r)
 		if err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
 
-		if err := s.DeleteUserResourceMapping(ctx, req.OrgID, req.MemberID); err != nil {
+		if err := s.DeleteUserResourceMapping(ctx, req.ResourceID, req.MemberID); err != nil {
 			EncodeError(ctx, err, w)
 			return
 		}
@@ -130,24 +206,24 @@ func newDeleteMemberHandler(s platform.UserResourceMappingService, userType plat
 	}
 }
 
-type deleteOrgMemberRequest struct {
-	MemberID platform.ID
-	OrgID    platform.ID
+type deleteMemberRequest struct {
+	MemberID   platform.ID
+	ResourceID platform.ID
 }
 
-func decodeDeleteOrgMemberRequest(ctx context.Context, r *http.Request) (*deleteOrgMemberRequest, error) {
+func decodeDeleteMemberRequest(ctx context.Context, r *http.Request) (*deleteMemberRequest, error) {
 	params := httprouter.ParamsFromContext(ctx)
 	id := params.ByName("id")
 	if id == "" {
 		return nil, kerrors.InvalidDataf("url missing resource id")
 	}
 
-	var oid platform.ID
-	if err := oid.DecodeFromString(id); err != nil {
+	var rid platform.ID
+	if err := rid.DecodeFromString(id); err != nil {
 		return nil, err
 	}
 
-	id = params.ByName("mid")
+	id = params.ByName("userID")
 	if id == "" {
 		return nil, kerrors.InvalidDataf("url missing member id")
 	}
@@ -157,9 +233,9 @@ func decodeDeleteOrgMemberRequest(ctx context.Context, r *http.Request) (*delete
 		return nil, err
 	}
 
-	return &deleteOrgMemberRequest{
-		MemberID: mid,
-		OrgID:    oid,
+	return &deleteMemberRequest{
+		MemberID:   mid,
+		ResourceID: rid,
 	}, nil
 }
 
@@ -205,16 +281,8 @@ func (s *UserResourceMappingService) FindUserResourceMappings(ctx context.Contex
 }
 
 func (s *UserResourceMappingService) CreateUserResourceMapping(ctx context.Context, m *platform.UserResourceMapping) error {
-	if !m.ResourceID.Valid() {
-		return kerrors.InvalidDataf("resource ID is required")
-	}
-
-	if !m.UserID.Valid() {
-		return kerrors.InvalidDataf("user ID is required")
-	}
-
-	if m.UserType == "" {
-		return kerrors.InvalidDataf("user type is required")
+	if err := m.Validate(); err != nil {
+		return err
 	}
 
 	url, err := newURL(s.Addr, resourceIDPath(s.BasePath, m.ResourceID))

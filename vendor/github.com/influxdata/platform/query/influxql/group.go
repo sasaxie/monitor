@@ -208,10 +208,14 @@ func (gr *groupInfo) createCursor(t *transpilerState) (cursor, error) {
 		}
 		id := t.op("filter", &transformations.FilterOpSpec{
 			Fn: &semantic.FunctionExpression{
-				Params: []*semantic.FunctionParam{{
-					Key: &semantic.Identifier{Name: "r"},
-				}},
-				Body: expr,
+				Block: &semantic.FunctionBlock{
+					Parameters: &semantic.FunctionParameters{
+						List: []*semantic.FunctionParameter{{
+							Key: &semantic.Identifier{Name: "r"},
+						}},
+					},
+					Body: expr,
+				},
 			},
 		}, cur.ID())
 		cur = &opCursor{id: id, cursor: cur}
@@ -242,11 +246,11 @@ func (gr *groupInfo) createCursor(t *transpilerState) (cursor, error) {
 		if interval > 0 {
 			cur = &groupCursor{
 				id: t.op("window", &transformations.WindowOpSpec{
-					Every:         flux.Duration(math.MaxInt64),
-					Period:        flux.Duration(math.MaxInt64),
-					TimeCol:       execute.DefaultTimeColLabel,
-					StartColLabel: execute.DefaultStartColLabel,
-					StopColLabel:  execute.DefaultStopColLabel,
+					Every:       flux.Duration(math.MaxInt64),
+					Period:      flux.Duration(math.MaxInt64),
+					TimeColumn:  execute.DefaultTimeColLabel,
+					StartColumn: execute.DefaultStartColLabel,
+					StopColumn:  execute.DefaultStopColLabel,
 				}, cur.ID()),
 				cursor: cur,
 			}
@@ -255,7 +259,7 @@ func (gr *groupInfo) createCursor(t *transpilerState) (cursor, error) {
 		// If we do not have a function, but we have a field option,
 		// return the appropriate error message if there is something wrong with the flux.
 		if interval > 0 {
-			return nil, errors.New("GROUP BY requires at least one aggregate function")
+			return nil, errors.New("using GROUP BY requires at least one aggregate function")
 		}
 
 		// TODO(jsternberg): Fill needs to be somewhere and it's probably here somewhere.
@@ -362,16 +366,17 @@ func (gr *groupInfo) group(t *transpilerState, in cursor) (cursor, error) {
 	// there is always something to group in influxql.
 	// TODO(jsternberg): A wildcard will skip this step.
 	id := t.op("group", &transformations.GroupOpSpec{
-		By: tags,
+		Columns: tags,
+		Mode:    "by",
 	}, in.ID())
 
 	if windowEvery > 0 {
 		windowOp := &transformations.WindowOpSpec{
-			Every:         flux.Duration(windowEvery),
-			Period:        flux.Duration(windowEvery),
-			TimeCol:       execute.DefaultTimeColLabel,
-			StartColLabel: execute.DefaultStartColLabel,
-			StopColLabel:  execute.DefaultStopColLabel,
+			Every:       flux.Duration(windowEvery),
+			Period:      flux.Duration(windowEvery),
+			TimeColumn:  execute.DefaultTimeColLabel,
+			StartColumn: execute.DefaultStartColLabel,
+			StopColumn:  execute.DefaultStopColLabel,
 		}
 
 		if !windowStart.IsZero() {

@@ -16,6 +16,7 @@ import (
 	"github.com/influxdata/flux/semantic"
 	"github.com/influxdata/influxql"
 	"github.com/influxdata/platform"
+	pinputs "github.com/influxdata/platform/query/functions/inputs"
 )
 
 // Transpiler converts InfluxQL queries into a query spec.
@@ -52,7 +53,6 @@ func (t *Transpiler) Transpile(ctx context.Context, txt string) (*flux.Spec, err
 }
 
 type transpilerState struct {
-	id             int
 	stmt           *influxql.SelectStatement
 	config         Config
 	spec           *flux.Spec
@@ -93,6 +93,10 @@ func (t *transpilerState) transpile(ctx context.Context, s influxql.Statement) (
 		return t.transpileSelect(ctx, stmt)
 	case *influxql.ShowTagValuesStatement:
 		return t.transpileShowTagValues(ctx, stmt)
+	case *influxql.ShowDatabasesStatement:
+		return t.transpileShowDatabases(ctx, stmt)
+	case *influxql.ShowRetentionPoliciesStatement:
+		return t.transpileShowRetentionPolicies(ctx, stmt)
 	default:
 		return "", fmt.Errorf("unknown statement type %T", s)
 	}
@@ -122,6 +126,7 @@ func (t *transpilerState) transpileShowTagValues(ctx context.Context, stmt *infl
 			Relative:   -time.Hour,
 			IsRelative: true,
 		},
+		Stop: flux.Now,
 	}, op)
 
 	// If we have a list of sources, look through it and add each of the measurement names.
@@ -156,10 +161,14 @@ func (t *transpilerState) transpileShowTagValues(ctx context.Context, stmt *infl
 		}
 		op = t.op("filter", &transformations.FilterOpSpec{
 			Fn: &semantic.FunctionExpression{
-				Params: []*semantic.FunctionParam{
-					{Key: &semantic.Identifier{Name: "r"}},
+				Block: &semantic.FunctionBlock{
+					Parameters: &semantic.FunctionParameters{
+						List: []*semantic.FunctionParameter{
+							{Key: &semantic.Identifier{Name: "r"}},
+						},
+					},
+					Body: expr,
 				},
-				Body: expr,
 			},
 		}, op)
 	}
@@ -170,11 +179,11 @@ func (t *transpilerState) transpileShowTagValues(ctx context.Context, stmt *infl
 	var keyValues transformations.KeyValuesOpSpec
 	switch expr := stmt.TagKeyExpr.(type) {
 	case *influxql.ListLiteral:
-		keyValues.KeyCols = expr.Vals
+		keyValues.KeyColumns = expr.Vals
 	case *influxql.StringLiteral:
 		switch stmt.Op {
 		case influxql.EQ:
-			keyValues.KeyCols = []string{expr.Val}
+			keyValues.KeyColumns = []string{expr.Val}
 		case influxql.NEQ, influxql.EQREGEX, influxql.NEQREGEX:
 			return "", fmt.Errorf("unimplemented: tag key operand: %s", stmt.Op)
 		default:
@@ -188,17 +197,100 @@ func (t *transpilerState) transpileShowTagValues(ctx context.Context, stmt *infl
 	// Group by the measurement and key, find distinct values, then group by the measurement
 	// to join all of the different keys together. Finish by renaming the columns. This is static.
 	return t.op("rename", &transformations.RenameOpSpec{
-		Cols: map[string]string{
+		Columns: map[string]string{
 			"_key":   "key",
 			"_value": "value",
 		},
 	}, t.op("group", &transformations.GroupOpSpec{
-		By: []string{"_measurement"},
+		Columns: []string{"_measurement"},
+		Mode:    "by",
 	}, t.op("distinct", &transformations.DistinctOpSpec{
 		Column: execute.DefaultValueColLabel,
 	}, t.op("group", &transformations.GroupOpSpec{
-		By: []string{"_measurement", "_key"},
+		Columns: []string{"_measurement", "_key"},
+		Mode:    "by",
 	}, op)))), nil
+}
+
+func (t *transpilerState) transpileShowDatabases(ctx context.Context, stmt *influxql.ShowDatabasesStatement) (flux.OperationID, error) {
+	// While the ShowTagValuesStatement contains a sources section and those sources are measurements, they do
+	// not actually contain the database and we do not factor in retention policies. So we are always going to use
+	// the default retention policy when evaluating which bucket we are querying and we do not have to consult
+	// the sources in the statement.
+
+	spec := &pinputs.DatabasesOpSpec{}
+	op := t.op("databases", spec)
+
+	// SHOW DATABASES has one column, name
+	return t.op("extractcol", &transformations.KeepOpSpec{
+		Columns: []string{
+			"name",
+		},
+	}, t.op("rename", &transformations.RenameOpSpec{
+		Columns: map[string]string{
+			"databaseName": "name",
+		},
+	}, op)), nil
+}
+
+func (t *transpilerState) transpileShowRetentionPolicies(ctx context.Context, stmt *influxql.ShowRetentionPoliciesStatement) (flux.OperationID, error) {
+	// While the ShowTagValuesStatement contains a sources section and those sources are measurements, they do
+	// not actually contain the database and we do not factor in retention policies. So we are always going to use
+	// the default retention policy when evaluating which bucket we are querying and we do not have to consult
+	// the sources in the statement.
+
+	spec := &pinputs.DatabasesOpSpec{}
+	op := t.op("databases", spec)
+	var expr semantic.Expression = &semantic.BinaryExpression{
+		Operator: ast.EqualOperator,
+		Left: &semantic.MemberExpression{
+			Object:   &semantic.IdentifierExpression{Name: "r"},
+			Property: "databaseName",
+		},
+		Right: &semantic.StringLiteral{Value: stmt.Database},
+	}
+
+	op = t.op("filter", &transformations.FilterOpSpec{
+		Fn: &semantic.FunctionExpression{
+			Block: &semantic.FunctionBlock{
+				Parameters: &semantic.FunctionParameters{
+					List: []*semantic.FunctionParameter{
+						{Key: &semantic.Identifier{Name: "r"}},
+					},
+				},
+				Body: expr,
+			},
+		},
+	}, op)
+
+	return t.op("keep",
+		&transformations.KeepOpSpec{
+			Columns: []string{
+				"name",
+				"duration",
+				"shardGroupDuration",
+				"replicaN",
+				"default",
+			},
+		},
+		t.op("set",
+			&transformations.SetOpSpec{
+				Key:   "replicaN",
+				Value: "2",
+			},
+			t.op("set",
+				&transformations.SetOpSpec{
+					Key:   "shardGroupDuration",
+					Value: "0",
+				},
+				t.op("rename",
+					&transformations.RenameOpSpec{
+						Columns: map[string]string{
+							"retentionPolicy": "name",
+							"retentionPeriod": "duration",
+						},
+					},
+					op)))), nil
 }
 
 func (t *transpilerState) transpileSelect(ctx context.Context, stmt *influxql.SelectStatement) (flux.OperationID, error) {

@@ -30,9 +30,15 @@ func init() {
 	if h := viper.GetString("ORG_ID"); h != "" {
 		queryFlags.OrgID = h
 	}
+	queryCmd.MarkPersistentFlagRequired("org-id")
 }
 
 func fluxQueryF(cmd *cobra.Command, args []string) {
+	if flags.local {
+		fmt.Println("Local flag not supported for query command")
+		os.Exit(1)
+	}
+
 	q, err := repl.LoadQuery(args[0])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

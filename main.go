@@ -3,10 +3,12 @@ package main
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
+	"github.com/robfig/cron"
 	"github.com/sasaxie/monitor/alerts"
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/datamanger"
+	"github.com/sasaxie/monitor/reports"
 	_ "github.com/sasaxie/monitor/routers"
 	"time"
 )
@@ -16,10 +18,23 @@ func main() {
 	logs.Info("start monitor")
 
 	go start()
+	go report()
 
 	defer influxdb.Client.C.Close()
 
 	beego.Run()
+}
+
+func report() {
+	c := cron.New()
+	c.AddFunc("0 0 * * * *", func() {
+		r := new(reports.TotalMissed)
+		r.Date = time.Now().AddDate(0, 0, -1)
+		r.ComputeData()
+		r.Save()
+		r.Report()
+	})
+	c.Start()
 }
 
 func start() {

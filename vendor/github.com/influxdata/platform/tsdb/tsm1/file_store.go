@@ -17,12 +17,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/influxdb/pkg/metrics"
-	"github.com/influxdata/influxdb/query"
-	"github.com/influxdata/platform/models"
 	"github.com/influxdata/platform/pkg/file"
 	"github.com/influxdata/platform/pkg/limiter"
+	"github.com/influxdata/platform/pkg/metrics"
+	"github.com/influxdata/platform/query"
 	"github.com/influxdata/platform/tsdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -150,11 +150,15 @@ type TSMFile interface {
 	MeasurementStats() (MeasurementStats, error)
 }
 
-// Statistics gathered by the FileStore.
-const (
-	statFileStoreBytes = "diskBytes"
-	statFileStoreCount = "numFiles"
-)
+// FileStoreObserver is passed notifications before the file store adds or deletes files. In this way, it can
+// be sure to observe every file that is added or removed even in the presence of process death.
+type FileStoreObserver interface {
+	// FileFinishing is called before a file is renamed to it's final name.
+	FileFinishing(path string) error
+
+	// FileUnlinking is called before a file is unlinked.
+	FileUnlinking(path string) error
+}
 
 var (
 	floatBlocksDecodedCounter    = metrics.MustRegisterCounter("float_blocks_decoded", metrics.WithGroup(tsmGroup))
@@ -188,14 +192,14 @@ type FileStore struct {
 	traceLogger  *zap.Logger // Logger to be used when trace-logging is on.
 	traceLogging bool
 
-	stats  *FileStoreStatistics
-	purger *purger
+	tracker *fileTracker
+	purger  *purger
 
 	currentTempDirID int
 
 	parseFileName ParseFileNameFunc
 
-	obs tsdb.FileStoreObserver
+	obs FileStoreObserver
 }
 
 // FileStat holds information about a TSM file on disk.
@@ -232,20 +236,23 @@ func NewFileStore(dir string) *FileStore {
 		logger:       logger,
 		traceLogger:  logger,
 		openLimiter:  limiter.NewFixed(runtime.GOMAXPROCS(0)),
-		stats:        &FileStoreStatistics{},
 		purger: &purger{
 			files:  map[string]TSMFile{},
 			logger: logger,
 		},
 		obs:           noFileStoreObserver{},
 		parseFileName: DefaultParseFileName,
+		tracker:       newFileTracker(newFileMetrics(nil), nil),
 	}
 	fs.purger.fileStore = fs
 	return fs
 }
 
 // WithObserver sets the observer for the file store.
-func (f *FileStore) WithObserver(obs tsdb.FileStoreObserver) {
+func (f *FileStore) WithObserver(obs FileStoreObserver) {
+	if obs == nil {
+		obs = noFileStoreObserver{}
+	}
 	f.obs = obs
 }
 
@@ -277,20 +284,58 @@ func (f *FileStore) WithLogger(log *zap.Logger) {
 
 // FileStoreStatistics keeps statistics about the file store.
 type FileStoreStatistics struct {
-	DiskBytes int64
-	FileCount int64
+	SDiskBytes int64
+	SFileCount int64
 }
 
-// Statistics returns statistics for periodic monitoring.
-func (f *FileStore) Statistics(tags map[string]string) []models.Statistic {
-	return []models.Statistic{{
-		Name: "tsm1_filestore",
-		Tags: tags,
-		Values: map[string]interface{}{
-			statFileStoreBytes: atomic.LoadInt64(&f.stats.DiskBytes),
-			statFileStoreCount: atomic.LoadInt64(&f.stats.FileCount),
-		},
-	}}
+// fileTracker tracks file counts and sizes within the FileStore.
+//
+// As well as being responsible for providing atomic reads and writes to the
+// statistics, fileTracker also mirrors any changes to the external prometheus
+// metrics, which the Engine exposes.
+//
+// *NOTE* - fileTracker fields should not be directory modified. Doing so
+// could result in the Engine exposing inaccurate metrics.
+type fileTracker struct {
+	metrics   *fileMetrics
+	labels    prometheus.Labels
+	diskBytes uint64
+	fileCount uint64
+}
+
+func newFileTracker(metrics *fileMetrics, defaultLabels prometheus.Labels) *fileTracker {
+	return &fileTracker{metrics: metrics, labels: defaultLabels}
+}
+
+func (t *fileTracker) Labels() prometheus.Labels {
+	return t.labels
+}
+
+// Bytes returns the number of bytes in use on disk.
+func (t *fileTracker) Bytes() uint64 { return atomic.LoadUint64(&t.diskBytes) }
+
+// SetBytes sets the number of bytes in use on disk.
+func (t *fileTracker) SetBytes(bytes uint64) {
+	atomic.StoreUint64(&t.diskBytes, bytes)
+
+	labels := t.Labels()
+	t.metrics.DiskSize.With(labels).Set(float64(bytes))
+}
+
+// AddBytes increases the number of bytes.
+func (t *fileTracker) AddBytes(bytes uint64) {
+	atomic.AddUint64(&t.diskBytes, bytes)
+
+	labels := t.Labels()
+	t.metrics.DiskSize.With(labels).Add(float64(bytes))
+}
+
+// SetFileCount sets the number of files in the FileStore.
+func (t *fileTracker) SetFileCount(files uint64) {
+	atomic.StoreUint64(&t.fileCount, files)
+
+	labels := t.Labels()
+	t.metrics.Files.With(labels).Set(float64(files))
 }
 
 // Count returns the number of TSM files currently loaded.
@@ -568,10 +613,11 @@ func (f *FileStore) Open() error {
 		f.files = append(f.files, res.r)
 
 		// Accumulate file store size stats
-		atomic.AddInt64(&f.stats.DiskBytes, int64(res.r.Size()))
+		totalSize := uint64(res.r.Size())
 		for _, ts := range res.r.TombstoneFiles() {
-			atomic.AddInt64(&f.stats.DiskBytes, int64(ts.Size))
+			totalSize += uint64(ts.Size)
 		}
+		f.tracker.AddBytes(totalSize)
 
 		// Re-initialize the lastModified time for the file store
 		if res.r.LastModified() > lm {
@@ -583,7 +629,7 @@ func (f *FileStore) Open() error {
 	close(readerC)
 
 	sort.Sort(tsmReaders(f.files))
-	atomic.StoreInt64(&f.stats.FileCount, int64(len(f.files)))
+	f.tracker.SetFileCount(uint64(len(f.files)))
 	return nil
 }
 
@@ -596,7 +642,7 @@ func (f *FileStore) Close() error {
 
 	f.lastFileStats = nil
 	f.files = nil
-	atomic.StoreInt64(&f.stats.FileCount, 0)
+	f.tracker.SetFileCount(uint64(0))
 
 	// Let other methods access this closed object while we do the actual closing.
 	f.mu.Unlock()
@@ -611,9 +657,8 @@ func (f *FileStore) Close() error {
 	return nil
 }
 
-func (f *FileStore) DiskSizeBytes() int64 {
-	return atomic.LoadInt64(&f.stats.DiskBytes)
-}
+// DiskSizeBytes returns the total number of bytes consumed by the files in the FileStore.
+func (f *FileStore) DiskSizeBytes() int64 { return int64(f.tracker.Bytes()) }
 
 // Read returns the slice of values for the given key and the given timestamp,
 // if any file matches those constraints.
@@ -732,6 +777,14 @@ func (f *FileStore) replace(oldFiles, newFiles []string, updatedFn func(r []TSMF
 			return err
 		}
 
+		// Observe the associated statistics file, if available.
+		statsFile := StatsFilename(file)
+		if _, err := os.Stat(statsFile); err == nil {
+			if err := f.obs.FileFinishing(statsFile); err != nil {
+				return err
+			}
+		}
+
 		var newName = file
 		if strings.HasSuffix(file, tsmTmpExt) {
 			// The new TSM files have a tmp extension.  First rename them.
@@ -787,6 +840,14 @@ func (f *FileStore) replace(oldFiles, newFiles []string, updatedFn func(r []TSMF
 				// give the observer a chance to process the file first.
 				if err := f.obs.FileUnlinking(file.Path()); err != nil {
 					return err
+				}
+
+				// Remove associated stats file.
+				statsFile := StatsFilename(file.Path())
+				if _, err := os.Stat(statsFile); err == nil {
+					if err := f.obs.FileUnlinking(statsFile); err != nil {
+						return err
+					}
 				}
 
 				for _, t := range file.TombstoneFiles() {
@@ -865,18 +926,18 @@ func (f *FileStore) replace(oldFiles, newFiles []string, updatedFn func(r []TSMF
 	f.lastFileStats = nil
 	f.files = active
 	sort.Sort(tsmReaders(f.files))
-	atomic.StoreInt64(&f.stats.FileCount, int64(len(f.files)))
+	f.tracker.SetFileCount(uint64(len(f.files)))
 
 	// Recalculate the disk size stat
-	var totalSize int64
+	var totalSize uint64
 	for _, file := range f.files {
-		totalSize += int64(file.Size())
+		totalSize += uint64(file.Size())
 		for _, ts := range file.TombstoneFiles() {
-			totalSize += int64(ts.Size)
+			totalSize += uint64(ts.Size)
 		}
 
 	}
-	atomic.StoreInt64(&f.stats.DiskBytes, totalSize)
+	f.tracker.SetBytes(totalSize)
 
 	return nil
 }

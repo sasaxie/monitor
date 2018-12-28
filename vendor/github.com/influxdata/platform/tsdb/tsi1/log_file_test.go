@@ -15,14 +15,16 @@ import (
 
 	"github.com/influxdata/platform/pkg/slices"
 
-	"github.com/influxdata/influxdb/pkg/bloom"
 	"github.com/influxdata/platform/models"
+	"github.com/influxdata/platform/pkg/bloom"
 	"github.com/influxdata/platform/tsdb"
 	"github.com/influxdata/platform/tsdb/tsi1"
 )
 
 // Ensure log file can append series.
 func TestLogFile_AddSeriesList(t *testing.T) {
+	t.Parallel()
+
 	sfile := MustOpenSeriesFile()
 	defer sfile.Close()
 
@@ -127,6 +129,8 @@ func TestLogFile_AddSeriesList(t *testing.T) {
 }
 
 func TestLogFile_SeriesStoredInOrder(t *testing.T) {
+	t.Parallel()
+
 	sfile := MustOpenSeriesFile()
 	defer sfile.Close()
 
@@ -189,6 +193,8 @@ func TestLogFile_SeriesStoredInOrder(t *testing.T) {
 
 // Ensure log file can delete an existing measurement.
 func TestLogFile_DeleteMeasurement(t *testing.T) {
+	t.Parallel()
+
 	sfile := MustOpenSeriesFile()
 	defer sfile.Close()
 
@@ -232,6 +238,8 @@ func TestLogFile_DeleteMeasurement(t *testing.T) {
 
 // Ensure log file can recover correctly.
 func TestLogFile_Open(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Truncate", func(t *testing.T) {
 		sfile := MustOpenSeriesFile()
 		defer sfile.Close()

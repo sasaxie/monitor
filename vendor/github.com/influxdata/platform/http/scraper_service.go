@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"path"
 
 	"github.com/influxdata/platform"
 	kerrors "github.com/influxdata/platform/kit/errors"
 	"github.com/julienschmidt/httprouter"
+	"go.uber.org/zap"
 )
 
 // ScraperHandler represents an HTTP API handler for scraper targets.
 type ScraperHandler struct {
 	*httprouter.Router
+	Logger                *zap.Logger
 	ScraperStorageService platform.ScraperTargetStoreService
 }
 
@@ -26,7 +27,8 @@ const (
 // NewScraperHandler returns a new instance of ScraperHandler.
 func NewScraperHandler() *ScraperHandler {
 	h := &ScraperHandler{
-		Router: httprouter.New(),
+		Router: NewRouter(),
+		Logger: zap.NewNop(),
 	}
 	h.HandlerFunc("POST", targetPath, h.handlePostScraperTarget)
 	h.HandlerFunc("GET", targetPath, h.handleGetScraperTargets)
@@ -51,7 +53,7 @@ func (h *ScraperHandler) handlePostScraperTarget(w http.ResponseWriter, r *http.
 		return
 	}
 	if err := encodeResponse(ctx, w, http.StatusCreated, newTargetResponse(*req)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -71,7 +73,7 @@ func (h *ScraperHandler) handleDeleteScraperTarget(w http.ResponseWriter, r *htt
 		return
 	}
 
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handlePatchScraperTarget is the HTTP handler for the PATCH /api/v2/scrapertargets/:id route.
@@ -91,7 +93,7 @@ func (h *ScraperHandler) handlePatchScraperTarget(w http.ResponseWriter, r *http
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newTargetResponse(*target)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -111,7 +113,7 @@ func (h *ScraperHandler) handleGetScraperTarget(w http.ResponseWriter, r *http.R
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newTargetResponse(*target)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -127,7 +129,7 @@ func (h *ScraperHandler) handleGetScraperTargets(w http.ResponseWriter, r *http.
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newListTargetsResponse(targets)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -174,6 +176,8 @@ type ScraperService struct {
 	Addr               string
 	Token              string
 	InsecureSkipVerify bool
+	// OpPrefix is for update invalid ops
+	OpPrefix string
 }
 
 // ListTargets returns a list of all scraper targets.
@@ -198,7 +202,7 @@ func (s *ScraperService) ListTargets(ctx context.Context) ([]platform.ScraperTar
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -219,7 +223,11 @@ func (s *ScraperService) ListTargets(ctx context.Context) ([]platform.ScraperTar
 // Returns the new target state after update.
 func (s *ScraperService) UpdateTarget(ctx context.Context, update *platform.ScraperTarget) (*platform.ScraperTarget, error) {
 	if !update.ID.Valid() {
-		return nil, errors.New("update scraper: id is invalid")
+		return nil, &platform.Error{
+			Code: platform.EInvalid,
+			Op:   s.OpPrefix + platform.OpUpdateTarget,
+			Msg:  "id is invalid",
+		}
 	}
 	url, err := newURL(s.Addr, targetIDPath(update.ID))
 	if err != nil {
@@ -244,7 +252,7 @@ func (s *ScraperService) UpdateTarget(ctx context.Context, update *platform.Scra
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 	var targetResp targetResponse
@@ -284,7 +292,7 @@ func (s *ScraperService) AddTarget(ctx context.Context, target *platform.Scraper
 	}
 
 	// TODO(jsternberg): Should this check for a 201 explicitly?
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -314,7 +322,8 @@ func (s *ScraperService) RemoveTarget(ctx context.Context, id platform.ID) error
 	if err != nil {
 		return err
 	}
-	return CheckError(resp)
+
+	return CheckErrorStatus(http.StatusNoContent, resp, true)
 }
 
 // GetTargetByID returns a single target by ID.
@@ -336,7 +345,7 @@ func (s *ScraperService) GetTargetByID(ctx context.Context, id platform.ID) (*pl
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 

@@ -9,6 +9,7 @@ import (
 type UserType string
 type ResourceType string
 
+// available user resource types.
 const (
 	Owner                 UserType     = "owner"
 	Member                UserType     = "member"
@@ -17,6 +18,9 @@ const (
 	TaskResourceType      ResourceType = "task"
 	OrgResourceType       ResourceType = "org"
 	ViewResourceType      ResourceType = "view"
+	TelegrafResourceType  ResourceType = "telegraf"
+	TokenResourceType     ResourceType = "token"
+	UserResourceType      ResourceType = "user"
 )
 
 // UserResourceMappingService maps the relationships between users and resources
@@ -51,9 +55,9 @@ func (m UserResourceMapping) Validate() error {
 		return errors.New("a valid user type is required")
 	}
 	switch m.ResourceType {
-	case DashboardResourceType, BucketResourceType, TaskResourceType, OrgResourceType, ViewResourceType:
+	case DashboardResourceType, BucketResourceType, TaskResourceType, OrgResourceType, ViewResourceType, TelegrafResourceType:
 	default:
-		return fmt.Errorf("a valid resource type is required")
+		return errors.New("a valid resource type is required")
 	}
 	return nil
 }
@@ -64,4 +68,34 @@ type UserResourceMappingFilter struct {
 	ResourceType ResourceType
 	UserID       ID
 	UserType     UserType
+}
+
+var ownerActions = []action{WriteAction, CreateAction, DeleteAction}
+var memberActions = []action{ReadAction}
+
+// ToPermission converts a user resource mapping into a set of permissions.
+func (m *UserResourceMapping) ToPermissions() []Permission {
+	// TODO(desa): we'll have to do something more fine-grained eventually
+	// but this should be good enough for now.
+	ps := []Permission{}
+	r := resource(fmt.Sprintf("%s/%s", m.ResourceType, m.ResourceID))
+	if m.UserType == Owner {
+		for _, a := range ownerActions {
+			p := Permission{
+				Resource: r,
+				Action:   a,
+			}
+			ps = append(ps, p)
+		}
+	}
+
+	for _, a := range memberActions {
+		p := Permission{
+			Resource: r,
+			Action:   a,
+		}
+		ps = append(ps, p)
+	}
+
+	return ps
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/influxdata/platform"
 	kerrors "github.com/influxdata/platform/kit/errors"
 	"github.com/julienschmidt/httprouter"
+	"go.uber.org/zap"
 )
 
 const (
@@ -21,13 +22,16 @@ const (
 type MacroHandler struct {
 	*httprouter.Router
 
+	Logger *zap.Logger
+
 	MacroService platform.MacroService
 }
 
 // NewMacroHandler creates a new MacroHandler
 func NewMacroHandler() *MacroHandler {
 	h := &MacroHandler{
-		Router: httprouter.New(),
+		Router: NewRouter(),
+		Logger: zap.NewNop(),
 	}
 
 	h.HandlerFunc("GET", "/api/v2/macros", h.handleGetMacros)
@@ -83,7 +87,7 @@ func (h *MacroHandler) handleGetMacros(w http.ResponseWriter, r *http.Request) {
 
 	err = encodeResponse(ctx, w, http.StatusOK, newGetMacrosResponse(macros))
 	if err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -96,7 +100,14 @@ func requestMacroID(ctx context.Context) (platform.ID, error) {
 	}
 
 	id, err := platform.IDFromString(urlID)
-	return *id, err
+	if err != nil {
+		return platform.InvalidID(), &platform.Error{
+			Code: platform.EInvalid,
+			Err:  err,
+		}
+	}
+
+	return *id, nil
 }
 
 func (h *MacroHandler) handleGetMacro(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +127,7 @@ func (h *MacroHandler) handleGetMacro(w http.ResponseWriter, r *http.Request) {
 
 	err = encodeResponse(ctx, w, http.StatusOK, newMacroResponse(macro))
 	if err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -156,7 +167,7 @@ func (h *MacroHandler) handlePostMacro(w http.ResponseWriter, r *http.Request) {
 
 	err = encodeResponse(ctx, w, http.StatusCreated, newMacroResponse(req.macro))
 	if err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -205,7 +216,7 @@ func (h *MacroHandler) handlePatchMacro(w http.ResponseWriter, r *http.Request) 
 
 	err = encodeResponse(ctx, w, http.StatusOK, newMacroResponse(macro))
 	if err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -261,7 +272,7 @@ func (h *MacroHandler) handlePutMacro(w http.ResponseWriter, r *http.Request) {
 
 	err = encodeResponse(ctx, w, http.StatusOK, newMacroResponse(req.macro))
 	if err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -339,7 +350,7 @@ func (s *MacroService) FindMacroByID(ctx context.Context, id platform.ID) (*plat
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -372,7 +383,7 @@ func (s *MacroService) FindMacros(ctx context.Context) ([]*platform.Macro, error
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -416,7 +427,7 @@ func (s *MacroService) CreateMacro(ctx context.Context, m *platform.Macro) error
 		return err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -450,7 +461,7 @@ func (s *MacroService) UpdateMacro(ctx context.Context, id platform.ID, update *
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -490,7 +501,7 @@ func (s *MacroService) ReplaceMacro(ctx context.Context, macro *platform.Macro) 
 		return err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -520,7 +531,7 @@ func (s *MacroService) DeleteMacro(ctx context.Context, id platform.ID) error {
 	if err != nil {
 		return err
 	}
-	return CheckError(resp)
+	return CheckError(resp, true)
 }
 
 func macroIDPath(id platform.ID) string {

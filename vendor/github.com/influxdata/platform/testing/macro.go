@@ -3,20 +3,17 @@ package testing
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/platform"
-	kerrors "github.com/influxdata/platform/kit/errors"
 	"github.com/influxdata/platform/mock"
 )
 
 const (
 	idA = "020f755c3c082000"
 	idB = "020f755c3c082001"
-	idC = "020f755c3c082002"
 )
 
 var macroCmpOptions = cmp.Options{
@@ -40,11 +37,11 @@ type MacroFields struct {
 
 // MacroService tests all the service functions.
 func MacroService(
-	init func(MacroFields, *testing.T) (platform.MacroService, func()), t *testing.T,
+	init func(MacroFields, *testing.T) (platform.MacroService, string, func()), t *testing.T,
 ) {
 	tests := []struct {
 		name string
-		fn   func(init func(MacroFields, *testing.T) (platform.MacroService, func()),
+		fn   func(init func(MacroFields, *testing.T) (platform.MacroService, string, func()),
 			t *testing.T)
 	}{
 		{
@@ -72,7 +69,7 @@ func MacroService(
 }
 
 // CreateMacro tests platform.MacroService CreateMacro interface method
-func CreateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func()), t *testing.T) {
+func CreateMacro(init func(MacroFields, *testing.T) (platform.MacroService, string, func()), t *testing.T) {
 	type args struct {
 		macro *platform.Macro
 	}
@@ -145,12 +142,12 @@ func CreateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 	}
 
 	for _, tt := range tests {
-		s, done := init(tt.fields, t)
+		s, opPrefix, done := init(tt.fields, t)
 		defer done()
 		ctx := context.TODO()
 
 		err := s.CreateMacro(ctx, tt.args.macro)
-		diffErrors(err, tt.wants.err, t)
+		diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
 
 		macros, err := s.FindMacros(ctx)
 		if err != nil {
@@ -163,7 +160,7 @@ func CreateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 }
 
 // FindMacroByID tests platform.MacroService FindMacroByID interface method
-func FindMacroByID(init func(MacroFields, *testing.T) (platform.MacroService, func()), t *testing.T) {
+func FindMacroByID(init func(MacroFields, *testing.T) (platform.MacroService, string, func()), t *testing.T) {
 	type args struct {
 		id platform.ID
 	}
@@ -224,19 +221,23 @@ func FindMacroByID(init func(MacroFields, *testing.T) (platform.MacroService, fu
 				id: MustIDBase16(idA),
 			},
 			wants: wants{
-				err:   kerrors.Errorf(kerrors.NotFound, "macro with ID %s not found", idA),
+				err: &platform.Error{
+					Code: platform.ENotFound,
+					Op:   platform.OpFindMacroByID,
+					Msg:  "macro not found",
+				},
 				macro: nil,
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		s, done := init(tt.fields, t)
+		s, opPrefix, done := init(tt.fields, t)
 		defer done()
 		ctx := context.TODO()
 
 		macro, err := s.FindMacroByID(ctx, tt.args.id)
-		diffErrors(err, tt.wants.err, t)
+		diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
 
 		if diff := cmp.Diff(macro, tt.wants.macro); diff != "" {
 			t.Fatalf("found unexpected macro -got/+want\ndiff %s", diff)
@@ -245,7 +246,7 @@ func FindMacroByID(init func(MacroFields, *testing.T) (platform.MacroService, fu
 }
 
 // UpdateMacro tests platform.MacroService UpdateMacro interface method
-func UpdateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func()), t *testing.T) {
+func UpdateMacro(init func(MacroFields, *testing.T) (platform.MacroService, string, func()), t *testing.T) {
 	type args struct {
 		id     platform.ID
 		update *platform.MacroUpdate
@@ -323,7 +324,11 @@ func UpdateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 				},
 			},
 			wants: wants{
-				err:    fmt.Errorf("macro with ID %s not found", idA),
+				err: &platform.Error{
+					Op:   platform.OpUpdateMacro,
+					Msg:  "macro not found",
+					Code: platform.ENotFound,
+				},
 				macros: []*platform.Macro{},
 			},
 		},
@@ -331,12 +336,12 @@ func UpdateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, done := init(tt.fields, t)
+			s, opPrefix, done := init(tt.fields, t)
 			defer done()
 			ctx := context.TODO()
 
 			macro, err := s.UpdateMacro(ctx, tt.args.id, tt.args.update)
-			diffErrors(err, tt.wants.err, t)
+			diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
 
 			if macro != nil {
 				if tt.args.update.Name != "" && macro.Name != tt.args.update.Name {
@@ -356,7 +361,7 @@ func UpdateMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 }
 
 // DeleteMacro tests platform.MacroService DeleteMacro interface method
-func DeleteMacro(init func(MacroFields, *testing.T) (platform.MacroService, func()), t *testing.T) {
+func DeleteMacro(init func(MacroFields, *testing.T) (platform.MacroService, string, func()), t *testing.T) {
 	type args struct {
 		id platform.ID
 	}
@@ -411,7 +416,11 @@ func DeleteMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 				id: MustIDBase16(idB),
 			},
 			wants: wants{
-				err: kerrors.Errorf(kerrors.NotFound, "macro with ID %s not found", idB),
+				err: &platform.Error{
+					Code: platform.ENotFound,
+					Op:   platform.OpDeleteMacro,
+					Msg:  "macro not found",
+				},
 				macros: []*platform.Macro{
 					{
 						ID:   MustIDBase16(idA),
@@ -427,7 +436,7 @@ func DeleteMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 	}
 
 	for _, tt := range tests {
-		s, done := init(tt.fields, t)
+		s, opPrefix, done := init(tt.fields, t)
 		defer done()
 		ctx := context.TODO()
 
@@ -435,7 +444,7 @@ func DeleteMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 		defer s.ReplaceMacro(ctx, &platform.Macro{
 			ID: tt.args.id,
 		})
-		diffErrors(err, tt.wants.err, t)
+		diffPlatformErrors(tt.name, err, tt.wants.err, opPrefix, t)
 
 		macros, err := s.FindMacros(ctx)
 		if err != nil {
@@ -444,19 +453,5 @@ func DeleteMacro(init func(MacroFields, *testing.T) (platform.MacroService, func
 		if diff := cmp.Diff(macros, tt.wants.macros, macroCmpOptions...); diff != "" {
 			t.Fatalf("found unexpected macros -got/+want\ndiff %s", diff)
 		}
-	}
-}
-
-func diffErrors(actual, expected error, t *testing.T) {
-	if expected == nil && actual != nil {
-		t.Fatalf("unexpected error %q", actual.Error())
-	}
-
-	if expected != nil && actual == nil {
-		t.Fatalf("expected error %q but received nil", expected.Error())
-	}
-
-	if expected != nil && actual != nil && expected.Error() != actual.Error() {
-		t.Fatalf("expected error %q but received error %q", expected.Error(), actual.Error())
 	}
 }

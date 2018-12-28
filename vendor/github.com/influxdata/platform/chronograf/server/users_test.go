@@ -12,7 +12,6 @@ import (
 
 	"github.com/bouk/httprouter"
 	"github.com/influxdata/platform/chronograf"
-	"github.com/influxdata/platform/chronograf/log"
 	"github.com/influxdata/platform/chronograf/mocks"
 	"github.com/influxdata/platform/chronograf/roles"
 )
@@ -46,7 +45,7 @@ func TestService_UserID(t *testing.T) {
 				),
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					GetF: func(ctx context.Context, q chronograf.UserQuery) (*chronograf.User, error) {
 						switch *q.ID {
@@ -61,7 +60,7 @@ func TestService_UserID(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -147,7 +146,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -197,7 +196,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -275,7 +274,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -332,7 +331,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -354,7 +353,7 @@ func TestService_NewUser(t *testing.T) {
 			},
 			wantStatus:      http.StatusUnauthorized,
 			wantContentType: "application/json",
-			wantBody:        `{"code":401,"message":"User does not have authorization required to set SuperAdmin status. See https://github.com/influxdata/platform/chronograf/issues/2601 for more information."}`,
+			wantBody:        `{"code":401,"message":"user does not have authorization required to set SuperAdmin status. See https://github.com/influxdata/platform/chronograf/issues/2601 for more information"}`,
 		},
 		{
 			name: "Create a new SuperAdmin User - as superadmin",
@@ -380,7 +379,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -428,7 +427,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -473,7 +472,7 @@ func TestService_NewUser(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				ConfigStore: &mocks.ConfigStore{
 					Config: &chronograf.Config{
 						Auth: chronograf.AuthConfig{
@@ -588,7 +587,7 @@ func TestService_RemoveUser(t *testing.T) {
 		{
 			name: "Delete a Chronograf User",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					GetF: func(ctx context.Context, q chronograf.UserQuery) (*chronograf.User, error) {
 						switch *q.ID {
@@ -600,7 +599,7 @@ func TestService_RemoveUser(t *testing.T) {
 								Scheme:   "oauth2",
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 					DeleteF: func(ctx context.Context, user *chronograf.User) error {
@@ -628,7 +627,7 @@ func TestService_RemoveUser(t *testing.T) {
 		{
 			name: "Deleting yourself",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					GetF: func(ctx context.Context, q chronograf.UserQuery) (*chronograf.User, error) {
 						switch *q.ID {
@@ -640,7 +639,7 @@ func TestService_RemoveUser(t *testing.T) {
 								Scheme:   "oauth2",
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 					DeleteF: func(ctx context.Context, user *chronograf.User) error {
@@ -734,7 +733,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "Update a Chronograf user - no roles",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					UpdateF: func(ctx context.Context, user *chronograf.User) error {
 						return nil
@@ -755,7 +754,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -787,7 +786,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "Update a Chronograf user",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -821,7 +820,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -858,7 +857,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "Update a Chronograf user roles different orgs",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -895,7 +894,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -936,7 +935,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "Update a Chronograf user roles same org",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					UpdateF: func(ctx context.Context, user *chronograf.User) error {
 						return nil
@@ -954,7 +953,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -988,7 +987,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "SuperAdmin modifying their own SuperAdmin Status - user missing from context",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -1023,7 +1022,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -1054,7 +1053,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "SuperAdmin modifying their own SuperAdmin Status",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -1089,7 +1088,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -1127,7 +1126,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "Update a SuperAdmin's Roles - without super admin context",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -1162,7 +1161,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -1200,7 +1199,7 @@ func TestService_UpdateUser(t *testing.T) {
 		{
 			name: "Update a Chronograf user to super admin - without super admin context",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -1231,7 +1230,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -1264,12 +1263,12 @@ func TestService_UpdateUser(t *testing.T) {
 			id:              "1336",
 			wantStatus:      http.StatusUnauthorized,
 			wantContentType: "application/json",
-			wantBody:        `{"code":401,"message":"User does not have authorization required to set SuperAdmin status. See https://github.com/influxdata/platform/chronograf/issues/2601 for more information."}`,
+			wantBody:        `{"code":401,"message":"user does not have authorization required to set SuperAdmin status. See https://github.com/influxdata/platform/chronograf/issues/2601 for more information"}`,
 		},
 		{
 			name: "Update a Chronograf user to super admin - with super admin context",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -1300,7 +1299,7 @@ func TestService_UpdateUser(t *testing.T) {
 								},
 							}, nil
 						default:
-							return nil, fmt.Errorf("User with ID %d not found", *q.ID)
+							return nil, fmt.Errorf("user with ID %d not found", *q.ID)
 						}
 					},
 				},
@@ -1402,7 +1401,7 @@ func TestService_Users(t *testing.T) {
 		{
 			name: "Get all Chronograf users",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					AllF: func(ctx context.Context) ([]chronograf.User, error) {
 						return []chronograf.User{
@@ -1440,7 +1439,7 @@ func TestService_Users(t *testing.T) {
 		{
 			name: "Get all Chronograf users, ensuring order of users in response",
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					AllF: func(ctx context.Context) ([]chronograf.User, error) {
 						return []chronograf.User{
@@ -1550,7 +1549,7 @@ func TestUserRequest_ValidCreate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("Name required on Chronograf User request body"),
+			err:     fmt.Errorf("name required on Chronograf User request body"),
 		},
 		{
 			name: "Invalid – Provider missing",
@@ -1568,7 +1567,7 @@ func TestUserRequest_ValidCreate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("Provider required on Chronograf User request body"),
+			err:     fmt.Errorf("provider required on Chronograf User request body"),
 		},
 		{
 			name: "Invalid – Scheme missing",
@@ -1586,7 +1585,7 @@ func TestUserRequest_ValidCreate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("Scheme required on Chronograf User request body"),
+			err:     fmt.Errorf("scheme required on Chronograf User request body"),
 		},
 		{
 			name: "Invalid roles - bad role name",
@@ -1605,7 +1604,7 @@ func TestUserRequest_ValidCreate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("Unknown role BilliettaSpecialRole. Valid roles are 'member', 'viewer', 'editor', 'admin', and '*'"),
+			err:     fmt.Errorf("unknown role BilliettaSpecialRole. Valid roles are 'member', 'viewer', 'editor', 'admin', and '*'"),
 		},
 		{
 			name: "Invalid roles - missing organization",
@@ -1676,7 +1675,7 @@ func TestUserRequest_ValidUpdate(t *testing.T) {
 				u: &userRequest{},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("No Roles to update"),
+			err:     fmt.Errorf("no Roles to update"),
 		},
 		{
 			name: "Invalid - bad role name",
@@ -1695,7 +1694,7 @@ func TestUserRequest_ValidUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("Unknown role BillietaSpecialOrg. Valid roles are 'member', 'viewer', 'editor', 'admin', and '*'"),
+			err:     fmt.Errorf("unknown role BillietaSpecialOrg. Valid roles are 'member', 'viewer', 'editor', 'admin', and '*'"),
 		},
 		{
 			name: "Valid – roles empty",
@@ -1727,7 +1726,7 @@ func TestUserRequest_ValidUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			err:     fmt.Errorf("Unknown role BillietaSpecialOrg. Valid roles are 'member', 'viewer', 'editor', 'admin', and '*'"),
+			err:     fmt.Errorf("unknown role BillietaSpecialOrg. Valid roles are 'member', 'viewer', 'editor', 'admin', and '*'"),
 		},
 		{
 			name: "Invalid - duplicate organization",

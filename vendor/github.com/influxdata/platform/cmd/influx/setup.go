@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/influxdata/platform"
@@ -21,6 +22,11 @@ var setupCmd = &cobra.Command{
 }
 
 func setupF(cmd *cobra.Command, args []string) {
+	if flags.local {
+		fmt.Println("Local flag not supported for setup command")
+		os.Exit(1)
+	}
+
 	// check if setup is allowed
 	s := &http.SetupService{
 		Addr: flags.host,
@@ -36,9 +42,9 @@ func setupF(cmd *cobra.Command, args []string) {
 		os.Exit(0)
 	}
 
-	or := getOnboardingRequest()
+	req := getOnboardingRequest()
 
-	result, err := s.Generate(context.Background(), or)
+	result, err := s.Generate(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -58,41 +64,48 @@ func setupF(cmd *cobra.Command, args []string) {
 		"Bucket":       result.Bucket.Name,
 		"Token":        result.Auth.Token,
 	})
+
+	writeTokenToPath(result.Auth.Token, defaultTokenPath())
+
 	w.Flush()
 }
 
-func getOnboardingRequest() (or *platform.OnboardingRequest) {
+func getOnboardingRequest() (req *platform.OnboardingRequest) {
 	ui := &input.UI{
 		Writer: os.Stdout,
 		Reader: os.Stdin,
 	}
-	or = new(platform.OnboardingRequest)
+	req = new(platform.OnboardingRequest)
 	fmt.Println(promptWithColor(`Welcome to InfluxDB 2.0!`, colorYellow))
-	or.User = getInput(ui, "Please type your primary username", "")
-	or.Password = getPassword(ui)
-	or.Org = getInput(ui, "Please type your primary organization name.\r\nOr ENTER to use \"default\"", "default")
-	or.Bucket = getInput(ui, "Please type your primary bucket name.\r\nOr ENTER to use \"default\"", "default")
-
-	if confirmed := getConfirm(ui, or); !confirmed {
-		fmt.Println("Setup is canceled.")
-		os.Exit(1)
+	req.User = getInput(ui, "Please type your primary username", "")
+	req.Password = getPassword(ui)
+	req.Org = getInput(ui, "Please type your primary organization name.", "")
+	req.Bucket = getInput(ui, "Please type your primary bucket name.", "")
+	for {
+		rpStr := getInput(ui, "Please type your retention period in hours (exp 168 for 1 week).\r\nOr press ENTER for infinite.", strconv.Itoa(platform.InfiniteRetention))
+		rp, err := strconv.Atoi(rpStr)
+		if rp >= 0 && err == nil {
+			req.RetentionPeriod = uint(rp)
+			break
+		}
 	}
 
-	return or
+	if confirmed := getConfirm(ui, req); !confirmed {
+		fmt.Println("Setup is canceled.")
+		// user cancel
+		os.Exit(0)
+	}
+
+	return req
 }
 
 // vt100EscapeCodes
 var (
-	keyEscape    = byte(27)
-	colorBlack   = []byte{keyEscape, '[', '3', '0', 'm'}
-	colorRed     = []byte{keyEscape, '[', '3', '1', 'm'}
-	colorGreen   = []byte{keyEscape, '[', '3', '2', 'm'}
-	colorYellow  = []byte{keyEscape, '[', '3', '3', 'm'}
-	colorBlue    = []byte{keyEscape, '[', '3', '4', 'm'}
-	colorMagenta = []byte{keyEscape, '[', '3', '5', 'm'}
-	colorCyan    = []byte{keyEscape, '[', '3', '6', 'm'}
-	colorWhite   = []byte{keyEscape, '[', '3', '7', 'm'}
-	keyReset     = []byte{keyEscape, '[', '0', 'm'}
+	keyEscape   = byte(27)
+	colorRed    = []byte{keyEscape, '[', '3', '1', 'm'}
+	colorYellow = []byte{keyEscape, '[', '3', '3', 'm'}
+	colorCyan   = []byte{keyEscape, '[', '3', '6', 'm'}
+	keyReset    = []byte{keyEscape, '[', '0', 'm'}
 )
 
 func promptWithColor(s string, color []byte) string {
@@ -102,16 +115,22 @@ func promptWithColor(s string, color []byte) string {
 func getConfirm(ui *input.UI, or *platform.OnboardingRequest) bool {
 	prompt := promptWithColor("Confirm? (y/n)", colorRed)
 	for {
+		rp := "infinite"
+		if or.RetentionPeriod > 0 {
+			rp = fmt.Sprintf("%d hrs", or.RetentionPeriod)
+		}
 		fmt.Print(promptWithColor(fmt.Sprintf(`
 You have entered:
-    Username:      %s
-    Organization:  %s
-    Bucket:        %s
-`, or.User, or.Org, or.Bucket), colorCyan))
+  Username:          %s
+  Organization:      %s
+  Bucket:            %s
+  Retention Period:  %s
+`, or.User, or.Org, or.Bucket, rp), colorCyan))
 		result, err := ui.Ask(prompt, &input.Options{
 			HideOrder: true,
 		})
 		if err != nil {
+			// interrupt
 			os.Exit(1)
 		}
 		switch result {
@@ -164,7 +183,7 @@ enterPasswd:
 		case input.ErrInterrupted:
 			os.Exit(1)
 		case nil:
-			break
+			// Nothing.
 		default:
 			fmt.Println(promptWithColor("Passwords do not match!", colorRed))
 			goto enterPasswd

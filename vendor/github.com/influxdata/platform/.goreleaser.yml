@@ -44,6 +44,8 @@ builds:
       - GO111MODULE=on
     ldflags: -s -w -X main.commit={{.Commit}}
     binary: influxd
+    hooks:
+      pre: make generate
 
 archive:
   format: tar.gz
@@ -64,7 +66,7 @@ s3:
   -
     bucket: dl.influxdata.com
     region: us-east-1
-    folder: "flux/nightlies/"
+    folder: "platform/nightlies/"
 
 dockers:
   -

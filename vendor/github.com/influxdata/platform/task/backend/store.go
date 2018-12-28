@@ -27,6 +27,12 @@ var (
 
 	// ErrManualQueueFull is returned when a manual run request cannot be completed.
 	ErrManualQueueFull = errors.New("manual queue at capacity")
+
+	// ErrRunNotFound is returned when searching for a run that doesn't exist.
+	ErrRunNotFound = errors.New("run not found")
+
+	// ErrRunNotFinished is returned when a retry is invalid due to the run not being finished yet.
+	ErrRunNotFinished = errors.New("run is still in progress")
 )
 
 type TaskStatus string
@@ -38,6 +44,19 @@ const (
 	DefaultTaskStatus TaskStatus = TaskActive
 )
 
+// validate returns an error if s is not a known task status.
+func (s TaskStatus) validate(allowEmpty bool) error {
+	if allowEmpty && s == "" {
+		return nil
+	}
+
+	if s == TaskActive || s == TaskInactive {
+		return nil
+	}
+
+	return fmt.Errorf("invalid task status: %q", s)
+}
+
 type RunStatus int
 
 const (
@@ -45,6 +64,7 @@ const (
 	RunSuccess
 	RunFail
 	RunCanceled
+	RunScheduled
 )
 
 func (r RunStatus) String() string {
@@ -57,6 +77,8 @@ func (r RunStatus) String() string {
 		return "failed"
 	case RunCanceled:
 		return "canceled"
+	case RunScheduled:
+		return "scheduled"
 	}
 	panic(fmt.Sprintf("unknown RunStatus: %d", r))
 }
@@ -71,6 +93,43 @@ func (e RunNotYetDueError) Error() string {
 	return "run not due until " + time.Unix(e.DueAt, 0).UTC().Format(time.RFC3339)
 }
 
+// RequestStillQueuedError is returned when attempting to retry a run which has not yet completed.
+type RequestStillQueuedError struct {
+	// Unix timestamps matching existing request's start and end.
+	Start, End int64
+}
+
+const fmtRequestStillQueued = "previous retry for start=%s end=%s has not yet finished"
+
+func (e RequestStillQueuedError) Error() string {
+	return fmt.Sprintf(fmtRequestStillQueued,
+		time.Unix(e.Start, 0).UTC().Format(time.RFC3339),
+		time.Unix(e.End, 0).UTC().Format(time.RFC3339),
+	)
+}
+
+// ParseRequestStillQueuedError attempts to parse a RequestStillQueuedError from msg.
+// If msg is formatted correctly, the resultant error is returned; otherwise it returns nil.
+func ParseRequestStillQueuedError(msg string) *RequestStillQueuedError {
+	var s, e string
+	n, err := fmt.Sscanf(msg, fmtRequestStillQueued, &s, &e)
+	if err != nil || n != 2 {
+		return nil
+	}
+
+	start, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil
+	}
+
+	end, err := time.Parse(time.RFC3339, e)
+	if err != nil {
+		return nil
+	}
+
+	return &RequestStillQueuedError{Start: start.Unix(), End: end.Unix()}
+}
+
 // RunCreation is returned by CreateNextRun.
 type RunCreation struct {
 	Created QueuedRun
@@ -83,6 +142,7 @@ type RunCreation struct {
 	HasQueue bool
 }
 
+// CreateTaskRequest encapsulates state of a new task to be created.
 type CreateTaskRequest struct {
 	// Owners.
 	Org, User platform.ID
@@ -100,34 +160,55 @@ type CreateTaskRequest struct {
 	Status TaskStatus
 }
 
+// UpdateTaskRequest encapsulates requested changes to a task.
+type UpdateTaskRequest struct {
+	// ID of the task.
+	ID platform.ID
+
+	// New script content of the task.
+	// If empty, do not modify the existing script.
+	Script string
+
+	// The new desired task status.
+	// If empty, do not modify the existing status.
+	Status TaskStatus
+}
+
+// UpdateTaskResult describes the result of modifying a single task.
+// Having the content returned from ModifyTask makes it much simpler for callers
+// to decide how to notify on status changes, etc.
+type UpdateTaskResult struct {
+	OldScript string
+	OldStatus TaskStatus
+
+	NewTask StoreTask
+	NewMeta StoreTaskMeta
+}
+
 // Store is the interface around persisted tasks.
 type Store interface {
 	// CreateTask creates a task with from the given CreateTaskRequest.
 	// If the task is created successfully, the ID of the new task is returned.
 	CreateTask(ctx context.Context, req CreateTaskRequest) (platform.ID, error)
 
-	// ModifyTask updates the script of an existing task.
+	// UpdateTask updates an existing task.
 	// It returns an error if there was no task matching the given ID.
-	ModifyTask(ctx context.Context, id platform.ID, newScript string) error
+	// If the returned error is not nil, the returned result should not be inspected.
+	UpdateTask(ctx context.Context, req UpdateTaskRequest) (UpdateTaskResult, error)
 
 	// ListTasks lists the tasks in the store that match the search params.
-	ListTasks(ctx context.Context, params TaskSearchParams) ([]StoreTask, error)
+	ListTasks(ctx context.Context, params TaskSearchParams) ([]StoreTaskWithMeta, error)
 
 	// FindTaskByID returns the task with the given ID.
-	// If no task matches the ID, the returned task is nil.
+	// If no task matches the ID, the returned task is nil and ErrTaskNotFound is returned.
 	FindTaskByID(ctx context.Context, id platform.ID) (*StoreTask, error)
 
 	// FindTaskMetaByID returns the metadata about a task.
+	// If no task meta matches the ID, the returned meta is nil and ErrTaskNotFound is returned.
 	FindTaskMetaByID(ctx context.Context, id platform.ID) (*StoreTaskMeta, error)
 
 	// FindTaskByIDWithMeta combines finding the task and the meta into a single call.
 	FindTaskByIDWithMeta(ctx context.Context, id platform.ID) (*StoreTask, *StoreTaskMeta, error)
-
-	// EnableTask updates task status to active.
-	EnableTask(ctx context.Context, id platform.ID) error
-
-	// DisableTask updates task status to inactive.
-	DisableTask(ctx context.Context, id platform.ID) error
 
 	// DeleteTask returns whether an entry matching the given ID was deleted.
 	// If err is non-nil, deleted is false.
@@ -145,7 +226,7 @@ type Store interface {
 	// ManuallyRunTimeRange enqueues a request to run the task with the given ID for all schedules no earlier than start and no later than end (Unix timestamps).
 	// requestedAt is the Unix timestamp when the request was initiated.
 	// ManuallyRunTimeRange must delegate to an underlying StoreTaskMeta's ManuallyRunTimeRange method.
-	ManuallyRunTimeRange(ctx context.Context, taskID platform.ID, start, end, requestedAt int64) error
+	ManuallyRunTimeRange(ctx context.Context, taskID platform.ID, start, end, requestedAt int64) (*StoreTaskMetaManualRun, error)
 
 	// DeleteOrg deletes the org.
 	DeleteOrg(ctx context.Context, orgID platform.ID) error
@@ -199,6 +280,7 @@ type LogReader interface {
 	ListRuns(ctx context.Context, runFilter platform.RunFilter) ([]*platform.Run, error)
 
 	// FindRunByID finds a run given a orgID and runID.
+	// orgID is necessary to look in the correct system bucket.
 	FindRunByID(ctx context.Context, orgID, runID platform.ID) (*platform.Run, error)
 
 	// ListLogs lists logs for a task or a specified run of a task.
@@ -252,6 +334,12 @@ type StoreTask struct {
 	Script string
 }
 
+// StoreTaskWithMeta is a single struct with a StoreTask and a StoreTaskMeta.
+type StoreTaskWithMeta struct {
+	Task StoreTask
+	Meta StoreTaskMeta
+}
+
 // StoreValidator is a package-level StoreValidation, so that you can write
 //    backend.StoreValidator.CreateArgs(...)
 var StoreValidator StoreValidation
@@ -286,30 +374,36 @@ func (StoreValidation) CreateArgs(req CreateTaskRequest) (options.Options, error
 		return o, fmt.Errorf("missing required fields to create task: %s", strings.Join(missing, ", "))
 	}
 
-	if req.Status != "" && req.Status != TaskActive && req.Status != TaskInactive {
-		return o, fmt.Errorf("invalid status: %s", req.Status)
+	if err := req.Status.validate(true); err != nil {
+		return o, err
 	}
 
 	return o, nil
 }
 
-// ModifyArgs returns the script's parsed options,
-// and an error if any of the provided fields are invalid for modifying a task.
-func (StoreValidation) ModifyArgs(taskID platform.ID, script string) (options.Options, error) {
+// UpdateArgs validates the UpdateTaskRequest.
+// If the update only includes a new status (i.e. req.Script is empty), the returned options are zero.
+// If the update contains neither a new script nor a new status, or if the script is invalid, an error is returned.
+func (StoreValidation) UpdateArgs(req UpdateTaskRequest) (options.Options, error) {
 	var missing []string
 	var o options.Options
 
-	if script == "" {
-		missing = append(missing, "script")
+	if req.Script == "" && req.Status == "" {
+		missing = append(missing, "script or status")
 	} else {
-		var err error
-		o, err = options.FromScript(script)
-		if err != nil {
+		if req.Script != "" {
+			var err error
+			o, err = options.FromScript(req.Script)
+			if err != nil {
+				return o, err
+			}
+		}
+		if err := req.Status.validate(true); err != nil {
 			return o, err
 		}
 	}
 
-	if !taskID.Valid() {
+	if !req.ID.Valid() {
 		missing = append(missing, "task ID")
 	}
 

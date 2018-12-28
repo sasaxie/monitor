@@ -10,12 +10,21 @@ import (
 	"time"
 
 	"github.com/influxdata/platform"
+	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
-var ErrRunCanceled = errors.New("run canceled")
-var ErrTaskNotClaimed = errors.New("task not claimed")
+var (
+	// ErrRunCanceled is returned from the RunResult when a Run is Canceled.  It is used mostly internally.
+	ErrRunCanceled = errors.New("run canceled")
+
+	// ErrTaskNotClaimed is returned when attempting to operate against a task that must be claimed but is not.
+	ErrTaskNotClaimed = errors.New("task not claimed")
+
+	// ErrTaskAlreadyClaimed is returned when attempting to operate against a task that must not be claimed but is.
+	ErrTaskAlreadyClaimed = errors.New("task already claimed")
+)
 
 // DesiredState persists the desired state of a run.
 type DesiredState interface {
@@ -39,6 +48,11 @@ type Executor interface {
 	// TODO(mr): this assumes you can execute a run just from a taskID and a now time.
 	// We may need to include the script content in this method signature.
 	Execute(ctx context.Context, run QueuedRun) (RunPromise, error)
+
+	// Wait blocks until all RunPromises created through Execute have finished.
+	// Once Wait has been called, it is an error to call Execute before Wait has returned.
+	// After Wait returns, it is safe to call Execute again.
+	Wait()
 }
 
 // QueuedRun is a task run that has been assigned an ID,
@@ -103,20 +117,32 @@ type Scheduler interface {
 	// ReleaseTask immediately cancels any in-progress runs for the given task ID,
 	// and releases any resources related to management of that task.
 	ReleaseTask(taskID platform.ID) error
+
+	// Cancel stops an executing run.
+	CancelRun(ctx context.Context, taskID, runID platform.ID) error
 }
 
 // TickSchedulerOption is a option you can use to modify the schedulers behavior.
 type TickSchedulerOption func(*TickScheduler)
 
+// WithTicker sets a time.Ticker with period d,
+// and calls TickScheduler.Tick when the ticker rolls over to a new second.
+// With a sub-second d, TickScheduler.Tick should be called roughly no later than d after a second:
+// this can help ensure tasks happen early with a second window.
 func WithTicker(ctx context.Context, d time.Duration) TickSchedulerOption {
 	return func(s *TickScheduler) {
 		ticker := time.NewTicker(d)
 
 		go func() {
+			prev := time.Now().Unix() - 1
 			for {
 				select {
-				case time := <-ticker.C:
-					go s.Tick(time.Unix())
+				case t := <-ticker.C:
+					u := t.Unix()
+					if u > prev {
+						prev = u
+						go s.Tick(u)
+					}
 				case <-ctx.Done():
 					ticker.Stop()
 					return
@@ -141,7 +167,7 @@ func NewScheduler(desiredState DesiredState, executor Executor, lw LogWriter, no
 		executor:       executor,
 		logWriter:      lw,
 		now:            now,
-		taskSchedulers: make(map[string]*taskScheduler),
+		taskSchedulers: make(map[platform.ID]*taskScheduler),
 		logger:         zap.NewNop(),
 		wg:             &sync.WaitGroup{},
 		metrics:        newSchedulerMetrics(),
@@ -168,8 +194,29 @@ type TickScheduler struct {
 	cancel context.CancelFunc
 	wg     *sync.WaitGroup
 
-	schedulerMu    sync.Mutex                // Protects access and modification of taskSchedulers map.
-	taskSchedulers map[string]*taskScheduler // Stringified task ID -> task scheduler.
+	schedulerMu    sync.Mutex                     // Protects access and modification of taskSchedulers map.
+	taskSchedulers map[platform.ID]*taskScheduler // task ID -> task scheduler.
+}
+
+// CancelRun cancels a run, it has the unused Context argument so that it can implement a task.RunController
+func (s *TickScheduler) CancelRun(_ context.Context, taskID, runID platform.ID) error {
+	s.schedulerMu.Lock()
+	defer s.schedulerMu.Unlock()
+	ts, ok := s.taskSchedulers[taskID]
+	if !ok {
+		return ErrTaskNotFound
+	}
+	ts.runningMu.Lock()
+	c, ok := ts.running[runID]
+	if !ok {
+		ts.runningMu.Unlock()
+		return ErrRunNotFound
+	}
+	ts.runningMu.Unlock()
+	if c.CancelFunc != nil {
+		c.CancelFunc()
+	}
+	return nil
 }
 
 // Tick updates the time of the scheduler.
@@ -199,7 +246,8 @@ func (s *TickScheduler) Tick(now int64) {
 			affected++
 		}
 	}
-	s.logger.Info("Ticked", zap.Int64("now", now), zap.Int("tasks_affected", affected))
+	// TODO(mr): find a way to emit a more useful / less annoying tick message, maybe aggregated over the past 10s or 30s?
+	s.logger.Debug("Ticked", zap.Int64("now", now), zap.Int("tasks_affected", affected))
 }
 
 func (s *TickScheduler) Start(ctx context.Context) {
@@ -210,7 +258,6 @@ func (s *TickScheduler) Start(ctx context.Context) {
 }
 
 func (s *TickScheduler) Stop() {
-	defer s.wg.Wait()
 
 	s.schedulerMu.Lock()
 	defer s.schedulerMu.Unlock()
@@ -225,8 +272,14 @@ func (s *TickScheduler) Stop() {
 	// release tasks
 	for id := range s.taskSchedulers {
 		delete(s.taskSchedulers, id)
-		s.metrics.ReleaseTask(id)
+		s.metrics.ReleaseTask(id.String())
 	}
+
+	// Wait for schedulers to clean up.
+	s.wg.Wait()
+
+	// Wait for outstanding executions to finish.
+	s.executor.Wait()
 }
 
 func (s *TickScheduler) ClaimTask(task *StoreTask, meta *StoreTaskMeta) (err error) {
@@ -250,19 +303,18 @@ func (s *TickScheduler) ClaimTask(task *StoreTask, meta *StoreTaskMeta) (err err
 		return err
 	}
 
-	if len(meta.CurrentlyRunning) != 0 {
+	_, ok := s.taskSchedulers[task.ID]
+	if ok {
+		return ErrTaskAlreadyClaimed
+	}
+
+	s.taskSchedulers[task.ID] = ts
+
+	if len(meta.CurrentlyRunning) > 0 {
 		if err := ts.WorkCurrentlyRunning(meta); err != nil {
 			return err
 		}
 	}
-
-	tid := task.ID.String()
-	_, ok := s.taskSchedulers[tid]
-	if ok {
-		return errors.New("task has already been claimed")
-	}
-
-	s.taskSchedulers[tid] = ts
 
 	next, hasQueue := ts.NextDue()
 	if now := atomic.LoadInt64(&s.now); now >= next || hasQueue {
@@ -275,8 +327,7 @@ func (s *TickScheduler) UpdateTask(task *StoreTask, meta *StoreTaskMeta) error {
 	s.schedulerMu.Lock()
 	defer s.schedulerMu.Unlock()
 
-	tid := task.ID.String()
-	ts, ok := s.taskSchedulers[tid]
+	ts, ok := s.taskSchedulers[task.ID]
 	if !ok {
 		return ErrTaskNotClaimed
 	}
@@ -287,7 +338,7 @@ func (s *TickScheduler) UpdateTask(task *StoreTask, meta *StoreTaskMeta) error {
 		return err
 	}
 
-	s.taskSchedulers[tid] = nts
+	s.taskSchedulers[task.ID] = nts
 
 	next, hasQueue := ts.NextDue()
 	if now := atomic.LoadInt64(&s.now); now >= next || hasQueue {
@@ -301,22 +352,26 @@ func (s *TickScheduler) ReleaseTask(taskID platform.ID) error {
 	s.schedulerMu.Lock()
 	defer s.schedulerMu.Unlock()
 
-	tid := taskID.String()
-	t, ok := s.taskSchedulers[tid]
+	t, ok := s.taskSchedulers[taskID]
 	if !ok {
 		return ErrTaskNotClaimed
 	}
 
 	t.Cancel()
-	delete(s.taskSchedulers, tid)
+	delete(s.taskSchedulers, taskID)
 
-	s.metrics.ReleaseTask(tid)
+	s.metrics.ReleaseTask(taskID.String())
 
 	return nil
 }
 
 func (s *TickScheduler) PrometheusCollectors() []prometheus.Collector {
 	return s.metrics.PrometheusCollectors()
+}
+
+type runCtx struct {
+	Context    context.Context
+	CancelFunc context.CancelFunc
 }
 
 // taskScheduler is a lightweight wrapper around a collection of runners.
@@ -332,7 +387,9 @@ type taskScheduler struct {
 	wg     *sync.WaitGroup
 
 	// Fixed-length slice of runners.
-	runners []*runner
+	runners   []*runner
+	running   map[platform.ID]runCtx
+	runningMu sync.Mutex
 
 	logger *zap.Logger
 
@@ -364,6 +421,7 @@ func newTaskScheduler(
 		cancel:        cancel,
 		wg:            wg,
 		runners:       make([]*runner, meta.MaxConcurrency),
+		running:       make(map[platform.ID]runCtx, meta.MaxConcurrency),
 		logger:        s.logger.With(zap.String("task_id", task.ID.String())),
 		metrics:       s.metrics,
 		nextDue:       firstDue,
@@ -511,12 +569,18 @@ func (r *runner) RestartRun(qr QueuedRun) bool {
 		// already working
 		return false
 	}
-
 	// create a QueuedRun because we cant stm.CreateNextRun
 	runLogger := r.logger.With(zap.String("run_id", qr.RunID.String()), zap.Int64("now", qr.Now))
-
 	r.wg.Add(1)
-	go r.executeAndWait(qr, runLogger)
+	r.ts.runningMu.Lock()
+	rCtx, ok := r.ts.running[qr.RunID]
+	if !ok {
+		ctx, cancel := context.WithCancel(context.TODO())
+		rCtx = runCtx{Context: ctx, CancelFunc: cancel}
+		r.ts.running[qr.RunID] = rCtx
+	}
+	r.ts.runningMu.Unlock()
+	go r.executeAndWait(rCtx.Context, qr, runLogger)
 
 	r.updateRunState(qr, RunStarted, runLogger)
 	return true
@@ -530,14 +594,18 @@ func (r *runner) startFromWorking(now int64) {
 		atomic.StoreUint32(r.state, runnerIdle)
 		return
 	}
-
-	rc, err := r.desiredState.CreateNextRun(r.ctx, r.task.ID, now)
+	ctx, cancel := context.WithCancel(r.ctx)
+	rc, err := r.desiredState.CreateNextRun(ctx, r.task.ID, now)
 	if err != nil {
 		r.logger.Info("Failed to create run", zap.Error(err))
 		atomic.StoreUint32(r.state, runnerIdle)
+		cancel() // cancel to prevent context leak
 		return
 	}
 	qr := rc.Created
+	r.ts.runningMu.Lock()
+	r.ts.running[qr.RunID] = runCtx{Context: ctx, CancelFunc: cancel}
+	r.ts.runningMu.Unlock()
 	r.ts.SetNextDue(rc.NextDue, rc.HasQueue, qr.Now)
 
 	// Create a new child logger for the individual run.
@@ -547,14 +615,26 @@ func (r *runner) startFromWorking(now int64) {
 
 	runLogger.Info("Created run; beginning execution")
 	r.wg.Add(1)
-	go r.executeAndWait(qr, runLogger)
+	go r.executeAndWait(ctx, qr, runLogger)
 
 	r.updateRunState(qr, RunStarted, runLogger)
 }
 
-func (r *runner) executeAndWait(qr QueuedRun, runLogger *zap.Logger) {
+func (r *runner) clearRunning(id platform.ID) {
+	r.ts.runningMu.Lock()
+	r.ts.running[id].CancelFunc() // cleanup
+	delete(r.ts.running, id)
+	r.ts.runningMu.Unlock()
+}
+
+func (r *runner) executeAndWait(ctx context.Context, qr QueuedRun, runLogger *zap.Logger) {
 	defer r.wg.Done()
-	rp, err := r.executor.Execute(r.ctx, qr)
+
+	sp, spCtx := opentracing.StartSpanFromContext(ctx, "task.run.execution")
+	defer sp.Finish()
+
+	rp, err := r.executor.Execute(spCtx, qr)
+
 	if err != nil {
 		// TODO(mr): retry? and log error.
 		atomic.StoreUint32(r.state, runnerIdle)
@@ -566,11 +646,16 @@ func (r *runner) executeAndWait(qr QueuedRun, runLogger *zap.Logger) {
 	go func() {
 		// If the runner's context is canceled, cancel the RunPromise.
 		select {
+		case <-ctx.Done():
+			r.clearRunning(qr.RunID)
+			rp.Cancel()
 		// Canceled context.
 		case <-r.ctx.Done():
+			r.clearRunning(qr.RunID)
 			rp.Cancel()
 		// Wait finished.
 		case <-ready:
+			r.clearRunning(qr.RunID)
 		}
 	}()
 

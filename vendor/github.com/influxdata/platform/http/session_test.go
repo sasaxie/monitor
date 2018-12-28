@@ -23,7 +23,6 @@ func TestBasicAuthHandler_handleSignin(t *testing.T) {
 	}
 	type wants struct {
 		cookie string
-		err    error
 		code   int
 	}
 
@@ -84,7 +83,6 @@ func TestBasicAuthHandler_handleSignin(t *testing.T) {
 			if got, want := cookie, tt.wants.cookie; got != want {
 				t.Errorf("expected session cookie to be set: got %q want %q", got, want)
 			}
-
 		})
 	}
 }

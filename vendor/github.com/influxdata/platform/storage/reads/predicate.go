@@ -155,11 +155,11 @@ func (v *predicateExpressionPrinter) Visit(n *datatypes.Node) NodeVisitor {
 }
 
 func toStoragePredicate(f *semantic.FunctionExpression) (*datatypes.Predicate, error) {
-	if len(f.Params) != 1 {
+	if f.Block.Parameters == nil || len(f.Block.Parameters.List) != 1 {
 		return nil, errors.New("storage predicate functions must have exactly one parameter")
 	}
 
-	root, err := toStoragePredicateHelper(f.Body.(semantic.Expression), f.Params[0].Key.Name)
+	root, err := toStoragePredicateHelper(f.Block.Body.(semantic.Expression), f.Block.Parameters.List[0].Key.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -320,8 +320,6 @@ func toComparisonOperator(o ast.OperatorKind) (datatypes.Node_Comparison, error)
 	}
 }
 
-var measurementRemap = map[string]string{"_measurement": "_name"}
-
 // NodeToExpr transforms a predicate node to an influxql.Expr.
 func NodeToExpr(node *datatypes.Node, remap map[string]string) (influxql.Expr, error) {
 	v := &nodeToExprVisitor{remap: remap}
@@ -388,7 +386,7 @@ func (v *nodeToExprVisitor) Visit(n *datatypes.Node) NodeVisitor {
 
 	case datatypes.NodeTypeParenExpression:
 		if len(n.Children) != 1 {
-			v.err = errors.New("ParenExpression expects one child")
+			v.err = errors.New("parenExpression expects one child")
 			return nil
 		}
 
@@ -407,7 +405,7 @@ func (v *nodeToExprVisitor) Visit(n *datatypes.Node) NodeVisitor {
 		WalkChildren(v, n)
 
 		if len(v.exprs) < 2 {
-			v.err = errors.New("ComparisonExpression expects two children")
+			v.err = errors.New("comparisonExpression expects two children")
 			return nil
 		}
 

@@ -13,7 +13,6 @@ import (
 	gojwt "github.com/dgrijalva/jwt-go"
 	"github.com/influxdata/platform/chronograf"
 	"github.com/influxdata/platform/chronograf/influx"
-	"github.com/influxdata/platform/chronograf/log"
 	"github.com/influxdata/platform/chronograf/mocks"
 )
 
@@ -45,7 +44,7 @@ func Test_Influx_MakesRequestsToQueryEndpoint(t *testing.T) {
 	defer ts.Close()
 
 	var series chronograf.TimeSeries
-	series, err := NewClient(ts.URL, log.New(log.DebugLevel))
+	series, err := NewClient(ts.URL, &chronograf.NoopLogger{})
 	if err != nil {
 		t.Fatal("Unexpected error initializing client: err:", err)
 	}
@@ -58,7 +57,7 @@ func Test_Influx_MakesRequestsToQueryEndpoint(t *testing.T) {
 		t.Fatal("Expected no error but was", err)
 	}
 
-	if called == false {
+	if !called {
 		t.Error("Expected http request to Influx but there was none")
 	}
 }
@@ -80,7 +79,7 @@ func Test_Influx_AuthorizationBearer(t *testing.T) {
 		tokenString := strings.Split(auth, " ")[1]
 		token, err := gojwt.Parse(tokenString, func(token *gojwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*gojwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return []byte("42"), nil
 		})
@@ -106,7 +105,7 @@ func Test_Influx_AuthorizationBearer(t *testing.T) {
 		SharedSecret: "42",
 	}
 	series := &influx.Client{
-		Logger: log.New(log.DebugLevel),
+		Logger: &chronograf.NoopLogger{},
 	}
 	series.Connect(context.Background(), src)
 
@@ -155,7 +154,7 @@ func Test_Influx_AuthorizationBearerCtx(t *testing.T) {
 	defer ts.Close()
 
 	series := &influx.Client{
-		Logger: log.New(log.DebugLevel),
+		Logger: &chronograf.NoopLogger{},
 	}
 
 	err := series.Connect(context.Background(), &chronograf.Source{
@@ -164,6 +163,9 @@ func Test_Influx_AuthorizationBearerCtx(t *testing.T) {
 		URL:                ts.URL,
 		InsecureSkipVerify: true,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	query := chronograf.Query{
 		Command: "show databases",
@@ -185,7 +187,7 @@ func Test_Influx_AuthorizationBearerFailure(t *testing.T) {
 	series := &influx.Client{
 		URL:        u,
 		Authorizer: bearer,
-		Logger:     log.New(log.DebugLevel),
+		Logger:     &chronograf.NoopLogger{},
 	}
 
 	query := chronograf.Query{
@@ -206,7 +208,7 @@ func Test_Influx_HTTPS_Failure(t *testing.T) {
 
 	ctx := context.Background()
 	var series chronograf.TimeSeries
-	series, err := NewClient(ts.URL, log.New(log.DebugLevel))
+	series, err := NewClient(ts.URL, &chronograf.NoopLogger{})
 	if err != nil {
 		t.Fatal("Unexpected error initializing client: err:", err)
 	}
@@ -226,10 +228,9 @@ func Test_Influx_HTTPS_Failure(t *testing.T) {
 		t.Error("Expected error but was successful")
 	}
 
-	if called == true {
+	if called {
 		t.Error("Expected http request to fail, but, succeeded")
 	}
-
 }
 
 func Test_Influx_HTTPS_InsecureSkipVerify(t *testing.T) {
@@ -250,7 +251,7 @@ func Test_Influx_HTTPS_InsecureSkipVerify(t *testing.T) {
 
 	ctx := context.Background()
 	var series chronograf.TimeSeries
-	series, err := NewClient(ts.URL, log.New(log.DebugLevel))
+	series, err := NewClient(ts.URL, &chronograf.NoopLogger{})
 	if err != nil {
 		t.Fatal("Unexpected error initializing client: err:", err)
 	}
@@ -271,7 +272,7 @@ func Test_Influx_HTTPS_InsecureSkipVerify(t *testing.T) {
 		t.Fatal("Expected no error but was", err)
 	}
 
-	if called == false {
+	if !called {
 		t.Error("Expected http request to Influx but there was none")
 	}
 	called = false
@@ -284,7 +285,7 @@ func Test_Influx_HTTPS_InsecureSkipVerify(t *testing.T) {
 		t.Fatal("Expected no error but was", err)
 	}
 
-	if called == false {
+	if !called {
 		t.Error("Expected http request to Influx but there was none")
 	}
 
@@ -308,7 +309,7 @@ func Test_Influx_CancelsInFlightRequests(t *testing.T) {
 		ts.Close()
 	}()
 
-	series, _ := NewClient(ts.URL, log.New(log.DebugLevel))
+	series, _ := NewClient(ts.URL, &chronograf.NoopLogger{})
 	ctx, cancel := context.WithCancel(context.Background())
 
 	errs := make(chan (error))
@@ -351,7 +352,7 @@ func Test_Influx_CancelsInFlightRequests(t *testing.T) {
 }
 
 func Test_Influx_RejectsInvalidHosts(t *testing.T) {
-	_, err := NewClient(":", log.New(log.DebugLevel))
+	_, err := NewClient(":", &chronograf.NoopLogger{})
 	if err == nil {
 		t.Fatal("Expected err but was nil")
 	}
@@ -363,7 +364,7 @@ func Test_Influx_ReportsInfluxErrs(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cl, err := NewClient(ts.URL, log.New(log.DebugLevel))
+	cl, err := NewClient(ts.URL, &chronograf.NoopLogger{})
 	if err != nil {
 		t.Fatal("Encountered unexpected error while initializing influx client: err:", err)
 	}

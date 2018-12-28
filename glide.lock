@@ -1,8 +1,17 @@
-hash: 1d7deacfdf29c12e3e27684161625ff1c364cd786436f8b94c28821a05081fe6
-updated: 2018-10-16T14:10:38.785264+08:00
+hash: a385bbd892a91b017abcff48f0da329688ab6d8780b0e8d15234dfea8c070f9d
+updated: 2018-12-28T19:07:57.910285+08:00
 imports:
 - name: github.com/astaxie/beego
   version: f16688817aa428d10361394015b40d096b680542
+  subpackages:
+  - config
+  - context
+  - context/param
+  - grace
+  - logs
+  - session
+  - toolbox
+  - utils
 - name: github.com/BurntSushi/toml
   version: 3012a1dbe2e4bd1391d42b32f0577cb7bbc7f005
 - name: github.com/ethereum/go-ethereum
@@ -20,18 +29,21 @@ imports:
   - ptypes/duration
   - ptypes/timestamp
 - name: github.com/gorilla/websocket
-  version: 76e4896901ef89d253d69b528d3701dd146fe2ae
+  version: 95ba29eb981bbb27d92e1f70bf8a1949452d926b
 - name: github.com/influxdata/influxdb
-  version: 4958cdc70be25b636b1598277ba9846afbced004
+  version: 38b07bbaab8616d26ce9e71eb9a7e62fd6463c6e
   subpackages:
   - client/v2
   - models
   - pkg/escape
 - name: github.com/influxdata/platform
-  version: 8bf3ab548d4868837c049f335ad8398044703320
+  version: efdb37386875ec70c5df4ff303c07cc0323624e5
   subpackages:
+  - kit/errors
   - models
   - pkg/escape
+- name: github.com/robfig/cron
+  version: b41be1df696709bb6395fe435af20370037c0b4c
 - name: github.com/shengdoushi/base58
   version: c2e5dd9cebf91f86ab174cf5fd8bdb66d99c9e22
 - name: golang.org/x/net

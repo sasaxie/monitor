@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"strings"
 
 	"go.uber.org/zap"
 
@@ -23,12 +22,15 @@ type AuthorizationHandler struct {
 	Logger *zap.Logger
 
 	AuthorizationService platform.AuthorizationService
+	UserService          platform.UserService
 }
 
 // NewAuthorizationHandler returns a new instance of AuthorizationHandler.
-func NewAuthorizationHandler() *AuthorizationHandler {
+func NewAuthorizationHandler(userService platform.UserService) *AuthorizationHandler {
 	h := &AuthorizationHandler{
-		Router: httprouter.New(),
+		Router:      NewRouter(),
+		Logger:      zap.NewNop(),
+		UserService: userService,
 	}
 
 	h.HandlerFunc("POST", "/api/v2/authorizations", h.handlePostAuthorization)
@@ -56,7 +58,7 @@ func newAuthResponse(a *platform.Authorization) *authResponse {
 
 type authsResponse struct {
 	Links map[string]string `json:"links"`
-	Auths []*authResponse   `json:"auths"`
+	Auths []*authResponse   `json:"authorizations"`
 }
 
 func newAuthsResponse(opts platform.FindOptions, f platform.AuthorizationFilter, as []*platform.Authorization) *authsResponse {
@@ -84,17 +86,30 @@ func (h *AuthorizationHandler) handlePostAuthorization(w http.ResponseWriter, r 
 		return
 	}
 
+	a := req.Authorization
+	userFilter := platform.UserFilter{
+		ID:   &a.UserID,
+		Name: &a.User,
+	}
+	if _, err := h.UserService.FindUser(ctx, userFilter); err != nil {
+		h.Logger.Info("failed to find user", zap.String("handler", "postAuthorization"), zap.Error(err))
+		EncodeError(ctx, &platform.Error{
+			Err:  err,
+			Code: platform.EInvalid,
+		}, w)
+		return
+	}
+
 	// TODO: Need to do some validation of req.Authorization.Permissions
 
-	if err := h.AuthorizationService.CreateAuthorization(ctx, req.Authorization); err != nil {
+	if err := h.AuthorizationService.CreateAuthorization(ctx, a); err != nil {
 		// Don't log here, it should already be handled by the service
 		EncodeError(ctx, err, w)
 		return
 	}
 
-	if err := encodeResponse(ctx, w, http.StatusCreated, newAuthResponse(req.Authorization)); err != nil {
-		h.Logger.Info("failed to encode response", zap.String("handler", "postAuthorization"), zap.Error(err))
-		EncodeError(ctx, err, w)
+	if err := encodeResponse(ctx, w, http.StatusCreated, newAuthResponse(a)); err != nil {
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -128,18 +143,13 @@ func (h *AuthorizationHandler) handleGetAuthorizations(w http.ResponseWriter, r 
 	opts := platform.FindOptions{}
 	as, _, err := h.AuthorizationService.FindAuthorizations(ctx, req.filter, opts)
 	if err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = kerrors.New(err.Error(), kerrors.NotFound)
-		}
 		// Don't log here, it should already be handled by the service
 		EncodeError(ctx, err, w)
 		return
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newAuthsResponse(opts, req.filter, as)); err != nil {
-		h.Logger.Info("failed to encode response", zap.String("handler", "getAuthorizations"), zap.Error(err))
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -192,18 +202,13 @@ func (h *AuthorizationHandler) handleGetAuthorization(w http.ResponseWriter, r *
 
 	a, err := h.AuthorizationService.FindAuthorizationByID(ctx, req.ID)
 	if err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = kerrors.New(err.Error(), kerrors.NotFound)
-		}
 		// Don't log here, it should already be handled by the service
 		EncodeError(ctx, err, w)
 		return
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newAuthResponse(a)); err != nil {
-		h.Logger.Info("failed to encode response", zap.String("handler", "getAuthorization"), zap.Error(err))
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -242,10 +247,6 @@ func (h *AuthorizationHandler) handleSetAuthorizationStatus(w http.ResponseWrite
 
 	a, err := h.AuthorizationService.FindAuthorizationByID(ctx, req.ID)
 	if err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = kerrors.New(err.Error(), kerrors.NotFound)
-		}
 		EncodeError(ctx, err, w)
 		return
 	}
@@ -259,8 +260,7 @@ func (h *AuthorizationHandler) handleSetAuthorizationStatus(w http.ResponseWrite
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newAuthResponse(a)); err != nil {
-		h.Logger.Info("failed to encode response", zap.String("handler", "updateAuthorization"), zap.Error(err))
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -311,10 +311,6 @@ func (h *AuthorizationHandler) handleDeleteAuthorization(w http.ResponseWriter, 
 	}
 
 	if err := h.AuthorizationService.DeleteAuthorization(ctx, req.ID); err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = kerrors.New(err.Error(), kerrors.NotFound)
-		}
 		// Don't log here, it should already be handled by the service
 		EncodeError(ctx, err, w)
 		return
@@ -372,7 +368,7 @@ func (s *AuthorizationService) FindAuthorizationByID(ctx context.Context, id pla
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -426,7 +422,7 @@ func (s *AuthorizationService) FindAuthorizations(ctx context.Context, filter pl
 		return nil, 0, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, 0, err
 	}
 
@@ -476,7 +472,7 @@ func (s *AuthorizationService) CreateAuthorization(ctx context.Context, a *platf
 	}
 
 	// TODO(jsternberg): Should this check for a 201 explicitly?
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -520,7 +516,7 @@ func (s *AuthorizationService) SetAuthorizationStatus(ctx context.Context, id pl
 		return err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -545,7 +541,7 @@ func (s *AuthorizationService) DeleteAuthorization(ctx context.Context, id platf
 	if err != nil {
 		return err
 	}
-	return CheckError(resp)
+	return CheckError(resp, true)
 }
 
 func authorizationIDPath(id platform.ID) string {

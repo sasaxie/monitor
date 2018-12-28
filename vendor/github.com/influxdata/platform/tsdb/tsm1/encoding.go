@@ -45,7 +45,7 @@ func init() {
 		vals = vals[:0]
 		// Check one out to force the allocation now and hold onto it
 		for i := 0; i < runtime.NumCPU(); i++ {
-			v := p.Get(tsdb.DefaultMaxPointsPerBlock)
+			v := p.Get(MaxPointsPerBlock)
 			vals = append(vals, v)
 		}
 		// Add them all back
@@ -169,12 +169,12 @@ func (e EmptyValue) Size() int { return 0 }
 // String returns the empty string.
 func (e EmptyValue) String() string { return "" }
 
-func (_ EmptyValue) internalOnly()    {}
-func (_ StringValue) internalOnly()   {}
-func (_ IntegerValue) internalOnly()  {}
-func (_ UnsignedValue) internalOnly() {}
-func (_ BooleanValue) internalOnly()  {}
-func (_ FloatValue) internalOnly()    {}
+func (EmptyValue) internalOnly()    {}
+func (StringValue) internalOnly()   {}
+func (IntegerValue) internalOnly()  {}
+func (UnsignedValue) internalOnly() {}
+func (BooleanValue) internalOnly()  {}
+func (FloatValue) internalOnly()    {}
 
 // Encode converts the values to a byte slice.  If there are no values,
 // this function panics.

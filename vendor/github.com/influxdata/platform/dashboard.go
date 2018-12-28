@@ -2,14 +2,28 @@ package platform
 
 import (
 	"context"
-	"fmt"
+	"sort"
+	"time"
 )
 
-// ErrDashboardNotFound is the error for a missing dashboard.
-const ErrDashboardNotFound = ChronografError("dashboard not found")
+// ErrDashboardNotFound is the error msg for a missing dashboard.
+const ErrDashboardNotFound = "dashboard not found"
 
-// ErrCellNotFound is the error for a missing cell.
-const ErrCellNotFound = ChronografError("cell not found")
+// ErrCellNotFound is the error msg for a missing cell.
+const ErrCellNotFound = "cell not found"
+
+// ops for dashboard service.
+const (
+	OpFindDashboardByID     = "FindDashboardByID"
+	OpFindDashboards        = "FindDashboards"
+	OpCreateDashboard       = "CreateDashboard"
+	OpUpdateDashboard       = "UpdateDashboard"
+	OpAddDashboardCell      = "AddDashboardCell"
+	OpRemoveDashboardCell   = "RemoveDashboardCell"
+	OpUpdateDashboardCell   = "UpdateDashboardCell"
+	OpDeleteDashboard       = "DeleteDashboard"
+	OpReplaceDashboardCells = "ReplaceDashboardCells"
+)
 
 // DashboardService represents a service for managing dashboard data.
 type DashboardService interface {
@@ -18,7 +32,7 @@ type DashboardService interface {
 
 	// FindDashboards returns a list of dashboards that match filter and the total count of matching dashboards.
 	// Additional options provide pagination & sorting.
-	FindDashboards(ctx context.Context, filter DashboardFilter) ([]*Dashboard, int, error)
+	FindDashboards(ctx context.Context, filter DashboardFilter, opts FindOptions) ([]*Dashboard, int, error)
 
 	// CreateDashboard creates a new dashboard and sets b.ID with the new identifier.
 	CreateDashboard(ctx context.Context, b *Dashboard) error
@@ -43,11 +57,49 @@ type DashboardService interface {
 	ReplaceDashboardCells(ctx context.Context, id ID, c []*Cell) error
 }
 
-// Dashboard represents all visual and query data for a dashboard
+// Dashboard represents all visual and query data for a dashboard.
 type Dashboard struct {
-	ID    ID      `json:"id,omitempty"`
-	Name  string  `json:"name"`
-	Cells []*Cell `json:"cells"`
+	ID          ID            `json:"id,omitempty"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Cells       []*Cell       `json:"cells"`
+	Meta        DashboardMeta `json:"meta"`
+}
+
+// DashboardMeta contains meta information about dashboards
+type DashboardMeta struct {
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// DefaultDashboardFindOptions are the default find options for dashboards
+var DefaultDashboardFindOptions = FindOptions{
+	SortBy: "ID",
+}
+
+// SortDashboards sorts a slice of dashboards by a field.
+func SortDashboards(by string, ds []*Dashboard) {
+	var sorter func(i, j int) bool
+	switch by {
+	case "CreatedAt":
+		sorter = func(i, j int) bool {
+			return ds[j].Meta.CreatedAt.After(ds[i].Meta.CreatedAt)
+		}
+	case "UpdatedAt":
+		sorter = func(i, j int) bool {
+			return ds[j].Meta.UpdatedAt.After(ds[i].Meta.UpdatedAt)
+		}
+	case "Name":
+		sorter = func(i, j int) bool {
+			return ds[i].Name < ds[j].Name
+		}
+	default:
+		sorter = func(i, j int) bool {
+			return ds[i].ID < ds[j].ID
+		}
+	}
+
+	sort.Slice(ds, sorter)
 }
 
 // Cell holds positional information about a cell on dashboard and a reference to a cell.
@@ -67,14 +119,8 @@ type DashboardFilter struct {
 
 // DashboardUpdate is the patch structure for a dashboard.
 type DashboardUpdate struct {
-	Name *string `json:"name"`
-}
-
-// AddDashboardCellOptions are options for adding a dashboard.
-type AddDashboardCellOptions struct {
-	// UsingView specifies the view that should be used as a template
-	// for the new cells view.
-	UsingView ID
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
 }
 
 // Apply applies an update to a dashboard.
@@ -83,7 +129,30 @@ func (u DashboardUpdate) Apply(d *Dashboard) error {
 		d.Name = *u.Name
 	}
 
+	if u.Description != nil {
+		d.Description = *u.Description
+	}
+
 	return nil
+}
+
+// Valid returns an error if the dashboard update is invalid.
+func (u DashboardUpdate) Valid() *Error {
+	if u.Name == nil && u.Description == nil {
+		return &Error{
+			Code: EInvalid,
+			Msg:  "must update at least one attribute",
+		}
+	}
+
+	return nil
+}
+
+// AddDashboardCellOptions are options for adding a dashboard.
+type AddDashboardCellOptions struct {
+	// UsingView specifies the view that should be used as a template
+	// for the new cells view.
+	UsingView ID
 }
 
 // CellUpdate is the patch structure for a cell.
@@ -120,10 +189,13 @@ func (u CellUpdate) Apply(c *Cell) error {
 	return nil
 }
 
-// Valid returns an error if the dashboard update is invalid.
-func (u DashboardUpdate) Valid() error {
-	if u.Name == nil {
-		return fmt.Errorf("must update at least one attribute")
+// Valid returns an error if the cell update is invalid.
+func (u CellUpdate) Valid() *Error {
+	if u.H == nil && u.W == nil && u.Y == nil && u.X == nil && !u.ViewID.Valid() {
+		return &Error{
+			Code: EInvalid,
+			Msg:  "must update at least one attribute",
+		}
 	}
 
 	return nil

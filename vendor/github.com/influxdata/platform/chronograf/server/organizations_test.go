@@ -12,7 +12,6 @@ import (
 
 	"github.com/bouk/httprouter"
 	"github.com/influxdata/platform/chronograf"
-	"github.com/influxdata/platform/chronograf/log"
 	"github.com/influxdata/platform/chronograf/mocks"
 	"github.com/influxdata/platform/chronograf/roles"
 )
@@ -46,7 +45,7 @@ func TestService_OrganizationID(t *testing.T) {
 				),
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -56,7 +55,7 @@ func TestService_OrganizationID(t *testing.T) {
 								Name: "The Good Place",
 							}, nil
 						default:
-							return nil, fmt.Errorf("Organization with ID %s not found", *q.ID)
+							return nil, fmt.Errorf("organization with ID %s not found", *q.ID)
 						}
 					},
 				},
@@ -77,7 +76,7 @@ func TestService_OrganizationID(t *testing.T) {
 				),
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					GetF: func(ctx context.Context, q chronograf.OrganizationQuery) (*chronograf.Organization, error) {
 						switch *q.ID {
@@ -87,7 +86,7 @@ func TestService_OrganizationID(t *testing.T) {
 								Name: "The Good Place",
 							}, nil
 						default:
-							return nil, fmt.Errorf("Organization with ID %s not found", *q.ID)
+							return nil, fmt.Errorf("organization with ID %s not found", *q.ID)
 						}
 					},
 				},
@@ -164,7 +163,7 @@ func TestService_Organizations(t *testing.T) {
 				),
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					AllF: func(ctx context.Context) ([]chronograf.Organization, error) {
 						return []chronograf.Organization{
@@ -220,10 +219,9 @@ func TestService_UpdateOrganization(t *testing.T) {
 		Logger             chronograf.Logger
 	}
 	type args struct {
-		w      *httptest.ResponseRecorder
-		r      *http.Request
-		org    *organizationRequest
-		setPtr bool
+		w   *httptest.ResponseRecorder
+		r   *http.Request
+		org *organizationRequest
 	}
 	tests := []struct {
 		name            string
@@ -248,7 +246,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					UpdateF: func(ctx context.Context, o *chronograf.Organization) error {
 						return nil
@@ -279,7 +277,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 				org: &organizationRequest{},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					UpdateF: func(ctx context.Context, o *chronograf.Organization) error {
 						return nil
@@ -296,7 +294,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 			id:              "1337",
 			wantStatus:      http.StatusUnprocessableEntity,
 			wantContentType: "application/json",
-			wantBody:        `{"code":422,"message":"No fields to update"}`,
+			wantBody:        `{"code":422,"message":"no fields to update"}`,
 		},
 		{
 			name: "Update Organization default role",
@@ -312,7 +310,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					UpdateF: func(ctx context.Context, o *chronograf.Organization) error {
 						return nil
@@ -343,7 +341,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 				org: &organizationRequest{},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					UpdateF: func(ctx context.Context, o *chronograf.Organization) error {
 						return nil
@@ -356,7 +354,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 			id:              "1337",
 			wantStatus:      http.StatusUnprocessableEntity,
 			wantContentType: "application/json",
-			wantBody:        `{"code":422,"message":"No fields to update"}`,
+			wantBody:        `{"code":422,"message":"no fields to update"}`,
 		},
 		{
 			name: "Update Organization - invalid role",
@@ -372,7 +370,7 @@ func TestService_UpdateOrganization(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					UpdateF: func(ctx context.Context, o *chronograf.Organization) error {
 						return nil
@@ -454,7 +452,7 @@ func TestService_RemoveOrganization(t *testing.T) {
 				),
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				OrganizationsStore: &mocks.OrganizationsStore{
 					DeleteF: func(ctx context.Context, o *chronograf.Organization) error {
 						return nil
@@ -467,7 +465,7 @@ func TestService_RemoveOrganization(t *testing.T) {
 								Name: "The Good Place",
 							}, nil
 						default:
-							return nil, fmt.Errorf("Organization with ID %s not found", *q.ID)
+							return nil, fmt.Errorf("organization with ID %s not found", *q.ID)
 						}
 					},
 				},
@@ -520,7 +518,6 @@ func TestService_NewOrganization(t *testing.T) {
 		name            string
 		fields          fields
 		args            args
-		id              string
 		wantStatus      int
 		wantContentType string
 		wantBody        string
@@ -545,7 +542,7 @@ func TestService_NewOrganization(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					AddF: func(ctx context.Context, u *chronograf.User) (*chronograf.User, error) {
 						return &chronograf.User{
@@ -587,7 +584,7 @@ func TestService_NewOrganization(t *testing.T) {
 				org: &organizationRequest{},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					AddF: func(ctx context.Context, u *chronograf.User) (*chronograf.User, error) {
 						return &chronograf.User{
@@ -606,7 +603,7 @@ func TestService_NewOrganization(t *testing.T) {
 			},
 			wantStatus:      http.StatusUnprocessableEntity,
 			wantContentType: "application/json",
-			wantBody:        `{"code":422,"message":"Name required on Chronograf Organization request body"}`,
+			wantBody:        `{"code":422,"message":"name required on Chronograf Organization request body"}`,
 		},
 		{
 			name: "Create Organization - no user on context",
@@ -622,7 +619,7 @@ func TestService_NewOrganization(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					AddF: func(ctx context.Context, u *chronograf.User) (*chronograf.User, error) {
 						return &chronograf.User{
@@ -669,7 +666,7 @@ func TestService_NewOrganization(t *testing.T) {
 				},
 			},
 			fields: fields{
-				Logger: log.New(log.DebugLevel),
+				Logger: &chronograf.NoopLogger{},
 				UsersStore: &mocks.UsersStore{
 					AddF: func(ctx context.Context, u *chronograf.User) (*chronograf.User, error) {
 						return nil, fmt.Errorf("failed to add user to org")

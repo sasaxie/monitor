@@ -9,6 +9,7 @@ type Authorization struct {
 	ID          ID           `json:"id,omitempty"`
 	Token       string       `json:"token"`
 	Status      Status       `json:"status"`
+	Description string       `json:"description"`
 	User        string       `json:"user,omitempty"`
 	UserID      ID           `json:"userID,omitempty"`
 	Permissions []Permission `json:"permissions,omitempty"`
@@ -34,11 +35,26 @@ func (a *Authorization) IsActive() bool {
 	return a.Status == Active
 }
 
+// GetUserID returns the user id.
+func (a *Authorization) GetUserID() ID {
+	return a.UserID
+}
+
 // Kind returns session and is used for auditing.
 func (a *Authorization) Kind() string { return "authorization" }
 
 // Identifier returns the authorizations ID and is used for auditing.
 func (a *Authorization) Identifier() ID { return a.ID }
+
+// auth service op
+const (
+	OpFindAuthorizationByID    = "FindAuthorizationByID"
+	OpFindAuthorizationByToken = "FindAuthorizationByToken"
+	OpFindAuthorizations       = "FindAuthorizations"
+	OpCreateAuthorization      = "CreateAuthorization"
+	OpSetAuthorizationStatus   = "SetAuthorizationStatus"
+	OpDeleteAuthorization      = "DeleteAuthorization"
+)
 
 // AuthorizationService represents a service for managing authorization data.
 type AuthorizationService interface {

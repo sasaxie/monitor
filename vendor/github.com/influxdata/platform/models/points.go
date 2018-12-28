@@ -162,6 +162,23 @@ const (
 	Unsigned
 )
 
+func (t FieldType) String() string {
+	switch t {
+	case Integer:
+		return "Integer"
+	case Float:
+		return "Float"
+	case Boolean:
+		return "Boolean"
+	case String:
+		return "String"
+	case Empty:
+		return "Empty"
+	default:
+		return "<unknown>"
+	}
+}
+
 // FieldIterator provides a low-allocation interface to iterate through a point's fields.
 type FieldIterator interface {
 	// Next indicates whether there any fields remaining.
@@ -294,7 +311,7 @@ func ParseKeyBytesWithTags(buf []byte, tags Tags) ([]byte, Tags) {
 	} else {
 		name = buf[:i]
 	}
-	return unescapeMeasurement(name), tags
+	return UnescapeMeasurement(name), tags
 }
 
 func ParseTags(buf []byte) Tags {
@@ -312,7 +329,17 @@ func ParseName(buf []byte) []byte {
 		name = buf[:i]
 	}
 
-	return unescapeMeasurement(name)
+	return UnescapeMeasurement(name)
+}
+
+// ValidPrecision checks if the precision is known.
+func ValidPrecision(precision string) bool {
+	switch precision {
+	case "ns", "us", "ms", "s":
+		return true
+	default:
+		return false
+	}
 }
 
 // ParsePointsWithPrecision is similar to ParsePoints, but allows the
@@ -452,16 +479,12 @@ func parsePoint(buf []byte, defaultTime time.Time, precision string) (Point, err
 func GetPrecisionMultiplier(precision string) int64 {
 	d := time.Nanosecond
 	switch precision {
-	case "u":
+	case "us":
 		d = time.Microsecond
 	case "ms":
 		d = time.Millisecond
 	case "s":
 		d = time.Second
-	case "m":
-		d = time.Minute
-	case "h":
-		d = time.Hour
 	}
 	return int64(d)
 }
@@ -1231,7 +1254,7 @@ func EscapeMeasurement(in []byte) []byte {
 	return in
 }
 
-func unescapeMeasurement(in []byte) []byte {
+func UnescapeMeasurement(in []byte) []byte {
 	if bytes.IndexByte(in, '\\') == -1 {
 		return in
 	}
@@ -1351,7 +1374,7 @@ func pointKey(measurement string, tags Tags, fields Fields, t time.Time) ([]byte
 				return nil, fmt.Errorf("+/-Inf is an unsupported value for field %s", key)
 			}
 			if math.IsNaN(value) {
-				return nil, fmt.Errorf("NaN is an unsupported value for field %s", key)
+				return nil, fmt.Errorf("NAN is an unsupported value for field %s", key)
 			}
 		case float32:
 			// Ensure the caller validates and handles invalid field values
@@ -1359,7 +1382,7 @@ func pointKey(measurement string, tags Tags, fields Fields, t time.Time) ([]byte
 				return nil, fmt.Errorf("+/-Inf is an unsupported value for field %s", key)
 			}
 			if math.IsNaN(float64(value)) {
-				return nil, fmt.Errorf("NaN is an unsupported value for field %s", key)
+				return nil, fmt.Errorf("NAN is an unsupported value for field %s", key)
 			}
 		}
 		if len(key) == 0 {
@@ -1613,7 +1636,7 @@ func MakeKey(name []byte, tags Tags) []byte {
 func AppendMakeKey(dst []byte, name []byte, tags Tags) []byte {
 	// unescape the name and then re-escape it to avoid double escaping.
 	// The key should always be stored in escaped form.
-	dst = append(dst, EscapeMeasurement(unescapeMeasurement(name))...)
+	dst = append(dst, EscapeMeasurement(UnescapeMeasurement(name))...)
 	dst = tags.AppendHashKey(dst)
 	return dst
 }
@@ -1649,17 +1672,12 @@ func (p *point) Fields() (Fields, error) {
 // SetPrecision will round a time to the specified precision.
 func (p *point) SetPrecision(precision string) {
 	switch precision {
-	case "n":
-	case "u":
+	case "us":
 		p.SetTime(p.Time().Truncate(time.Microsecond))
 	case "ms":
 		p.SetTime(p.Time().Truncate(time.Millisecond))
 	case "s":
 		p.SetTime(p.Time().Truncate(time.Second))
-	case "m":
-		p.SetTime(p.Time().Truncate(time.Minute))
-	case "h":
-		p.SetTime(p.Time().Truncate(time.Hour))
 	}
 }
 

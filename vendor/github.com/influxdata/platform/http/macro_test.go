@@ -159,6 +159,24 @@ func TestMacroService_handleGetMacro(t *testing.T) {
 				body:        ``,
 			},
 		},
+		{
+			name: "request an invalid macro ID",
+			args: args{
+				id: "baz",
+			},
+			fields: fields{
+				&mock.MacroService{
+					FindMacroByIDF: func(ctx context.Context, id platform.ID) (*platform.Macro, error) {
+						return nil, nil
+					},
+				},
+			},
+			wants: wants{
+				statusCode:  400,
+				contentType: "application/json; charset=utf-8",
+				body:        `{"code":"invalid","message":"An internal error has occurred.","error":"id must have a length of 16 bytes"}`,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -427,8 +445,7 @@ func TestMacroService_handleDeleteMacro(t *testing.T) {
 		id string
 	}
 	type wants struct {
-		statusCode  int
-		contentType string
+		statusCode int
 	}
 
 	tests := []struct {
@@ -498,7 +515,7 @@ func TestMacroService_handleDeleteMacro(t *testing.T) {
 	}
 }
 
-func initMacroService(f platformtesting.MacroFields, t *testing.T) (platform.MacroService, func()) {
+func initMacroService(f platformtesting.MacroFields, t *testing.T) (platform.MacroService, string, func()) {
 	t.Helper()
 	svc := inmem.NewService()
 	svc.IDGenerator = f.IDGenerator
@@ -518,7 +535,7 @@ func initMacroService(f platformtesting.MacroFields, t *testing.T) (platform.Mac
 	}
 	done := server.Close
 
-	return &client, done
+	return &client, inmem.OpPrefix, done
 }
 
 func TestMacroService(t *testing.T) {

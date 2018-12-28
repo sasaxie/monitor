@@ -407,6 +407,9 @@ components:
           description: Optional URI for data source for this query
         queryConfig:
           $ref: '#/components/schemas/QueryConfig'
+        name:
+          type: string
+          description: An optional word or phrase that refers to the query
     Axis:
       type: object
       description: A description of a particular axis for a visualization
@@ -460,7 +463,8 @@ components:
           type: string
         value:
           description: Value is the data value mapped to this color
-          type: string
+          type: number
+          format: float
     RenamableField:
       description: Describes a field that can be renamed and made visible or invisible
       type: object

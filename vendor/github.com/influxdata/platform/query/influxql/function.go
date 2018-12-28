@@ -47,7 +47,7 @@ func parseFunction(expr *influxql.Call) (*function, error) {
 		default:
 			return nil, fmt.Errorf("expected field argument in %s()", expr.Name)
 		}
-	case "min", "max", "sum", "first", "last", "mean":
+	case "min", "max", "sum", "first", "last", "mean", "median":
 		if exp, got := 1, len(expr.Args); exp != got {
 			return nil, fmt.Errorf("invalid number of arguments for %s, expected %d, got %d", expr.Name, exp, got)
 		}
@@ -192,6 +192,21 @@ func createFunctionCursor(t *transpilerState, call *influxql.Call, in cursor, no
 		}, in.ID())
 		cur.value = value
 		cur.exclude = map[influxql.Expr]struct{}{call.Args[0]: {}}
+	case "median":
+		value, ok := in.Value(call.Args[0])
+		if !ok {
+			return nil, fmt.Errorf("undefined variable: %s", call.Args[0])
+		}
+		cur.id = t.op("median", &transformations.PercentileOpSpec{
+			Percentile:  0.5,
+			Compression: 0,
+			Method:      "exact_mean",
+			AggregateConfig: execute.AggregateConfig{
+				Columns: []string{value},
+			},
+		}, in.ID())
+		cur.value = value
+		cur.exclude = map[influxql.Expr]struct{}{call.Args[0]: {}}
 	case "percentile":
 		if len(call.Args) != 2 {
 			return nil, errors.New("percentile function requires two arguments field_key and N")
@@ -234,12 +249,12 @@ func createFunctionCursor(t *transpilerState, call *influxql.Call, in cursor, no
 	if normalize {
 		if influxql.IsSelector(call) {
 			cur.id = t.op("drop", &transformations.DropOpSpec{
-				Cols: []string{execute.DefaultTimeColLabel},
+				Columns: []string{execute.DefaultTimeColLabel},
 			}, cur.id)
 		}
 		cur.id = t.op("duplicate", &transformations.DuplicateOpSpec{
-			Col: execute.DefaultStartColLabel,
-			As:  execute.DefaultTimeColLabel,
+			Column: execute.DefaultStartColLabel,
+			As:     execute.DefaultTimeColLabel,
 		}, cur.id)
 	}
 	return cur, nil

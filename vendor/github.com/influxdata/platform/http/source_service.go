@@ -32,6 +32,19 @@ type sourceResponse struct {
 func newSourceResponse(s *platform.Source) *sourceResponse {
 	s.Password = ""
 	s.SharedSecret = ""
+
+	if s.Type == platform.SelfSourceType {
+		return &sourceResponse{
+			Source: s,
+			Links: map[string]interface{}{
+				"self":    fmt.Sprintf("%s/%s", sourceHTTPPath, s.ID.String()),
+				"query":   "/api/v2/query",
+				"buckets": "/api/v2/buckets",
+				"health":  "/api/v2/health",
+			},
+		}
+	}
+
 	return &sourceResponse{
 		Source: s,
 		Links: map[string]interface{}{
@@ -78,7 +91,7 @@ type SourceHandler struct {
 // NewSourceHandler returns a new instance of SourceHandler.
 func NewSourceHandler() *SourceHandler {
 	h := &SourceHandler{
-		Router: httprouter.New(),
+		Router: NewRouter(),
 		Logger: zap.NewNop(),
 		NewBucketService: func(s *platform.Source) (platform.BucketService, error) {
 			return nil, fmt.Errorf("bucket service not set")
@@ -209,9 +222,8 @@ func (h *SourceHandler) handleGetSourcesBuckets(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// TODO(desa): enrich returned data structure.
 	if err := encodeResponse(ctx, w, http.StatusOK, bs); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -251,8 +263,10 @@ func (h *SourceHandler) handlePostSource(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := encodeResponse(ctx, w, http.StatusCreated, req.Source); err != nil {
-		EncodeError(ctx, err, w)
+	res := newSourceResponse(req.Source)
+
+	if err := encodeResponse(ctx, w, http.StatusCreated, res); err != nil {
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -291,15 +305,33 @@ func (h *SourceHandler) handleGetSource(w http.ResponseWriter, r *http.Request) 
 	res := newSourceResponse(s)
 
 	if err := encodeResponse(ctx, w, http.StatusOK, res); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
 
 // handleGetSourceHealth is the HTTP handler for the GET /v1/sources/:id/health route.
 func (h *SourceHandler) handleGetSourceHealth(w http.ResponseWriter, r *http.Request) {
-	// TODO(watts): actually check source health
+	ctx := r.Context()
+
+	msg := `{"name":"sources",message:"source is %shealthy","status":"%s","checks":[]}`
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	req, err := decodeGetSourceRequest(ctx, r)
+	if err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+	if _, err := h.SourceService.FindSourceByID(ctx, req.SourceID); err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+	// todo(leodido) > check source is actually healthy and reply with 503 if not
+	// w.WriteHeader(http.StatusServiceUnavailable)
+	// fmt.Fprintln(w, fmt.Sprintf(msg, "not ", "fail"))
+
 	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, fmt.Sprintf(msg, "", "pass"))
 }
 
 type getSourceRequest struct {
@@ -339,7 +371,7 @@ func (h *SourceHandler) handleDeleteSource(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type deleteSourceRequest struct {
@@ -383,7 +415,7 @@ func (h *SourceHandler) handleGetSources(w http.ResponseWriter, r *http.Request)
 	res := newSourcesResponse(srcs)
 
 	if err := encodeResponse(ctx, w, http.StatusOK, res); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -414,7 +446,7 @@ func (h *SourceHandler) handlePatchSource(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, b); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -623,7 +655,7 @@ func (s *SourceService) DeleteSource(ctx context.Context, id platform.ID) error 
 		return err
 	}
 
-	return CheckError(resp)
+	return CheckErrorStatus(http.StatusNoContent, resp)
 }
 
 func sourceIDPath(id platform.ID) string {
