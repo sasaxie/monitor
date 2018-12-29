@@ -128,30 +128,32 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	t := time.Now()
 	if witnesses.Witnesses != nil {
 		for _, w := range witnesses.Witnesses {
-			witnessTags := map[string]string{
-				influxDBFieldListWitnessesNode:    param.Node,
-				influxDBFieldListWitnessesType:    param.Type,
-				influxDBFieldListWitnessesTagName: param.TagName,
-				influxDBFieldListWitnessesUrl:     w.Url,
+			if w.IsJobs {
+				witnessTags := map[string]string{
+					influxDBFieldListWitnessesNode:    param.Node,
+					influxDBFieldListWitnessesType:    param.Type,
+					influxDBFieldListWitnessesTagName: param.TagName,
+					influxDBFieldListWitnessesUrl:     w.Url,
+				}
+
+				witnessFields := map[string]interface{}{
+					influxDBFieldListWitnessesNode:    param.Node,
+					influxDBFieldListWitnessesType:    param.Type,
+					influxDBFieldListWitnessesTagName: param.TagName,
+
+					influxDBFieldListWitnessesAddress:     w.Address,
+					influxDBFieldListWitnessesTotalMissed: w.TotalMissed,
+					influxDBFieldListWitnessesUrl:         w.Url,
+					influxDBFieldListWitnessesIsJobs:      w.IsJobs,
+				}
+
+				influxdb.Client.WriteByTime(
+					influxDBPointNameListWitnesses,
+					witnessTags,
+					witnessFields,
+					t,
+				)
 			}
-
-			witnessFields := map[string]interface{}{
-				influxDBFieldListWitnessesNode:    param.Node,
-				influxDBFieldListWitnessesType:    param.Type,
-				influxDBFieldListWitnessesTagName: param.TagName,
-
-				influxDBFieldListWitnessesAddress:     w.Address,
-				influxDBFieldListWitnessesTotalMissed: w.TotalMissed,
-				influxDBFieldListWitnessesUrl:         w.Url,
-				influxDBFieldListWitnessesIsJobs:      w.IsJobs,
-			}
-
-			influxdb.Client.WriteByTime(
-				influxDBPointNameListWitnesses,
-				witnessTags,
-				witnessFields,
-				t,
-			)
 		}
 	}
 }
