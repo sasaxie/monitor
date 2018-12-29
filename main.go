@@ -19,6 +19,7 @@ func main() {
 
 	go start()
 	go report()
+	go change()
 
 	defer influxdb.Client.C.Close()
 
@@ -37,6 +38,24 @@ func report() {
 		r.Report()
 	})
 	c.Start()
+}
+
+func change() {
+	c := new(alerts.ChainParameters)
+	c.MonitorUrl = "http://54.236.37.243:8090/wallet/getchainparameters"
+
+	ticker := time.NewTicker(
+		time.Duration(config.MonitorConfig.Task.GetDataInterval) *
+			time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			c.RequestData()
+			c.Judge()
+		}
+	}
 }
 
 func start() {
