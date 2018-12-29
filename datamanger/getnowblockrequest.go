@@ -16,11 +16,11 @@ import (
 const (
 	urlTemplateGetNowBlock = "http://%s:%d/%s/getnowblock"
 
-	influxDBFieldNowBlockNode   = "Node"
-	influxDBFieldNowBlockType   = "Type"
-	influxDBFieldNowBlockTag    = "Tag"
-	influxDBFieldNowBlockNumber = "Number"
-	influxDBPointNameNowBlock   = "api_get_now_block"
+	influxDBFieldNowBlockNode    = "Node"
+	influxDBFieldNowBlockType    = "Type"
+	influxDBFieldNowBlockTagName = "TagName"
+	influxDBFieldNowBlockNumber  = "Number"
+	influxDBPointNameNowBlock    = "api_get_now_block"
 )
 
 type GetNowBlockRequest struct {
@@ -61,7 +61,7 @@ func (g *GetNowBlockRequest) Load() {
 			config.NewNodeType(node.Type).GetApiPathByNodeType())
 		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
 		param.Type = node.Type
-		param.Tag = node.Tag
+		param.TagName = node.TagName
 
 		g.Parameters = append(g.Parameters, param)
 	}
@@ -124,15 +124,15 @@ func (g *GetNowBlockRequest) request(param *Parameter, wg *sync.WaitGroup) {
 
 	// Report block number
 	nowBlockTags := map[string]string{
-		influxDBFieldNowBlockNode: param.Node,
-		influxDBFieldNowBlockType: param.Type,
-		influxDBFieldNowBlockTag:  param.Tag,
+		influxDBFieldNowBlockNode:    param.Node,
+		influxDBFieldNowBlockType:    param.Type,
+		influxDBFieldNowBlockTagName: param.TagName,
 	}
 
 	nowBlockFields := map[string]interface{}{
-		influxDBFieldNowBlockNode: param.Node,
-		influxDBFieldNowBlockType: param.Type,
-		influxDBFieldNowBlockTag:  param.Tag,
+		influxDBFieldNowBlockNode:    param.Node,
+		influxDBFieldNowBlockType:    param.Type,
+		influxDBFieldNowBlockTagName: param.TagName,
 
 		influxDBFieldNowBlockNumber: block.BlockHeader.RawData.Number,
 	}

@@ -18,14 +18,14 @@ import (
 const (
 	urlTemplateGetNodeInfo = "http://%s:%d/%s/getnodeinfo"
 
-	influxDBTagGetNodeInfoNode = "node"
-	influxDBTagGetNodeInfoType = "type"
-	influxDBTagGetNodeInfoTag  = "tag"
-	influxDBTagGetNodeInfoPeer = "peer"
+	influxDBTagGetNodeInfoNode    = "node"
+	influxDBTagGetNodeInfoType    = "type"
+	influxDBTagGetNodeInfoTagName = "tag"
+	influxDBTagGetNodeInfoPeer    = "peer"
 
-	influxDBFieldGetNodeInfoNode = "Node"
-	influxDBFieldGetNodeInfoType = "Type"
-	influxDBFieldGetNodeInfoTag  = "Tag"
+	influxDBFieldGetNodeInfoNode    = "Node"
+	influxDBFieldGetNodeInfoType    = "Type"
+	influxDBFieldGetNodeInfoTagName = "TagName"
 
 	// Basic information
 	influxDBFieldGetNodeInfoActiveConnectCount  = "ActiveConnectCount"
@@ -146,7 +146,7 @@ func (g *GetNodeInfoRequest) Load() {
 			config.NewNodeType(node.Type).GetApiPathByNodeType())
 		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
 		param.Type = node.Type
-		param.Tag = node.Tag
+		param.TagName = node.TagName
 
 		g.Parameters = append(g.Parameters, param)
 	}
@@ -214,17 +214,17 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	timeNow := time.Now()
 
 	nodeInfoDetailTags := map[string]string{
-		influxDBTagGetNodeInfoNode: param.Node,
-		influxDBTagGetNodeInfoType: param.Type,
-		influxDBTagGetNodeInfoTag:  param.Tag,
+		influxDBTagGetNodeInfoNode:    param.Node,
+		influxDBTagGetNodeInfoType:    param.Type,
+		influxDBTagGetNodeInfoTagName: param.TagName,
 	}
 
 	cheatWitnessInfo := getCheatWitnessInfoStr(nodeInfoDetail.CheatWitnessInfoMap)
 
 	nodeInfoDetailFields := map[string]interface{}{
-		influxDBFieldGetNodeInfoNode: param.Node,
-		influxDBFieldGetNodeInfoType: param.Type,
-		influxDBFieldGetNodeInfoTag:  param.Tag,
+		influxDBFieldGetNodeInfoNode:    param.Node,
+		influxDBFieldGetNodeInfoType:    param.Type,
+		influxDBFieldGetNodeInfoTagName: param.TagName,
 
 		influxDBFieldGetNodeInfoActiveConnectCount: nodeInfoDetail.ActiveConnectCount,
 		influxDBFieldGetNodeInfoBeginSyncNum:       nodeInfoDetail.BeginSyncNum,

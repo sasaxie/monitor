@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
 	"github.com/sasaxie/monitor/common/database/influxdb"
@@ -14,7 +15,7 @@ const (
 	influxDBTagAddress                    = "Address"
 	influxDBTagUrl                        = "Url"
 	influxDBTagTotalMissed                = "TotalMissed"
-	influxDBTagTag                        = "Tag"
+	influxDBTagTag                        = "TagName"
 	influxDBTagDate                       = "Date"
 	influxDBTagPercent                    = "Percent"
 	influxDBTagAll                        = "All"
@@ -26,7 +27,7 @@ type TotalMissed struct {
 }
 
 type OriginData struct {
-	TotalMissed int
+	TotalMissed int64
 	Url         string
 }
 
@@ -59,6 +60,12 @@ func (t *TotalMissed) getT1T2() (int64, int64) {
 		99999999,
 		time.Local)
 
+	logs.Debug(
+		"report total missed start time:",
+		startTime.Format("2006-01-02 15:04:05"),
+		", end time:",
+		endTime.Format("2006-01-02 15:04:05"))
+
 	t1, t2 := startTime.UnixNano()/1000000, endTime.UnixNano()/1000000
 
 	return t1, t2
@@ -89,27 +96,47 @@ func (t *TotalMissed) ComputeData() {
 	}
 }
 
-func (t *TotalMissed) getTotalMissedSum(address string) int {
+func (t *TotalMissed) getTotalMissedSum(address string) int64 {
 	t1, t2 := t.getT1T2()
 
-	q := fmt.Sprintf(`
-SELECT sum(TotalMissed) FROM api_list_witnesses WHERE time >= %s AND time
-<= %s AND Tag='主网'
-`, fmt.Sprintf("%dms", t1), fmt.Sprintf("%dms", t2))
+	endQuery := fmt.Sprintf(`
+SELECT max(TotalMissed) FROM api_list_witnesses WHERE time >= %s AND time
+<= %s AND TagName='主网' AND Address='%s'
+`, fmt.Sprintf("%dms", t1), fmt.Sprintf("%dms", t2), address)
 
+	startQuery := fmt.Sprintf(`
+SELECT min(TotalMissed) FROM api_list_witnesses WHERE time >= %s AND time
+<= %s AND TagName='主网' AND Address='%s'
+`, fmt.Sprintf("%dms", t1), fmt.Sprintf("%dms", t2), address)
+
+	startTotalMissed := t.getTotalMissed(startQuery)
+	endTotalMissed := t.getTotalMissed(endQuery)
+
+	logs.Debug("max total missed:", endTotalMissed, "min total missed:",
+		startTotalMissed)
+	return endTotalMissed - startTotalMissed
+}
+
+func (t *TotalMissed) getTotalMissed(q string) int64 {
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {
-		logs.Error("[package: reports] [method: getTotalMissedSum("+
+		logs.Error("[package: reports] [method: getTotalMissed("+
 			")] [QueryDB error]", err.Error())
 		return 0
 	}
 
-	sum := 0
-	for _, value := range res[0].Series[0].Values {
-		sum = value[1].(int)
+	if res == nil || len(res) == 0 ||
+		len(res[0].Series) == 0 ||
+		len(res[0].Series[0].Values) == 0 {
+		return 0
 	}
 
-	return sum
+	var totalMissed int64 = 0
+	for _, value := range res[0].Series[0].Values {
+		totalMissed, err = value[1].(json.Number).Int64()
+	}
+
+	return totalMissed
 }
 
 func (t *TotalMissed) getAllAddress() []string {
@@ -117,7 +144,7 @@ func (t *TotalMissed) getAllAddress() []string {
 
 	q := fmt.Sprintf(`
 SELECT distinct(Address) FROM api_list_witnesses WHERE time >= %s AND time
-<= %s AND Tag='主网'
+<= %s AND TagName='主网' AND IsJobs=true
 `, fmt.Sprintf("%dms", t1), fmt.Sprintf("%dms", t2))
 
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
@@ -128,6 +155,11 @@ SELECT distinct(Address) FROM api_list_witnesses WHERE time >= %s AND time
 	}
 
 	addresses := make([]string, 0)
+	if res == nil || len(res) == 0 ||
+		len(res[0].Series) == 0 ||
+		len(res[0].Series[0].Values) == 0 {
+		return nil
+	}
 	for _, value := range res[0].Series[0].Values {
 		addresses = append(addresses, value[1].(string))
 	}
@@ -145,7 +177,7 @@ func (t *TotalMissed) Save() {
 
 	reportTime := time.Now()
 
-	totalMissedSum := 0
+	var totalMissedSum int64 = 0
 	for address, originData := range t.Data {
 		tags := map[string]string{
 			influxDBTagAddress: address,
@@ -192,17 +224,23 @@ func (t *TotalMissed) getUrlByAddress(address string) string {
 
 	q := fmt.Sprintf(`
 SELECT last(Url) FROM api_list_witnesses WHERE time >= %s AND time
-<= %s AND Tag='主网'
-`, fmt.Sprintf("%dms", t1), fmt.Sprintf("%dms", t2))
+<= %s AND TagName='主网' AND Address='%s'
+`, fmt.Sprintf("%dms", t1), fmt.Sprintf("%dms", t2), address)
 
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {
 		logs.Error("[package: reports] [method: getUrlByAddress("+
 			")] [QueryDB error]", err.Error())
-		return "unknown"
+		return ""
 	}
 
-	u := "unknown"
+	if res == nil || len(res) == 0 ||
+		len(res[0].Series) == 0 ||
+		len(res[0].Series[0].Values) == 0 {
+		return ""
+	}
+
+	u := ""
 	for _, value := range res[0].Series[0].Values {
 		u = value[1].(string)
 	}
@@ -211,26 +249,21 @@ SELECT last(Url) FROM api_list_witnesses WHERE time >= %s AND time
 }
 
 func (t *TotalMissed) Report() {
-	if t.Data == nil {
-		return
-	}
+	var percent = 0.0
+	var sumTotalMissed int64 = 0
 
 	msg := ""
-	sumTotalMissed := 0
-	for address, originData := range t.Data {
-		msg += fmt.Sprintf("%s: %d (%s)\n",
-			originData.Url,
-			originData.TotalMissed,
-			address)
-		sumTotalMissed += originData.TotalMissed
+	if t.Data != nil {
+		for _, originData := range t.Data {
+			msg += fmt.Sprintf("%6d: %s\n",
+				originData.TotalMissed,
+				originData.Url)
+			sumTotalMissed += originData.TotalMissed
+		}
+		percent = float64(sumTotalMissed) / 28800 * 100
 	}
 
-	if sumTotalMissed == 0 {
-		return
-	}
-
-	percent := 1.0 * sumTotalMissed / 28800 * 100
-	msg += fmt.Sprintf("%s 总Miss数：%d，总Miss率：%.4f\n",
+	msg += fmt.Sprintf("%s 总Miss数：%d，总Miss率：%.4f%%\n",
 		t.Date.Format("2006-01-02"),
 		sumTotalMissed,
 		percent)

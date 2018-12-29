@@ -13,7 +13,7 @@ import (
 )
 
 // ms: 1min
-const internal1min int64 = 1000 * 60 * 1
+const Internal1min int64 = 1000 * 60 * 1
 
 type ListWitnessesAlert struct {
 	Nodes                 []*Node
@@ -28,14 +28,14 @@ type ListWitnessesAlert struct {
 type TotalMissedInfo struct {
 	Address     string
 	Url         string
-	Tag         string
+	TagName     string
 	TotalMissed int64
 }
 
 type ListWitnessesAlertTotalMissedMsg struct {
 	Address      string
 	Url          string
-	Tag          string
+	TagName      string
 	TotalMissed1 int64
 	TotalMissed2 int64
 
@@ -55,7 +55,7 @@ type ListWitnessesAlertWitnessesChangeMsg struct {
 type WitnessesChangeInfo struct {
 	Address string
 	Url     string
-	Tag     string
+	TagName string
 }
 
 func (l ListWitnessesAlertTotalMissedMsg) TotalMissedChangeString() string {
@@ -108,7 +108,7 @@ func (l *ListWitnessesAlert) Load() {
 			n.GrpcPort = node.GrpcPort
 			n.HttpPort = node.HttpPort
 			n.Type = node.Type
-			n.Tag = node.Tag
+			n.TagName = node.TagName
 
 			l.Nodes = append(l.Nodes, n)
 		}
@@ -181,7 +181,7 @@ func (l *ListWitnessesAlert) Start() {
 			l.TotalMissedResult[k] = &ListWitnessesAlertTotalMissedMsg{
 				Address:      k,
 				Url:          v.Url,
-				Tag:          v.Tag,
+				TagName:      v.TagName,
 				TotalMissed1: v.TotalMissed,
 				TotalMissed2: vv.TotalMissed,
 				Msg:          "出块超时",
@@ -193,7 +193,7 @@ func (l *ListWitnessesAlert) Start() {
 func (l *ListWitnessesAlert) updateTotalMissed(t int64) {
 	for a, isWitness := range l.Witnesses2 {
 		if isWitness {
-			totalMissed, u := l.getTotalMissedInfo(a, t-internal1min)
+			totalMissed, u := l.getTotalMissedInfo(a, t-Internal1min)
 			l.TotalMissed1[a] = &TotalMissedInfo{
 				TotalMissed: totalMissed,
 				Url:         u,
@@ -223,7 +223,7 @@ func (l *ListWitnessesAlert) getWitnessUrl(a string, t int64) (string,
 	q := fmt.Sprintf(`SELECT Url FROM api_list_witnesses WHERE
 Address='%s' AND time <= %s AND time > %s ORDER BY time DESC LIMIT 1`, a,
 		fmt.Sprintf("%dms", t),
-		fmt.Sprintf("%dms", t-internal5min))
+		fmt.Sprintf("%dms", t-Internal5min))
 
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {
@@ -246,7 +246,7 @@ func (l *ListWitnessesAlert) getTotalMissed(a string, t int64) (int64,
 	q := fmt.Sprintf(`SELECT max(TotalMissed) FROM api_list_witnesses WHERE
 Address='%s' AND time <= %s AND time > %s`, a,
 		fmt.Sprintf("%dms", t),
-		fmt.Sprintf("%dms", t-internal5min))
+		fmt.Sprintf("%dms", t-Internal5min))
 
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {
@@ -271,7 +271,7 @@ Address='%s' AND time <= %s AND time > %s`, a,
 
 func (l *ListWitnessesAlert) updateWitnesses(t int64) error {
 
-	l.getWitness1(t - internal1min)
+	l.getWitness1(t - Internal1min)
 	l.getWitness2(t)
 
 	return nil
@@ -281,7 +281,7 @@ func (l *ListWitnessesAlert) getWitness1(t int64) error {
 	q := fmt.Sprintf(`SELECT distinct(
 Address) FROM api_list_witnesses WHERE IsJobs=true AND time <= %s AND time
 >= %s`, fmt.Sprintf("%dms", t), fmt.Sprintf("%dms",
-		t-internal5min))
+		t-Internal5min))
 
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {
@@ -306,7 +306,7 @@ Address) FROM api_list_witnesses WHERE IsJobs=true AND time <= %s AND time
 func (l *ListWitnessesAlert) getWitness2(t int64) error {
 	q := fmt.Sprintf(`SELECT distinct(
 Address) FROM api_list_witnesses WHERE IsJobs=true AND time <= %s AND time
->= %s`, fmt.Sprintf("%dms", t), fmt.Sprintf("%dms", t-internal5min))
+>= %s`, fmt.Sprintf("%dms", t), fmt.Sprintf("%dms", t-Internal5min))
 
 	res, err := influxdb.QueryDB(influxdb.Client.C, q)
 	if err != nil {

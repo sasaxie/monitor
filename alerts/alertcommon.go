@@ -5,5 +5,5 @@ type Node struct {
 	GrpcPort int
 	HttpPort int
 	Type     string
-	Tag      string
+	TagName  string
 }

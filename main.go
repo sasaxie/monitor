@@ -27,9 +27,11 @@ func main() {
 
 func report() {
 	c := cron.New()
-	c.AddFunc("0 0 * * * *", func() {
+	c.AddFunc("0 0 11 * * *", func() {
+		logs.Debug("report start")
 		r := new(reports.TotalMissed)
-		r.Date = time.Now().AddDate(0, 0, -1)
+		r.Date = time.Now().AddDate(0, 0, 0)
+		logs.Debug("report date", r.Date.Format("2006-01-02 15:04:05"))
 		r.ComputeData()
 		r.Save()
 		r.Report()

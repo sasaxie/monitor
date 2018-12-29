@@ -18,7 +18,7 @@ const (
 
 	influxDBFieldListWitnessesNode        = "Node"
 	influxDBFieldListWitnessesType        = "Type"
-	influxDBFieldListWitnessesTag         = "Tag"
+	influxDBFieldListWitnessesTagName     = "TagName"
 	influxDBFieldListWitnessesAddress     = "Address"
 	influxDBFieldListWitnessesTotalMissed = "TotalMissed"
 	influxDBFieldListWitnessesUrl         = "Url"
@@ -63,7 +63,7 @@ func (l *ListWitnessesRequest) Load() {
 			config.NewNodeType(node.Type).GetApiPathByNodeType())
 		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
 		param.Type = node.Type
-		param.Tag = node.Tag
+		param.TagName = node.TagName
 
 		l.Parameters = append(l.Parameters, param)
 	}
@@ -129,16 +129,16 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	if witnesses.Witnesses != nil {
 		for _, w := range witnesses.Witnesses {
 			witnessTags := map[string]string{
-				influxDBFieldListWitnessesNode: param.Node,
-				influxDBFieldListWitnessesType: param.Type,
-				influxDBFieldListWitnessesTag:  param.Tag,
-				influxDBFieldListWitnessesUrl:  w.Url,
+				influxDBFieldListWitnessesNode:    param.Node,
+				influxDBFieldListWitnessesType:    param.Type,
+				influxDBFieldListWitnessesTagName: param.TagName,
+				influxDBFieldListWitnessesUrl:     w.Url,
 			}
 
 			witnessFields := map[string]interface{}{
-				influxDBFieldListWitnessesNode: param.Node,
-				influxDBFieldListWitnessesType: param.Type,
-				influxDBFieldListWitnessesTag:  param.Tag,
+				influxDBFieldListWitnessesNode:    param.Node,
+				influxDBFieldListWitnessesType:    param.Type,
+				influxDBFieldListWitnessesTagName: param.TagName,
 
 				influxDBFieldListWitnessesAddress:     w.Address,
 				influxDBFieldListWitnessesTotalMissed: w.TotalMissed,

@@ -29,7 +29,7 @@ type Address struct {
 	GrpcPort int    `json:"grpcPort"`
 	HttpPort int    `json:"httpPort"`
 	Type     string `json:"type"`
-	Tag      string `json:"tag"`
+	TagName  string `json:"tagName"`
 	Monitor  string `json:"monitor"`
 }
 

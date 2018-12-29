@@ -13,7 +13,7 @@ import (
 )
 
 // ms: 5min
-const internal5min int64 = 1000 * 60 * 5
+const Internal5min int64 = 1000 * 60 * 5
 
 type GetNowBlockAlert struct {
 	Nodes       []*Node
@@ -23,12 +23,12 @@ type GetNowBlockAlert struct {
 }
 
 type GetNowBlockAlertMsg struct {
-	Ip     string
-	Port   int
-	Type   string
-	Tag    string
-	Num    int64
-	MaxNum int64
+	Ip      string
+	Port    int
+	Type    string
+	TagName string
+	Num     int64
+	MaxNum  int64
 
 	StartTime time.Time
 	FreshTime time.Time
@@ -41,12 +41,12 @@ func (g GetNowBlockAlertMsg) String() string {
 	return fmt.Sprintf(`ip: %s
 port: %d
 type: %s
-tag: %s
+tagName: %s
 num: %d
 maxNum: %d
 duration: %v
 msg: %s
-`, g.Ip, g.Port, g.Type, g.Tag, g.Num,
+`, g.Ip, g.Port, g.Type, g.TagName, g.Num,
 		g.MaxNum,
 		time.Now().Sub(g.StartTime), g.Msg)
 }
@@ -67,7 +67,7 @@ func (g *GetNowBlockAlert) Load() {
 			n.GrpcPort = node.GrpcPort
 			n.HttpPort = node.HttpPort
 			n.Type = node.Type
-			n.Tag = node.Tag
+			n.TagName = node.TagName
 
 			g.Nodes = append(g.Nodes, n)
 		}
@@ -95,9 +95,9 @@ func (g *GetNowBlockAlert) Start() {
 	g.getMaxBlockNum(queryTimeS)
 
 	for _, n := range g.Nodes {
-		maxBlockNum := g.MaxBlockNum[n.Tag]
+		maxBlockNum := g.MaxBlockNum[n.TagName]
 		num, _ := g.getNodeBlockNum(n.Ip, n.HttpPort, queryTimeS)
-		err := g.isOk(n.Ip, n.Tag, n.HttpPort, queryTimeS, maxBlockNum, num)
+		err := g.isOk(n.Ip, n.TagName, n.HttpPort, queryTimeS, maxBlockNum, num)
 		k := fmt.Sprintf("%s:%d", n.Ip, n.HttpPort)
 		if err != nil {
 			if _, ok := g.Result[k]; ok {
@@ -111,7 +111,7 @@ func (g *GetNowBlockAlert) Start() {
 					Ip:        n.Ip,
 					Port:      n.HttpPort,
 					Type:      n.Type,
-					Tag:       n.Tag,
+					TagName:   n.TagName,
 					Num:       num,
 					MaxNum:    maxBlockNum,
 					StartTime: time.Now(),
@@ -203,7 +203,7 @@ func (g *GetNowBlockAlert) getNodeBlockNum(ip string, port int,
 "Node" = '%s:%d')`,
 		"api_get_now_block",
 		fmt.Sprintf("%dms", queryTimeS),
-		fmt.Sprintf("%dms", queryTimeS-internal5min),
+		fmt.Sprintf("%dms", queryTimeS-Internal5min),
 		ip,
 		port)
 
@@ -216,17 +216,17 @@ func (g *GetNowBlockAlert) getMaxBlockNum(
 	tagMap := make(map[string]bool)
 
 	for _, n := range g.Nodes {
-		if _, ok := tagMap[n.Tag]; !ok {
-			tagMap[n.Tag] = true
+		if _, ok := tagMap[n.TagName]; !ok {
+			tagMap[n.TagName] = true
 		}
 	}
 
 	for k := range tagMap {
 		q := fmt.Sprintf(
 			`SELECT max(Number) FROM %s WHERE time <= %s AND time >= %s AND
-"Tag" = '%s'`,
+"TagName" = '%s'`,
 			"api_get_now_block", fmt.Sprintf("%dms", queryTimeS),
-			fmt.Sprintf("%dms", queryTimeS-internal5min), k)
+			fmt.Sprintf("%dms", queryTimeS-Internal5min), k)
 
 		num, _ := g.getBlockNum(q)
 		g.MaxBlockNum[k] = num
@@ -239,17 +239,17 @@ func (g *GetNowBlockAlert) getMinBlockNum(
 	tagMap := make(map[string]bool)
 
 	for _, n := range g.Nodes {
-		if _, ok := tagMap[n.Tag]; !ok {
-			tagMap[n.Tag] = true
+		if _, ok := tagMap[n.TagName]; !ok {
+			tagMap[n.TagName] = true
 		}
 	}
 
 	for k := range tagMap {
 		q := fmt.Sprintf(
 			`SELECT min(Number) FROM %s WHERE time <= %s AND time >= %s AND
-"Tag" = '%s'`,
+"TagName" = '%s'`,
 			"api_get_now_block", fmt.Sprintf("%dms", queryTimeS),
-			fmt.Sprintf("%dms", queryTimeS-internal5min), k)
+			fmt.Sprintf("%dms", queryTimeS-Internal5min), k)
 
 		num, _ := g.getBlockNum(q)
 		g.MinBlockNum[k] = num

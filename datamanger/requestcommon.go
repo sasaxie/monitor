@@ -8,7 +8,7 @@ type Parameter struct {
 	RequestUrl string
 
 	// InfluxDB tags
-	Node string
-	Type string
-	Tag  string
+	Node    string
+	Type    string
+	TagName string
 }
