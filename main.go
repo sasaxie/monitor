@@ -42,7 +42,8 @@ func report() {
 
 func change() {
 	c := new(alerts.ChainParameters)
-	c.MonitorUrl = "http://54.236.37.243:8090/wallet/getchainparameters"
+	c.MonitorUrl = config.MonitorConfig.Task.ProposalsMonitorUrl
+	logs.Info("init proposals monitor url:", c.MonitorUrl)
 
 	ticker := time.NewTicker(
 		time.Duration(config.MonitorConfig.Task.GetDataInterval) *

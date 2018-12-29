@@ -46,8 +46,9 @@ type Http struct {
 }
 
 type Task struct {
-	GetDataInterval int64
-	Dingding        string
+	GetDataInterval     int64
+	Dingding            string
+	ProposalsMonitorUrl string
 }
 
 func init() {
@@ -158,6 +159,7 @@ port = 8080
 # Interval defalut 60 seconds
 getDataInterval = 60
 dingding = "your DingDing robot url"
+proposalsMonitorUrl = "http://54.236.37.243:8090/wallet/getchainparameters"
 `
 
 	util.WriteToFile(filename, d)
