@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/influxdata/platform"
 	"github.com/influxdata/platform/snowflake"
+	"github.com/influxdata/platform/task/options"
 )
 
 var _ Store = (*inmem)(nil)
@@ -23,15 +23,15 @@ type inmem struct {
 	// but then we wouldn't have guaranteed ordering for paging.
 	tasks []StoreTask
 
-	runners map[string]StoreTaskMeta
+	meta map[platform.ID]StoreTaskMeta
 }
 
 // NewInMemStore returns a new in-memory store.
 // This store is not designed to be efficient, it is here for testing purposes.
 func NewInMemStore() Store {
 	return &inmem{
-		idgen:   snowflake.NewIDGenerator(),
-		runners: map[string]StoreTaskMeta{},
+		idgen: snowflake.NewIDGenerator(),
+		meta:  map[platform.ID]StoreTaskMeta{},
 	}
 }
 
@@ -58,68 +58,83 @@ func (s *inmem) CreateTask(_ context.Context, req CreateTaskRequest) (platform.I
 	defer s.mu.Unlock()
 
 	s.tasks = append(s.tasks, task)
-
-	stm := StoreTaskMeta{
-		MaxConcurrency:  int32(o.Concurrency),
-		Status:          string(req.Status),
-		LatestCompleted: req.ScheduleAfter,
-		EffectiveCron:   o.EffectiveCronString(),
-		Delay:           int32(o.Delay / time.Second),
-	}
-	if stm.Status == "" {
-		stm.Status = string(DefaultTaskStatus)
-	}
-	s.runners[id.String()] = stm
+	s.meta[id] = NewStoreTaskMeta(req, o)
 
 	return id, nil
 }
 
-func (s *inmem) ModifyTask(_ context.Context, id platform.ID, script string) error {
-	op, err := StoreValidator.ModifyArgs(id, script)
+func (s *inmem) UpdateTask(_ context.Context, req UpdateTaskRequest) (UpdateTaskResult, error) {
+	var res UpdateTaskResult
+	op, err := StoreValidator.UpdateArgs(req)
 	if err != nil {
-		return err
+		return res, err
 	}
+
+	idStr := req.ID.String()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	found := false
 	for n, t := range s.tasks {
-		if t.ID != id {
+		if t.ID != req.ID {
 			continue
 		}
+		found = true
 
+		res.OldScript = t.Script
+		if req.Script == "" {
+			op, err = options.FromScript(t.Script)
+			if err != nil {
+				return res, err
+			}
+		} else {
+			t.Script = req.Script
+		}
 		t.Name = op.Name
-		t.Script = script
+
 		s.tasks[n] = t
-		return nil
+		res.NewTask = t
+		break
+	}
+	if !found {
+		return res, fmt.Errorf("modifyTask: record not found for %s", idStr)
 	}
 
-	return fmt.Errorf("ModifyTask: record not found for %s", id)
+	stm, ok := s.meta[req.ID]
+	if !ok {
+		panic("inmem store: had task without runner for task ID " + idStr)
+	}
+	res.OldStatus = TaskStatus(stm.Status)
+
+	if req.Status != "" {
+		// Changing the status.
+		stm.Status = string(req.Status)
+		s.meta[req.ID] = stm
+	}
+	res.NewMeta = stm
+
+	return res, nil
 }
 
-func (s *inmem) ListTasks(_ context.Context, params TaskSearchParams) ([]StoreTask, error) {
+func (s *inmem) ListTasks(_ context.Context, params TaskSearchParams) ([]StoreTaskWithMeta, error) {
 	if params.Org.Valid() && params.User.Valid() {
 		return nil, errors.New("ListTasks: org and user filters are mutually exclusive")
 	}
 
-	const (
-		defaultPageSize = 100
-		maxPageSize     = 500
-	)
-
 	if params.PageSize < 0 {
 		return nil, errors.New("ListTasks: PageSize must be positive")
 	}
-	if params.PageSize > maxPageSize {
-		return nil, fmt.Errorf("ListTasks: PageSize exceeds maximum of %d", maxPageSize)
+	if params.PageSize > platform.TaskMaxPageSize {
+		return nil, fmt.Errorf("ListTasks: PageSize exceeds maximum of %d", platform.TaskMaxPageSize)
 	}
 
 	lim := params.PageSize
 	if lim == 0 {
-		lim = defaultPageSize
+		lim = platform.TaskDefaultPageSize
 	}
 
-	out := make([]StoreTask, 0, lim)
+	out := make([]StoreTaskWithMeta, 0, lim)
 
 	org := params.Org
 	user := params.User
@@ -145,10 +160,15 @@ func (s *inmem) ListTasks(_ context.Context, params TaskSearchParams) ([]StoreTa
 			continue
 		}
 
-		out = append(out, t)
+		out = append(out, StoreTaskWithMeta{Task: t})
 		if len(out) >= lim {
 			break
 		}
+	}
+
+	for i := range out {
+		id := out[i].Task.ID
+		out[i].Meta = s.meta[id]
 	}
 
 	return out, nil
@@ -187,7 +207,7 @@ func (s *inmem) FindTaskByIDWithMeta(_ context.Context, id platform.ID) (*StoreT
 		return nil, nil, ErrTaskNotFound
 	}
 
-	meta, ok := s.runners[id.String()]
+	meta, ok := s.meta[id]
 	if !ok {
 		return nil, nil, errors.New("task meta not found")
 	}
@@ -195,42 +215,11 @@ func (s *inmem) FindTaskByIDWithMeta(_ context.Context, id platform.ID) (*StoreT
 	return task, &meta, nil
 }
 
-func (s *inmem) EnableTask(ctx context.Context, id platform.ID) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	strID := id.String()
-
-	meta, ok := s.runners[strID]
-	if !ok {
-		return errors.New("task meta not found")
-	}
-	meta.Status = string(TaskActive)
-	s.runners[strID] = meta
-
-	return nil
-}
-
-func (s *inmem) DisableTask(ctx context.Context, id platform.ID) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	strID := id.String()
-
-	meta, ok := s.runners[strID]
-	if !ok {
-		return errors.New("task meta not found")
-	}
-	meta.Status = string(TaskInactive)
-	s.runners[strID] = meta
-
-	return nil
-}
-
 func (s *inmem) FindTaskMetaByID(ctx context.Context, id platform.ID) (*StoreTaskMeta, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	meta, ok := s.runners[id.String()]
+	meta, ok := s.meta[id]
 	if !ok {
 		return nil, ErrTaskNotFound
 	}
@@ -256,6 +245,7 @@ func (s *inmem) DeleteTask(_ context.Context, id platform.ID) (deleted bool, err
 
 	// Delete entry from slice.
 	s.tasks = append(s.tasks[:idx], s.tasks[idx+1:]...)
+	delete(s.meta, id)
 	return true, nil
 }
 
@@ -267,7 +257,7 @@ func (s *inmem) CreateNextRun(ctx context.Context, taskID platform.ID, now int64
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	stm, ok := s.runners[taskID.String()]
+	stm, ok := s.meta[taskID]
 	if !ok {
 		return RunCreation{}, errors.New("task not found")
 	}
@@ -281,14 +271,14 @@ func (s *inmem) CreateNextRun(ctx context.Context, taskID platform.ID, now int64
 	}
 	rc.Created.TaskID = taskID
 
-	s.runners[taskID.String()] = stm
+	s.meta[taskID] = stm
 	return rc, nil
 }
 
 // FinishRun removes runID from the list of running tasks and if its `now` is later then last completed update it.
 func (s *inmem) FinishRun(ctx context.Context, taskID, runID platform.ID) error {
 	s.mu.RLock()
-	stm, ok := s.runners[taskID.String()]
+	stm, ok := s.meta[taskID]
 	s.mu.RUnlock()
 
 	if !ok {
@@ -300,29 +290,28 @@ func (s *inmem) FinishRun(ctx context.Context, taskID, runID platform.ID) error 
 	}
 
 	s.mu.Lock()
-	s.runners[taskID.String()] = stm
+	s.meta[taskID] = stm
 	s.mu.Unlock()
 
 	return nil
 }
 
-func (s *inmem) ManuallyRunTimeRange(_ context.Context, taskID platform.ID, start, end, requestedAt int64) error {
-	tid := taskID.String()
-
+func (s *inmem) ManuallyRunTimeRange(_ context.Context, taskID platform.ID, start, end, requestedAt int64) (*StoreTaskMetaManualRun, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	stm, ok := s.runners[tid]
+	stm, ok := s.meta[taskID]
 	if !ok {
-		return errors.New("task not found")
+		return nil, errors.New("task not found")
 	}
 
-	if err := stm.ManuallyRunTimeRange(start, end, requestedAt); err != nil {
-		return err
+	if err := stm.ManuallyRunTimeRange(start, end, requestedAt, func() (platform.ID, error) { return s.idgen.ID(), nil }); err != nil {
+		return nil, err
 	}
 
-	s.runners[tid] = stm
-	return nil
+	s.meta[taskID] = stm
+	mr := stm.ManualRuns[len(stm.ManualRuns)-1]
+	return mr, nil
 }
 
 func (s *inmem) delete(ctx context.Context, id platform.ID, f func(StoreTask) platform.ID) error {
@@ -352,7 +341,7 @@ func (s *inmem) delete(ctx context.Context, id platform.ID, f func(StoreTask) pl
 	default:
 	}
 	for i := range deletingTasks {
-		delete(s.runners, s.tasks[i].ID.String())
+		delete(s.meta, s.tasks[i].ID)
 	}
 	s.tasks = newTasks
 	return nil

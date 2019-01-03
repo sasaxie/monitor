@@ -7,61 +7,87 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"strings"
+	"strconv"
+	"time"
 
 	"github.com/influxdata/platform"
-	errors "github.com/influxdata/platform/kit/errors"
+	"github.com/influxdata/platform/kit/errors"
 	"github.com/julienschmidt/httprouter"
+	"go.uber.org/zap"
 )
 
 // BucketHandler represents an HTTP API handler for buckets.
 type BucketHandler struct {
 	*httprouter.Router
 
+	Logger *zap.Logger
+
 	BucketService              platform.BucketService
+	BucketOperationLogService  platform.BucketOperationLogService
 	UserResourceMappingService platform.UserResourceMappingService
+	LabelService               platform.LabelService
+	UserService                platform.UserService
 }
 
 const (
-	bucketsPath            = "/api/v2/buckets"
-	bucketsIDPath          = "/api/v2/buckets/:id"
-	bucketsIDMembersPath   = "/api/v2/buckets/:id/members"
-	bucketsIDMembersIDPath = "/api/v2/buckets/:id/members/:userID"
-	bucketsIDOwnersPath    = "/api/v2/buckets/:id/owners"
-	bucketsIDOwnersIDPath  = "/api/v2/buckets/:id/owners/:userID"
+	bucketsPath             = "/api/v2/buckets"
+	bucketsIDPath           = "/api/v2/buckets/:id"
+	bucketsIDLogPath        = "/api/v2/buckets/:id/log"
+	bucketsIDMembersPath    = "/api/v2/buckets/:id/members"
+	bucketsIDMembersIDPath  = "/api/v2/buckets/:id/members/:userID"
+	bucketsIDOwnersPath     = "/api/v2/buckets/:id/owners"
+	bucketsIDOwnersIDPath   = "/api/v2/buckets/:id/owners/:userID"
+	bucketsIDLabelsPath     = "/api/v2/buckets/:id/labels"
+	bucketsIDLabelsNamePath = "/api/v2/buckets/:id/labels/:name"
 )
 
 // NewBucketHandler returns a new instance of BucketHandler.
-func NewBucketHandler() *BucketHandler {
+func NewBucketHandler(mappingService platform.UserResourceMappingService, labelService platform.LabelService, userService platform.UserService) *BucketHandler {
 	h := &BucketHandler{
-		Router: httprouter.New(),
+		Router:                     NewRouter(),
+		Logger:                     zap.NewNop(),
+		UserResourceMappingService: mappingService,
+		LabelService:               labelService,
+		UserService:                userService,
 	}
 
 	h.HandlerFunc("POST", bucketsPath, h.handlePostBucket)
 	h.HandlerFunc("GET", bucketsPath, h.handleGetBuckets)
 	h.HandlerFunc("GET", bucketsIDPath, h.handleGetBucket)
+	h.HandlerFunc("GET", bucketsIDLogPath, h.handleGetBucketLog)
 	h.HandlerFunc("PATCH", bucketsIDPath, h.handlePatchBucket)
 	h.HandlerFunc("DELETE", bucketsIDPath, h.handleDeleteBucket)
 
-	h.HandlerFunc("POST", bucketsIDMembersPath, newPostMemberHandler(h.UserResourceMappingService, platform.BucketResourceType, platform.Member))
-	h.HandlerFunc("GET", bucketsIDMembersPath, newGetMembersHandler(h.UserResourceMappingService, platform.Member))
+	h.HandlerFunc("POST", bucketsIDMembersPath, newPostMemberHandler(h.UserResourceMappingService, h.UserService, platform.BucketResourceType, platform.Member))
+	h.HandlerFunc("GET", bucketsIDMembersPath, newGetMembersHandler(h.UserResourceMappingService, h.UserService, platform.BucketResourceType, platform.Member))
 	h.HandlerFunc("DELETE", bucketsIDMembersIDPath, newDeleteMemberHandler(h.UserResourceMappingService, platform.Member))
 
-	h.HandlerFunc("POST", bucketsIDOwnersPath, newPostMemberHandler(h.UserResourceMappingService, platform.BucketResourceType, platform.Owner))
-	h.HandlerFunc("GET", bucketsIDOwnersPath, newGetMembersHandler(h.UserResourceMappingService, platform.Owner))
+	h.HandlerFunc("POST", bucketsIDOwnersPath, newPostMemberHandler(h.UserResourceMappingService, h.UserService, platform.BucketResourceType, platform.Owner))
+	h.HandlerFunc("GET", bucketsIDOwnersPath, newGetMembersHandler(h.UserResourceMappingService, h.UserService, platform.BucketResourceType, platform.Owner))
 	h.HandlerFunc("DELETE", bucketsIDOwnersIDPath, newDeleteMemberHandler(h.UserResourceMappingService, platform.Owner))
+
+	h.HandlerFunc("GET", bucketsIDLabelsPath, newGetLabelsHandler(h.LabelService))
+	h.HandlerFunc("POST", bucketsIDLabelsPath, newPostLabelHandler(h.LabelService))
+	h.HandlerFunc("DELETE", bucketsIDLabelsNamePath, newDeleteLabelHandler(h.LabelService))
+	h.HandlerFunc("PATCH", bucketsIDLabelsNamePath, newPatchLabelHandler(h.LabelService))
 
 	return h
 }
 
 // bucket is used for serialization/deserialization with duration string syntax.
 type bucket struct {
-	ID                  platform.ID `json:"id,omitempty"`
-	OrganizationID      platform.ID `json:"organizationID,omitempty"`
-	Organization        string      `json:"organization,omitempty"`
-	Name                string      `json:"name"`
-	RetentionPolicyName string      `json:"rp,omitempty"` // This to support v1 sources
-	RetentionPeriod     string      `json:"retentionPeriod"`
+	ID                  platform.ID     `json:"id,omitempty"`
+	OrganizationID      platform.ID     `json:"organizationID,omitempty"`
+	Organization        string          `json:"organization,omitempty"`
+	Name                string          `json:"name"`
+	RetentionPolicyName string          `json:"rp,omitempty"` // This to support v1 sources
+	RetentionRules      []retentionRule `json:"retentionRules"`
+}
+
+// retentionRule is the retention rule action for a bucket.
+type retentionRule struct {
+	Type         string `json:"type"`
+	EverySeconds int64  `json:"everySeconds"`
 }
 
 func (b *bucket) toPlatform() (*platform.Bucket, error) {
@@ -69,9 +95,14 @@ func (b *bucket) toPlatform() (*platform.Bucket, error) {
 		return nil, nil
 	}
 
-	d, err := ParseDuration(b.RetentionPeriod)
-	if err != nil {
-		return nil, err
+	var d time.Duration // zero value implies infinite retention policy
+
+	// Only support a single retention period for the moment
+	if len(b.RetentionRules) > 0 {
+		d = time.Duration(b.RetentionRules[0].EverySeconds) * time.Second
+		if d < time.Second {
+			return nil, errors.InvalidDataf("expiration seconds must be greater than or equal to one second")
+		}
 	}
 
 	return &platform.Bucket{
@@ -89,20 +120,29 @@ func newBucket(pb *platform.Bucket) *bucket {
 		return nil
 	}
 
+	rules := []retentionRule{}
+	rp := int64(pb.RetentionPeriod.Round(time.Second) / time.Second)
+	if rp > 0 {
+		rules = append(rules, retentionRule{
+			Type:         "expire",
+			EverySeconds: rp,
+		})
+	}
+
 	return &bucket{
 		ID:                  pb.ID,
 		OrganizationID:      pb.OrganizationID,
 		Organization:        pb.Organization,
 		Name:                pb.Name,
 		RetentionPolicyName: pb.RetentionPolicyName,
-		RetentionPeriod:     FormatDuration(pb.RetentionPeriod),
+		RetentionRules:      rules,
 	}
 }
 
-// bucketUpdate is used for serialization/deserialization with duration string syntax.
+// bucketUpdate is used for serialization/deserialization with retention rules.
 type bucketUpdate struct {
-	Name            *string `json:"name,omitempty"`
-	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
+	Name           *string         `json:"name,omitempty"`
+	RetentionRules []retentionRule `json:"retentionRules,omitempty"`
 }
 
 func (b *bucketUpdate) toPlatform() (*platform.BucketUpdate, error) {
@@ -110,18 +150,19 @@ func (b *bucketUpdate) toPlatform() (*platform.BucketUpdate, error) {
 		return nil, nil
 	}
 
-	up := &platform.BucketUpdate{
-		Name: b.Name,
-	}
-	if b.RetentionPeriod != nil {
-		d, err := ParseDuration(*b.RetentionPeriod)
-		if err != nil {
-			return nil, err
+	// For now, only use a single retention rule.
+	var d time.Duration
+	if len(b.RetentionRules) > 0 {
+		d = time.Duration(b.RetentionRules[0].EverySeconds) * time.Second
+		if d < time.Second {
+			return nil, errors.InvalidDataf("expiration seconds must be greater than or equal to one second")
 		}
-		up.RetentionPeriod = &d
 	}
 
-	return up, nil
+	return &platform.BucketUpdate{
+		Name:            b.Name,
+		RetentionPeriod: &d,
+	}, nil
 }
 
 func newBucketUpdate(pb *platform.BucketUpdate) *bucketUpdate {
@@ -130,11 +171,16 @@ func newBucketUpdate(pb *platform.BucketUpdate) *bucketUpdate {
 	}
 
 	up := &bucketUpdate{
-		Name: pb.Name,
+		Name:           pb.Name,
+		RetentionRules: []retentionRule{},
 	}
+
 	if pb.RetentionPeriod != nil {
-		d := FormatDuration(*pb.RetentionPeriod)
-		up.RetentionPeriod = &d
+		d := int64((*pb.RetentionPeriod).Round(time.Second) / time.Second)
+		up.RetentionRules = append(up.RetentionRules, retentionRule{
+			Type:         "expire",
+			EverySeconds: d,
+		})
 	}
 	return up
 }
@@ -148,6 +194,7 @@ func newBucketResponse(b *platform.Bucket) *bucketResponse {
 	return &bucketResponse{
 		Links: map[string]string{
 			"self": fmt.Sprintf("/api/v2/buckets/%s", b.ID),
+			"log":  fmt.Sprintf("/api/v2/buckets/%s/log", b.ID),
 			"org":  fmt.Sprintf("/api/v2/orgs/%s", b.OrganizationID),
 		},
 		bucket: *newBucket(b),
@@ -155,8 +202,8 @@ func newBucketResponse(b *platform.Bucket) *bucketResponse {
 }
 
 type bucketsResponse struct {
-	Links   map[string]string `json:"links"`
-	Buckets []*bucketResponse `json:"buckets"`
+	Links   *platform.PagingLinks `json:"links"`
+	Buckets []*bucketResponse     `json:"buckets"`
 }
 
 func newBucketsResponse(opts platform.FindOptions, f platform.BucketFilter, bs []*platform.Bucket) *bucketsResponse {
@@ -165,10 +212,7 @@ func newBucketsResponse(opts platform.FindOptions, f platform.BucketFilter, bs [
 		rs = append(rs, newBucketResponse(b))
 	}
 	return &bucketsResponse{
-		// TODO(desa): update links to include paging and filter information
-		Links: map[string]string{
-			"self": "/api/v2/buckets",
-		},
+		Links:   newPagingLinks(bucketsPath, opts, f, len(bs)),
 		Buckets: rs,
 	}
 }
@@ -189,7 +233,7 @@ func (h *BucketHandler) handlePostBucket(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusCreated, newBucketResponse(req.Bucket)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -235,16 +279,12 @@ func (h *BucketHandler) handleGetBucket(w http.ResponseWriter, r *http.Request) 
 
 	b, err := h.BucketService.FindBucketByID(ctx, req.BucketID)
 	if err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = errors.New(err.Error(), errors.NotFound)
-		}
 		EncodeError(ctx, err, w)
 		return
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newBucketResponse(b)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -282,10 +322,6 @@ func (h *BucketHandler) handleDeleteBucket(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := h.BucketService.DeleteBucket(ctx, req.BucketID); err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = errors.New(err.Error(), errors.NotFound)
-		}
 		EncodeError(ctx, err, w)
 		return
 	}
@@ -325,26 +361,33 @@ func (h *BucketHandler) handleGetBuckets(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	opts := platform.FindOptions{}
-	bs, _, err := h.BucketService.FindBuckets(ctx, req.filter, opts)
+	bs, _, err := h.BucketService.FindBuckets(ctx, req.filter, req.opts)
 	if err != nil {
 		EncodeError(ctx, err, w)
 		return
 	}
 
-	if err := encodeResponse(ctx, w, http.StatusOK, newBucketsResponse(opts, req.filter, bs)); err != nil {
-		EncodeError(ctx, err, w)
+	if err := encodeResponse(ctx, w, http.StatusOK, newBucketsResponse(req.opts, req.filter, bs)); err != nil {
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
 
 type getBucketsRequest struct {
 	filter platform.BucketFilter
+	opts   platform.FindOptions
 }
 
 func decodeGetBucketsRequest(ctx context.Context, r *http.Request) (*getBucketsRequest, error) {
 	qp := r.URL.Query()
 	req := &getBucketsRequest{}
+
+	opts, err := decodeFindOptions(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+
+	req.opts = *opts
 
 	if orgID := qp.Get("orgID"); orgID != "" {
 		id, err := platform.IDFromString(orgID)
@@ -356,14 +399,6 @@ func decodeGetBucketsRequest(ctx context.Context, r *http.Request) (*getBucketsR
 
 	if org := qp.Get("org"); org != "" {
 		req.filter.Organization = &org
-	}
-
-	if bucketID := qp.Get("id"); bucketID != "" {
-		id, err := platform.IDFromString(bucketID)
-		if err != nil {
-			return nil, err
-		}
-		req.filter.ID = id
 	}
 
 	if name := qp.Get("name"); name != "" {
@@ -385,16 +420,12 @@ func (h *BucketHandler) handlePatchBucket(w http.ResponseWriter, r *http.Request
 
 	b, err := h.BucketService.UpdateBucket(ctx, req.BucketID, req.Update)
 	if err != nil {
-		// TODO(desa): fix this when using real errors library
-		if strings.Contains(err.Error(), "not found") {
-			err = errors.New(err.Error(), errors.NotFound)
-		}
 		EncodeError(ctx, err, w)
 		return
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newBucketResponse(b)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -441,6 +472,9 @@ type BucketService struct {
 	Addr               string
 	Token              string
 	InsecureSkipVerify bool
+	// OpPrefix is an additional property for error
+	// find bucket service, when finds nothing.
+	OpPrefix string
 }
 
 // FindBucketByID returns a single bucket by ID.
@@ -462,7 +496,7 @@ func (s *BucketService) FindBucketByID(ctx context.Context, id platform.ID) (*pl
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -482,7 +516,12 @@ func (s *BucketService) FindBucket(ctx context.Context, filter platform.BucketFi
 	}
 
 	if n == 0 {
-		return nil, ErrNotFound
+		return nil, &platform.Error{
+			Code: platform.ENotFound,
+			Op:   s.OpPrefix + platform.OpFindBucket,
+			Msg:  "bucket not found",
+			Err:  ErrNotFound,
+		}
 	}
 
 	return bs[0], nil
@@ -524,7 +563,7 @@ func (s *BucketService) FindBuckets(ctx context.Context, filter platform.BucketF
 		return nil, 0, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, 0, err
 	}
 
@@ -575,7 +614,7 @@ func (s *BucketService) CreateBucket(ctx context.Context, b *platform.Bucket) er
 	}
 
 	// TODO(jsternberg): Should this check for a 201 explicitly?
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -621,7 +660,7 @@ func (s *BucketService) UpdateBucket(ctx context.Context, id platform.ID, upd pl
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -651,9 +690,87 @@ func (s *BucketService) DeleteBucket(ctx context.Context, id platform.ID) error 
 	if err != nil {
 		return err
 	}
-	return CheckError(resp)
+	return CheckError(resp, true)
 }
 
 func bucketIDPath(id platform.ID) string {
 	return path.Join(bucketPath, id.String())
+}
+
+// hanldeGetBucketLog retrieves a bucket log by the buckets ID.
+func (h *BucketHandler) handleGetBucketLog(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	req, err := decodeGetBucketLogRequest(ctx, r)
+	if err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	log, _, err := h.BucketOperationLogService.GetBucketOperationLog(ctx, req.BucketID, req.opts)
+	if err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if err := encodeResponse(ctx, w, http.StatusOK, newBucketLogResponse(req.BucketID, log)); err != nil {
+		logEncodingError(h.Logger, r, err)
+		return
+	}
+}
+
+type getBucketLogRequest struct {
+	BucketID platform.ID
+	opts     platform.FindOptions
+}
+
+func decodeGetBucketLogRequest(ctx context.Context, r *http.Request) (*getBucketLogRequest, error) {
+	params := httprouter.ParamsFromContext(ctx)
+	id := params.ByName("id")
+	if id == "" {
+		return nil, errors.InvalidDataf("url missing id")
+	}
+
+	var i platform.ID
+	if err := i.DecodeFromString(id); err != nil {
+		return nil, err
+	}
+
+	opts := platform.DefaultOperationLogFindOptions
+	qp := r.URL.Query()
+	if v := qp.Get("desc"); v == "false" {
+		opts.Descending = false
+	}
+	if v := qp.Get("limit"); v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, err
+		}
+		opts.Limit = i
+	}
+	if v := qp.Get("offset"); v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, err
+		}
+		opts.Offset = i
+	}
+
+	return &getBucketLogRequest{
+		BucketID: i,
+		opts:     opts,
+	}, nil
+}
+
+func newBucketLogResponse(id platform.ID, es []*platform.OperationLogEntry) *operationLogResponse {
+	log := make([]*operationLogEntryResponse, 0, len(es))
+	for _, e := range es {
+		log = append(log, newOperationLogEntryResponse(e))
+	}
+	return &operationLogResponse{
+		Links: map[string]string{
+			"self": fmt.Sprintf("/api/v2/buckets/%s/log", id),
+		},
+		Log: log,
+	}
 }

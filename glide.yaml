@@ -19,3 +19,4 @@ import:
   subpackages:
   - models
 - package: github.com/BurntSushi/toml
+- package: github.com/robfig/cron

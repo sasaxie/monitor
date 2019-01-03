@@ -390,7 +390,7 @@ func copyBuffer(f syncer, dst io.Writer, src io.Reader, buf []byte) (written int
 				written += int64(nw)
 			}
 
-			if written-lastSync > fsyncEvery {
+			if f != nil && written-lastSync > fsyncEvery {
 				if err := f.Sync(); err != nil {
 					return 0, err
 				}
@@ -789,7 +789,7 @@ func (t *tsmWriter) writeStatsFile() error {
 		return nil
 	}
 
-	f, err := os.OpenFile(StatsFilename(fw.Name()), os.O_CREATE|os.O_RDWR|os.O_EXCL, 0666)
+	f, err := os.Create(StatsFilename(fw.Name()))
 	if err != nil {
 		return err
 	}

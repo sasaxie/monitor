@@ -34,22 +34,22 @@ type FluxHandler struct {
 
 	Logger *zap.Logger
 
-	Now                  func() time.Time
-	AuthorizationService platform.AuthorizationService
-	OrganizationService  platform.OrganizationService
-	ProxyQueryService    query.ProxyQueryService
+	Now                 func() time.Time
+	OrganizationService platform.OrganizationService
+	ProxyQueryService   query.ProxyQueryService
 }
 
 // NewFluxHandler returns a new handler at /api/v2/query for flux queries.
 func NewFluxHandler() *FluxHandler {
 	h := &FluxHandler{
-		Router: httprouter.New(),
+		Router: NewRouter(),
 		Now:    time.Now,
 		Logger: zap.NewNop(),
 	}
 
 	h.HandlerFunc("POST", fluxPath, h.handlePostQuery)
 	h.HandlerFunc("POST", "/api/v2/query/ast", h.postFluxAST)
+	h.HandlerFunc("POST", "/api/v2/query/analyze", h.postQueryAnalyze)
 	h.HandlerFunc("POST", "/api/v2/query/spec", h.postFluxSpec)
 	h.HandlerFunc("GET", "/api/v2/query/suggestions", h.getFluxSuggestions)
 	h.HandlerFunc("GET", "/api/v2/query/suggestions/:name", h.getFluxSuggestion)
@@ -58,25 +58,15 @@ func NewFluxHandler() *FluxHandler {
 
 func (h *FluxHandler) handlePostQuery(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
 	a, err := pcontext.GetAuthorizer(ctx)
 	if err != nil {
 		EncodeError(ctx, err, w)
 		return
 	}
 
-	auth, err := h.AuthorizationService.FindAuthorizationByID(ctx, a.Identifier())
-	if err != nil {
-		EncodeError(ctx, err, w)
-		return
-	}
-
-	if !auth.IsActive() {
-		EncodeError(ctx, errors.Forbiddenf("insufficient permissions for query"), w)
-		return
-	}
-
-	req, err := decodeProxyQueryRequest(ctx, r, auth, h.OrganizationService)
-	if err != nil {
+	req, err := decodeProxyQueryRequest(ctx, r, a, h.OrganizationService)
+	if err != nil && err != platform.ErrAuthorizerNotSupported {
 		EncodeError(ctx, err, w)
 		return
 	}
@@ -123,7 +113,7 @@ func (h *FluxHandler) postFluxAST(w http.ResponseWriter, r *http.Request) {
 
 	ast, err := parser.NewAST(request.Query)
 	if err != nil {
-		EncodeError(ctx, errors.InvalidDataf("invalid json: %v", err), w)
+		EncodeError(ctx, errors.InvalidDataf("invalid AST: %v", err), w)
 		return
 	}
 
@@ -132,7 +122,28 @@ func (h *FluxHandler) postFluxAST(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, res); err != nil {
+		logEncodingError(h.Logger, r, err)
+		return
+	}
+}
+
+// postQueryAnalyze parses a query and returns any query errors.
+func (h *FluxHandler) postQueryAnalyze(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req QueryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		EncodeError(ctx, errors.MalformedDataf("invalid json: %v", err), w)
+		return
+	}
+
+	a, err := req.Analyze()
+	if err != nil {
 		EncodeError(ctx, err, w)
+		return
+	}
+	if err := encodeResponse(ctx, w, http.StatusOK, a); err != nil {
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -154,7 +165,7 @@ func (h *FluxHandler) postFluxSpec(w http.ResponseWriter, r *http.Request) {
 
 	spec, err := flux.Compile(ctx, req.Query, h.Now())
 	if err != nil {
-		EncodeError(ctx, errors.InvalidDataf("invalid json: %v", err), w)
+		EncodeError(ctx, errors.InvalidDataf("invalid spec: %v", err), w)
 		return
 	}
 
@@ -163,7 +174,7 @@ func (h *FluxHandler) postFluxSpec(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, res); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -212,7 +223,7 @@ func (h *FluxHandler) getFluxSuggestions(w http.ResponseWriter, r *http.Request)
 	res := suggestionsResponse{Functions: functions}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, res); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -231,7 +242,7 @@ func (h *FluxHandler) getFluxSuggestion(w http.ResponseWriter, r *http.Request) 
 
 	res := suggestionResponse{Name: name, Params: suggestion.Params}
 	if err := encodeResponse(ctx, w, http.StatusOK, res); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -273,11 +284,7 @@ func (s *FluxService) Query(ctx context.Context, w io.Writer, r *query.ProxyRequ
 		return 0, err
 	}
 
-	tok, err := pcontext.GetToken(ctx)
-	if err != nil {
-		tok = s.Token
-	}
-	SetToken(tok, hreq)
+	SetToken(s.Token, hreq)
 
 	hreq.Header.Set("Content-Type", "application/json")
 	hreq.Header.Set("Accept", "text/csv")
@@ -333,11 +340,7 @@ func (s *FluxQueryService) Query(ctx context.Context, r *query.Request) (flux.Re
 		return nil, err
 	}
 
-	tok, err := pcontext.GetToken(ctx)
-	if err != nil {
-		tok = s.Token
-	}
-	SetToken(tok, hreq)
+	SetToken(s.Token, hreq)
 
 	hreq.Header.Set("Content-Type", "application/json")
 	hreq.Header.Set("Accept", "text/csv")
@@ -349,7 +352,7 @@ func (s *FluxQueryService) Query(ctx context.Context, r *query.Request) (flux.Re
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 

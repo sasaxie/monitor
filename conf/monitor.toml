@@ -32,7 +32,7 @@ level = "debug"
 port = 8080
 
 [task]
-# gRPC Interval defalut 40 seconds
-getGRPCDataInterval = 40
-# HTTP Interval defalut 10 seconds
-getHTTPDataInterval = 10
+# Interval defalut 60 seconds
+getDataInterval = 60
+dingding = "your DingDing robot url"
+proposalsMonitorUrl = "http://54.236.37.243:8090/wallet/getchainparameters"

@@ -51,34 +51,44 @@ func (i *InfluxDB) WriteByTime(
 	tags map[string]string,
 	fields map[string]interface{},
 	t time.Time) {
+
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  config.MonitorConfig.InfluxDB.Database,
 		Precision: "s",
 	})
 	if err != nil {
-		log.Fatal(err)
+		logs.Error(fmt.Sprintf("[package: influxdb] [method: WriteByTime] [pointName: %s, tags"+
+			": %v, fields: %v, t: %v] [error: client.NewBatchPoints: %s]",
+			pointName, tags, fields, t, err))
+		return
 	}
 
 	pt, err := client.NewPoint(pointName, tags, fields, t)
 	if err != nil {
-		log.Fatal(err)
+		logs.Error(fmt.Sprintf("[package: influxdb] [method: WriteByTime] [pointName: %s, tags"+
+			": %v, fields: %v, t: %v] [error: client.NewPoint: %s]",
+			pointName, tags, fields, t, err))
+		return
 	}
 	bp.AddPoint(pt)
 
 	if err := i.C.Write(bp); err != nil {
-		log.Fatal(err)
+		logs.Error(fmt.Sprintf("[package: influxdb] [method: WriteByTime] [pointName: %s, tags"+
+			": %v, fields: %v, t: %v] [error: i.C.Write: %s]",
+			pointName, tags, fields, t, err))
+		return
 	}
 }
 
 func (i *InfluxDB) InitDatabase() {
-	_, err := queryDB(i.C, fmt.Sprintf("CREATE DATABASE %s",
+	_, err := QueryDB(i.C, fmt.Sprintf("CREATE DATABASE %s",
 		config.MonitorConfig.InfluxDB.Database))
 	if err != nil {
 		logs.Error(err)
 	}
 }
 
-func queryDB(clnt client.Client, cmd string) (res []client.Result, err error) {
+func QueryDB(clnt client.Client, cmd string) (res []client.Result, err error) {
 	q := client.Query{
 		Command:  cmd,
 		Database: config.MonitorConfig.InfluxDB.Database,

@@ -1,6 +1,7 @@
 package tsi1
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -16,18 +18,12 @@ import (
 	"github.com/cespare/xxhash"
 	"github.com/influxdata/influxql"
 	"github.com/influxdata/platform/models"
-	"github.com/influxdata/platform/pkg/estimator"
-	"github.com/influxdata/platform/pkg/estimator/hll"
 	"github.com/influxdata/platform/pkg/slices"
+	"github.com/influxdata/platform/query"
 	"github.com/influxdata/platform/tsdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
-
-// IndexName is the name of the index.
-const IndexName = tsdb.TSI1IndexName
-
-// DefaultSeriesIDSetCacheSize is the default number of series ID sets to cache.
-const DefaultSeriesIDSetCacheSize = 100
 
 // ErrCompactionInterrupted is returned if compactions are disabled or
 // an index is closed while a compaction is occurring.
@@ -41,15 +37,6 @@ func init() {
 		}
 		DefaultPartitionN = uint64(i)
 	}
-
-	// TODO(edd): To remove when feature finalised.
-	var err error
-	if os.Getenv("INFLUXDB_EXP_TSI_CACHING") != "" {
-		EnableBitsetCache, err = strconv.ParseBool(os.Getenv("INFLUXDB_EXP_TSI_CACHING"))
-		if err != nil {
-			panic(err)
-		}
-	}
 }
 
 // DefaultPartitionN determines how many shards the index will be partitioned into.
@@ -58,9 +45,6 @@ func init() {
 // it must also be a power of 2.
 //
 var DefaultPartitionN uint64 = 8
-
-// EnableBitsetCache determines if bitsets are cached.
-var EnableBitsetCache = true
 
 // An IndexOption is a functional option for changing the configuration of
 // an Index.
@@ -104,13 +88,25 @@ var WithLogFileBufferSize = func(sz int) IndexOption {
 	}
 }
 
+// DisableMetrics ensures that activity is not collected via the prometheus metrics.
+// DisableMetrics must be called before Open.
+var DisableMetrics = func() IndexOption {
+	return func(i *Index) {
+		i.metricsEnabled = false
+	}
+}
+
 // Index represents a collection of layered index files and WAL.
 type Index struct {
 	mu         sync.RWMutex
 	partitions []*Partition
 	opened     bool
 
-	tagValueCache *TagValueSeriesIDCache
+	defaultLabels prometheus.Labels
+
+	tagValueCache    *TagValueSeriesIDCache
+	partitionMetrics *partitionMetrics // Maintain a single set of partition metrics to be shared by partition.
+	metricsEnabled   bool
 
 	// The following may be set when initializing an Index.
 	path               string      // Root directory of the index partitions.
@@ -119,14 +115,10 @@ type Index struct {
 	logfileBufferSize  int         // The size of the buffer used by the LogFile.
 	disableFsync       bool        // Disables flushing buffers and fsyning files. Used when working with indexes offline.
 	logger             *zap.Logger // Index's logger.
+	config             Config      // The index configuration
 
 	// The following must be set when initializing an Index.
-	sfile    *tsdb.SeriesFile // series lookup file
-	database string           // Name of database.
-
-	// Cached sketches.
-	mSketch, mTSketch estimator.Sketch // Measurement sketches
-	sSketch, sTSketch estimator.Sketch // Series sketches
+	sfile *tsdb.SeriesFile // series lookup file
 
 	// Index's version.
 	version int
@@ -140,19 +132,17 @@ func (i *Index) UniqueReferenceID() uintptr {
 }
 
 // NewIndex returns a new instance of Index.
-func NewIndex(sfile *tsdb.SeriesFile, database string, c Config, options ...IndexOption) *Index {
+func NewIndex(sfile *tsdb.SeriesFile, c Config, options ...IndexOption) *Index {
 	idx := &Index{
-		tagValueCache:  NewTagValueSeriesIDCache(DefaultSeriesIDSetCacheSize),
-		maxLogFileSize: int64(c.MaxIndexLogFileSize),
-		logger:         zap.NewNop(),
-		version:        Version,
-		sfile:          sfile,
-		database:       database,
-		mSketch:        hll.NewDefaultPlus(),
-		mTSketch:       hll.NewDefaultPlus(),
-		sSketch:        hll.NewDefaultPlus(),
-		sTSketch:       hll.NewDefaultPlus(),
-		PartitionN:     DefaultPartitionN,
+		tagValueCache:    NewTagValueSeriesIDCache(c.SeriesIDSetCacheSize),
+		partitionMetrics: newPartitionMetrics(nil),
+		metricsEnabled:   true,
+		maxLogFileSize:   int64(c.MaxIndexLogFileSize),
+		logger:           zap.NewNop(),
+		version:          Version,
+		config:           c,
+		sfile:            sfile,
+		PartitionN:       DefaultPartitionN,
 	}
 
 	for _, option := range options {
@@ -160,6 +150,14 @@ func NewIndex(sfile *tsdb.SeriesFile, database string, c Config, options ...Inde
 	}
 
 	return idx
+}
+
+// SetDefaultMetricLabels sets the default labels on the trackers.
+func (i *Index) SetDefaultMetricLabels(labels prometheus.Labels) {
+	i.defaultLabels = make(prometheus.Labels, len(labels))
+	for k, v := range labels {
+		i.defaultLabels[k] = v
+	}
 }
 
 // Bytes estimates the memory footprint of this Index, in bytes.
@@ -178,20 +176,10 @@ func (i *Index) Bytes() int {
 	b += int(unsafe.Sizeof(i.logger))
 	b += int(unsafe.Sizeof(i.sfile))
 	// Do not count SeriesFile because it belongs to the code that constructed this Index.
-	b += int(unsafe.Sizeof(i.mSketch)) + i.mSketch.Bytes()
-	b += int(unsafe.Sizeof(i.mTSketch)) + i.mTSketch.Bytes()
-	b += int(unsafe.Sizeof(i.sSketch)) + i.sSketch.Bytes()
-	b += int(unsafe.Sizeof(i.sTSketch)) + i.sTSketch.Bytes()
-	b += int(unsafe.Sizeof(i.database)) + len(i.database)
 	b += int(unsafe.Sizeof(i.version))
 	b += int(unsafe.Sizeof(i.PartitionN))
 	i.mu.RUnlock()
 	return b
-}
-
-// Database returns the name of the database the index was initialized with.
-func (i *Index) Database() string {
-	return i.database
 }
 
 // WithLogger sets the logger on the index after it's been created.
@@ -201,9 +189,6 @@ func (i *Index) Database() string {
 func (i *Index) WithLogger(l *zap.Logger) {
 	i.logger = l.With(zap.String("index", "tsi"))
 }
-
-// Type returns the type of Index this is.
-func (i *Index) Type() string { return IndexName }
 
 // SeriesFile returns the series file attached to the index.
 func (i *Index) SeriesFile() *tsdb.SeriesFile { return i.sfile }
@@ -234,6 +219,19 @@ func (i *Index) Open() error {
 		return err
 	}
 
+	mmu.Lock()
+	if cms == nil && i.metricsEnabled {
+		cms = newCacheMetrics(i.defaultLabels)
+	}
+	if pms == nil && i.metricsEnabled {
+		pms = newPartitionMetrics(i.defaultLabels)
+	}
+	mmu.Unlock()
+
+	// Set the correct shared metrics on the cache
+	i.tagValueCache.tracker = newCacheTracker(cms, i.defaultLabels)
+	i.tagValueCache.tracker.enabled = i.metricsEnabled
+
 	// Initialize index partitions.
 	i.partitions = make([]*Partition, i.PartitionN)
 	for j := 0; j < len(i.partitions); j++ {
@@ -242,6 +240,16 @@ func (i *Index) Open() error {
 		p.nosync = i.disableFsync
 		p.logbufferSize = i.logfileBufferSize
 		p.logger = i.logger.With(zap.String("tsi1_partition", fmt.Sprint(j+1)))
+
+		// Each of the trackers needs to be given slightly different default
+		// labels to ensure the correct partition ids are set as labels.
+		labels := make(prometheus.Labels, len(i.defaultLabels))
+		for k, v := range i.defaultLabels {
+			labels[k] = v
+		}
+		labels["index_partition"] = fmt.Sprint(j)
+		p.tracker = newPartitionTracker(pms, labels)
+		p.tracker.enabled = i.metricsEnabled
 		i.partitions[j] = p
 	}
 
@@ -274,16 +282,9 @@ func (i *Index) Open() error {
 		}
 	}
 
-	// Refresh cached sketches.
-	if err := i.updateSeriesSketches(); err != nil {
-		return err
-	} else if err := i.updateMeasurementSketches(); err != nil {
-		return err
-	}
-
 	// Mark opened.
 	i.opened = true
-	i.logger.Info(fmt.Sprintf("index opened with %d partitions", partitionN))
+	i.logger.Info("Index opened", zap.Int("partitions", partitionN))
 	return nil
 }
 
@@ -358,36 +359,6 @@ func (i *Index) availableThreads() int {
 		return len(i.partitions)
 	}
 	return n
-}
-
-// updateMeasurementSketches rebuilds the cached measurement sketches.
-func (i *Index) updateMeasurementSketches() error {
-	i.mSketch, i.mTSketch = hll.NewDefaultPlus(), hll.NewDefaultPlus()
-	for j := 0; j < int(i.PartitionN); j++ {
-		if s, t, err := i.partitions[j].MeasurementsSketches(); err != nil {
-			return err
-		} else if i.mSketch.Merge(s); err != nil {
-			return err
-		} else if i.mTSketch.Merge(t); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// updateSeriesSketches rebuilds the cached series sketches.
-func (i *Index) updateSeriesSketches() error {
-	i.sSketch, i.sTSketch = hll.NewDefaultPlus(), hll.NewDefaultPlus()
-	for j := 0; j < int(i.PartitionN); j++ {
-		if s, t, err := i.partitions[j].SeriesSketches(); err != nil {
-			return err
-		} else if i.sSketch.Merge(s); err != nil {
-			return err
-		} else if i.sTSketch.Merge(t); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ForEachMeasurementName iterates over all measurement names in the index,
@@ -534,8 +505,52 @@ func (i *Index) MeasurementIterator() (tsdb.MeasurementIterator, error) {
 	return tsdb.MergeMeasurementIterators(itrs...), nil
 }
 
-// MeasurementSeriesIDIterator returns an iterator over all series in a measurement.
+func (i *Index) MeasurementSeriesByExprIterator(name []byte, expr influxql.Expr) (tsdb.SeriesIDIterator, error) {
+	return i.measurementSeriesByExprIterator(name, expr)
+}
+
+// measurementSeriesByExprIterator returns a series iterator for a measurement
+// that is filtered by expr. See MeasurementSeriesByExprIterator for more details.
+//
+// measurementSeriesByExprIterator guarantees to never take any locks on the
+// series file.
+func (i *Index) measurementSeriesByExprIterator(name []byte, expr influxql.Expr) (tsdb.SeriesIDIterator, error) {
+	// Return all series for the measurement if there are no tag expressions.
+
+	release := i.sfile.Retain()
+	defer release()
+
+	if expr == nil {
+		itr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+		return tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr), nil
+	}
+
+	itr, err := i.seriesByExprIterator(name, expr)
+	if err != nil {
+		return nil, err
+	}
+
+	return tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr), nil
+}
+
+// MeasurementSeriesIDIterator returns an iterator over all non-tombstoned series
+// for the provided measurement.
 func (i *Index) MeasurementSeriesIDIterator(name []byte) (tsdb.SeriesIDIterator, error) {
+	itr, err := i.measurementSeriesIDIterator(name)
+	if err != nil {
+		return nil, err
+	}
+
+	release := i.sfile.Retain()
+	defer release()
+	return tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr), nil
+}
+
+// measurementSeriesIDIterator returns an iterator over all series in a measurement.
+func (i *Index) measurementSeriesIDIterator(name []byte) (tsdb.SeriesIDIterator, error) {
 	itrs := make([]tsdb.SeriesIDIterator, 0, len(i.partitions))
 	for _, p := range i.partitions {
 		itr, err := p.MeasurementSeriesIDIterator(name)
@@ -582,12 +597,6 @@ func (i *Index) DropMeasurement(name []byte) error {
 		if err := <-errC; err != nil {
 			return err
 		}
-	}
-
-	// Update sketches.
-	i.mTSketch.Add(name)
-	if err := i.updateSeriesSketches(); err != nil {
-		return err
 	}
 
 	return nil
@@ -686,61 +695,6 @@ func (i *Index) CreateSeriesListIfNotExists(collection *tsdb.SeriesCollection) e
 		}
 	}
 
-	// Update sketches.
-	for _, key := range collection.Keys {
-		i.sSketch.Add(key)
-	}
-	for _, name := range collection.Names {
-		i.mSketch.Add(name)
-	}
-
-	return nil
-}
-
-// CreateSeriesIfNotExists creates a series if it doesn't exist or is deleted.
-// TODO(edd): This should go.
-func (i *Index) CreateSeriesIfNotExists(key, name []byte, tags models.Tags, typ models.FieldType) error {
-	collection := &tsdb.SeriesCollection{
-		Keys:  [][]byte{key},
-		Names: [][]byte{name},
-		Tags:  []models.Tags{tags},
-		Types: []models.FieldType{typ},
-	}
-	err := i.sfile.CreateSeriesListIfNotExists(collection)
-	if err != nil {
-		return err
-	}
-	ids, err := i.partition(key).createSeriesListIfNotExists(collection)
-	if err != nil {
-		return err
-	}
-	i.sSketch.Add(key)
-	i.mSketch.Add(name)
-
-	if len(ids) == 0 || ids[0].IsZero() {
-		return nil // No new series, nothing further to update.
-	}
-
-	// If there are cached sets for any of the tag pairs, they will need to be
-	// updated with the series id.
-	i.tagValueCache.RLock()
-	if i.tagValueCache.measurementContainsSets(name) {
-		for _, pair := range tags {
-			// TODO(edd): It's not clear to me yet whether it will be better to take a lock
-			// on every series id set, or whether to gather them all up under the cache rlock
-			// and then take the cache lock and update them all at once (without invoking a lock
-			// on each series id set).
-			//
-			// Taking the cache lock will block all queries, but is one lock. Taking each series set
-			// lock might be many lock/unlocks but will only block a query that needs that particular set.
-			//
-			// Need to think on it, but I think taking a lock on each series id set is the way to go.
-			//
-			// Note this will only add `id` to the set if it exists.
-			i.tagValueCache.addToSet(name, pair.Key, pair.Value, ids[0]) // Takes a lock on the series id set
-		}
-	}
-	i.tagValueCache.RUnlock()
 	return nil
 }
 
@@ -756,9 +710,6 @@ func (i *Index) DropSeries(seriesID tsdb.SeriesID, key []byte, cascade bool) err
 	if err := i.partition(key).DropSeries(seriesID); err != nil {
 		return err
 	}
-
-	// Add sketch tombstone.
-	i.sTSketch.Add(key)
 
 	if !cascade {
 		return nil
@@ -806,16 +757,6 @@ func (i *Index) DropMeasurementIfSeriesNotExist(name []byte) error {
 
 	// If no more series exist in the measurement then delete the measurement.
 	return i.DropMeasurement(name)
-}
-
-// MeasurementsSketches returns the two measurement sketches for the index.
-func (i *Index) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, error) {
-	return i.mSketch, i.mTSketch, nil
-}
-
-// SeriesSketches returns the two series sketches for the index.
-func (i *Index) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
-	return i.sSketch, i.sTSketch, nil
 }
 
 // SeriesN returns the series cardinality in the index. It is the sum of all
@@ -945,6 +886,18 @@ func (i *Index) TagValueIterator(name, key []byte) (tsdb.TagValueIterator, error
 
 // TagKeySeriesIDIterator returns a series iterator for all values across a single key.
 func (i *Index) TagKeySeriesIDIterator(name, key []byte) (tsdb.SeriesIDIterator, error) {
+	release := i.sfile.Retain()
+	defer release()
+
+	itr, err := i.tagKeySeriesIDIterator(name, key)
+	if err != nil {
+		return nil, err
+	}
+	return tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr), nil
+}
+
+// tagKeySeriesIDIterator returns a series iterator for all values across a single key.
+func (i *Index) tagKeySeriesIDIterator(name, key []byte) (tsdb.SeriesIDIterator, error) {
 	a := make([]tsdb.SeriesIDIterator, 0, len(i.partitions))
 	for _, p := range i.partitions {
 		itr := p.TagKeySeriesIDIterator(name, key)
@@ -957,8 +910,20 @@ func (i *Index) TagKeySeriesIDIterator(name, key []byte) (tsdb.SeriesIDIterator,
 
 // TagValueSeriesIDIterator returns a series iterator for a single tag value.
 func (i *Index) TagValueSeriesIDIterator(name, key, value []byte) (tsdb.SeriesIDIterator, error) {
+	release := i.sfile.Retain()
+	defer release()
+
+	itr, err := i.tagValueSeriesIDIterator(name, key, value)
+	if err != nil {
+		return nil, err
+	}
+	return tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr), nil
+}
+
+// tagValueSeriesIDIterator returns a series iterator for a single tag value.
+func (i *Index) tagValueSeriesIDIterator(name, key, value []byte) (tsdb.SeriesIDIterator, error) {
 	// Check series ID set cache...
-	if EnableBitsetCache {
+	if i.config.SeriesIDSetCacheSize > 0 { // Cache enabled.
 		if ss := i.tagValueCache.Get(name, key, value); ss != nil {
 			// Return a clone because the set is mutable.
 			return tsdb.NewSeriesIDSetIterator(ss.Clone()), nil
@@ -976,7 +941,7 @@ func (i *Index) TagValueSeriesIDIterator(name, key, value []byte) (tsdb.SeriesID
 	}
 
 	itr := tsdb.MergeSeriesIDIterators(a...)
-	if !EnableBitsetCache {
+	if i.config.SeriesIDSetCacheSize == 0 { // Cache disabled.
 		return itr, nil
 	}
 
@@ -987,6 +952,114 @@ func (i *Index) TagValueSeriesIDIterator(name, key, value []byte) (tsdb.SeriesID
 		i.tagValueCache.Put(name, key, value, ss)
 	}
 	return itr, nil
+}
+
+func (i *Index) TagSets(name []byte, opt query.IteratorOptions) ([]*query.TagSet, error) {
+	release := i.sfile.Retain()
+	defer release()
+
+	itr, err := i.MeasurementSeriesByExprIterator(name, opt.Condition)
+	if err != nil {
+		return nil, err
+	} else if itr == nil {
+		return nil, nil
+	}
+	defer itr.Close()
+	// measurementSeriesByExprIterator filters deleted series IDs; no need to
+	// do so here.
+
+	var dims []string
+	if len(opt.Dimensions) > 0 {
+		dims = make([]string, len(opt.Dimensions))
+		copy(dims, opt.Dimensions)
+		sort.Strings(dims)
+	}
+
+	// For every series, get the tag values for the requested tag keys i.e.
+	// dimensions. This is the TagSet for that series. Series with the same
+	// TagSet are then grouped together, because for the purpose of GROUP BY
+	// they are part of the same composite series.
+	tagSets := make(map[string]*query.TagSet, 64)
+	var seriesN, maxSeriesN int
+
+	if opt.MaxSeriesN > 0 {
+		maxSeriesN = opt.MaxSeriesN
+	} else {
+		maxSeriesN = int(^uint(0) >> 1)
+	}
+
+	// The tag sets require a string for each series key in the set, The series
+	// file formatted keys need to be parsed into models format. Since they will
+	// end up as strings we can re-use an intermediate buffer for this process.
+	var keyBuf []byte
+	var tagsBuf models.Tags // Buffer for tags. Tags are not needed outside of each loop iteration.
+	for {
+		se, err := itr.Next()
+		if err != nil {
+			return nil, err
+		} else if se.SeriesID.IsZero() {
+			break
+		}
+
+		// Skip if the series has been tombstoned.
+		key := i.sfile.SeriesKey(se.SeriesID)
+		if len(key) == 0 {
+			continue
+		}
+
+		if seriesN&0x3fff == 0x3fff {
+			// check every 16384 series if the query has been canceled
+			select {
+			case <-opt.InterruptCh:
+				return nil, query.ErrQueryInterrupted
+			default:
+			}
+		}
+
+		if seriesN > maxSeriesN {
+			return nil, fmt.Errorf("max-select-series limit exceeded: (%d/%d)", seriesN, opt.MaxSeriesN)
+		}
+
+		// NOTE - must not escape this loop iteration.
+		_, tagsBuf = tsdb.ParseSeriesKeyInto(key, tagsBuf)
+		var tagsAsKey []byte
+		if len(dims) > 0 {
+			tagsAsKey = tsdb.MakeTagsKey(dims, tagsBuf)
+		}
+
+		tagSet, ok := tagSets[string(tagsAsKey)]
+		if !ok {
+			// This TagSet is new, create a new entry for it.
+			tagSet = &query.TagSet{
+				Tags: nil,
+				Key:  tagsAsKey,
+			}
+		}
+
+		// Associate the series and filter with the Tagset.
+		keyBuf = models.AppendMakeKey(keyBuf, name, tagsBuf)
+		tagSet.AddFilter(string(keyBuf), se.Expr)
+		keyBuf = keyBuf[:0]
+
+		// Ensure it's back in the map.
+		tagSets[string(tagsAsKey)] = tagSet
+		seriesN++
+	}
+
+	// Sort the series in each tag set.
+	for _, t := range tagSets {
+		sort.Sort(t)
+	}
+
+	// The TagSets have been created, as a map of TagSets. Just send
+	// the values back as a slice, sorting for consistency.
+	sortedTagsSets := make([]*query.TagSet, 0, len(tagSets))
+	for _, v := range tagSets {
+		sortedTagsSets = append(sortedTagsSets, v)
+	}
+	sort.Sort(tsdb.ByTagKey(sortedTagsSets))
+
+	return sortedTagsSets, nil
 }
 
 // MeasurementTagKeysByExpr extracts the tag keys wanted by the expression.
@@ -1079,6 +1152,402 @@ func (i *Index) SetFieldName(measurement []byte, name string) {}
 
 // Rebuild rebuilds an index. It's a no-op for this index.
 func (i *Index) Rebuild() {}
+
+// MeasurementCardinalityStats returns cardinality stats for all measurements.
+func (i *Index) MeasurementCardinalityStats() MeasurementCardinalityStats {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
+	stats := NewMeasurementCardinalityStats()
+	for _, p := range i.partitions {
+		stats.Add(p.MeasurementCardinalityStats())
+	}
+	return stats
+}
+
+func (i *Index) seriesByExprIterator(name []byte, expr influxql.Expr) (tsdb.SeriesIDIterator, error) {
+	switch expr := expr.(type) {
+	case *influxql.BinaryExpr:
+		switch expr.Op {
+		case influxql.AND, influxql.OR:
+			// Get the series IDs and filter expressions for the LHS.
+			litr, err := i.seriesByExprIterator(name, expr.LHS)
+			if err != nil {
+				return nil, err
+			}
+
+			// Get the series IDs and filter expressions for the RHS.
+			ritr, err := i.seriesByExprIterator(name, expr.RHS)
+			if err != nil {
+				if litr != nil {
+					litr.Close()
+				}
+				return nil, err
+			}
+
+			// Intersect iterators if expression is "AND".
+			if expr.Op == influxql.AND {
+				return tsdb.IntersectSeriesIDIterators(litr, ritr), nil
+			}
+
+			// Union iterators if expression is "OR".
+			return tsdb.UnionSeriesIDIterators(litr, ritr), nil
+
+		default:
+			return i.seriesByBinaryExprIterator(name, expr)
+		}
+
+	case *influxql.ParenExpr:
+		return i.seriesByExprIterator(name, expr.Expr)
+
+	case *influxql.BooleanLiteral:
+		if expr.Val {
+			return i.measurementSeriesIDIterator(name)
+		}
+		return nil, nil
+
+	default:
+		return nil, nil
+	}
+}
+
+// seriesByBinaryExprIterator returns a series iterator and a filtering expression.
+func (i *Index) seriesByBinaryExprIterator(name []byte, n *influxql.BinaryExpr) (tsdb.SeriesIDIterator, error) {
+	// If this binary expression has another binary expression, then this
+	// is some expression math and we should just pass it to the underlying query.
+	if _, ok := n.LHS.(*influxql.BinaryExpr); ok {
+		itr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+		return tsdb.NewSeriesIDExprIterator(itr, n), nil
+	} else if _, ok := n.RHS.(*influxql.BinaryExpr); ok {
+		itr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+		return tsdb.NewSeriesIDExprIterator(itr, n), nil
+	}
+
+	// Retrieve the variable reference from the correct side of the expression.
+	key, ok := n.LHS.(*influxql.VarRef)
+	value := n.RHS
+	if !ok {
+		key, ok = n.RHS.(*influxql.VarRef)
+		if !ok {
+			// This is an expression we do not know how to evaluate. Let the
+			// query engine take care of this.
+			itr, err := i.measurementSeriesIDIterator(name)
+			if err != nil {
+				return nil, err
+			}
+			return tsdb.NewSeriesIDExprIterator(itr, n), nil
+		}
+		value = n.LHS
+	}
+
+	// For fields, return all series from this measurement.
+	if key.Val != "_name" && (key.Type == influxql.AnyField || (key.Type != influxql.Tag && key.Type != influxql.Unknown)) {
+		itr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+		return tsdb.NewSeriesIDExprIterator(itr, n), nil
+	} else if value, ok := value.(*influxql.VarRef); ok {
+		// Check if the RHS is a variable and if it is a field.
+		if value.Val != "_name" && (key.Type == influxql.AnyField || (value.Type != influxql.Tag && value.Type != influxql.Unknown)) {
+			itr, err := i.measurementSeriesIDIterator(name)
+			if err != nil {
+				return nil, err
+			}
+			return tsdb.NewSeriesIDExprIterator(itr, n), nil
+		}
+	}
+
+	// Create iterator based on value type.
+	switch value := value.(type) {
+	case *influxql.StringLiteral:
+		return i.seriesByBinaryExprStringIterator(name, []byte(key.Val), []byte(value.Val), n.Op)
+	case *influxql.RegexLiteral:
+		return i.seriesByBinaryExprRegexIterator(name, []byte(key.Val), value.Val, n.Op)
+	case *influxql.VarRef:
+		return i.seriesByBinaryExprVarRefIterator(name, []byte(key.Val), value, n.Op)
+	default:
+		// We do not know how to evaluate this expression so pass it
+		// on to the query engine.
+		itr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+		return tsdb.NewSeriesIDExprIterator(itr, n), nil
+	}
+}
+
+func (i *Index) seriesByBinaryExprStringIterator(name, key, value []byte, op influxql.Token) (tsdb.SeriesIDIterator, error) {
+	// Special handling for "_name" to match measurement name.
+	if bytes.Equal(key, []byte("_name")) {
+		if (op == influxql.EQ && bytes.Equal(value, name)) || (op == influxql.NEQ && !bytes.Equal(value, name)) {
+			return i.measurementSeriesIDIterator(name)
+		}
+		return nil, nil
+	}
+
+	if op == influxql.EQ {
+		// Match a specific value.
+		if len(value) != 0 {
+			return i.tagValueSeriesIDIterator(name, key, value)
+		}
+
+		mitr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+
+		kitr, err := i.tagKeySeriesIDIterator(name, key)
+		if err != nil {
+			if mitr != nil {
+				mitr.Close()
+			}
+			return nil, err
+		}
+
+		// Return all measurement series that have no values from this tag key.
+		return tsdb.DifferenceSeriesIDIterators(mitr, kitr), nil
+	}
+
+	// Return all measurement series without this tag value.
+	if len(value) != 0 {
+		mitr, err := i.measurementSeriesIDIterator(name)
+		if err != nil {
+			return nil, err
+		}
+
+		vitr, err := i.tagValueSeriesIDIterator(name, key, value)
+		if err != nil {
+			if mitr != nil {
+				mitr.Close()
+			}
+			return nil, err
+		}
+
+		return tsdb.DifferenceSeriesIDIterators(mitr, vitr), nil
+	}
+
+	// Return all series across all values of this tag key.
+	return i.tagKeySeriesIDIterator(name, key)
+}
+
+func (i *Index) seriesByBinaryExprRegexIterator(name, key []byte, value *regexp.Regexp, op influxql.Token) (tsdb.SeriesIDIterator, error) {
+	// Special handling for "_name" to match measurement name.
+	if bytes.Equal(key, []byte("_name")) {
+		match := value.Match(name)
+		if (op == influxql.EQREGEX && match) || (op == influxql.NEQREGEX && !match) {
+			mitr, err := i.measurementSeriesIDIterator(name)
+			if err != nil {
+				return nil, err
+			}
+			return tsdb.NewSeriesIDExprIterator(mitr, &influxql.BooleanLiteral{Val: true}), nil
+		}
+		return nil, nil
+	}
+	return i.matchTagValueSeriesIDIterator(name, key, value, op == influxql.EQREGEX)
+}
+
+func (i *Index) seriesByBinaryExprVarRefIterator(name, key []byte, value *influxql.VarRef, op influxql.Token) (tsdb.SeriesIDIterator, error) {
+	itr0, err := i.tagKeySeriesIDIterator(name, key)
+	if err != nil {
+		return nil, err
+	}
+
+	itr1, err := i.tagKeySeriesIDIterator(name, []byte(value.Val))
+	if err != nil {
+		if itr0 != nil {
+			itr0.Close()
+		}
+		return nil, err
+	}
+
+	if op == influxql.EQ {
+		return tsdb.IntersectSeriesIDIterators(itr0, itr1), nil
+	}
+	return tsdb.DifferenceSeriesIDIterators(itr0, itr1), nil
+}
+
+// MatchTagValueSeriesIDIterator returns a series iterator for tags which match value.
+// If matches is false, returns iterators which do not match value.
+func (i *Index) MatchTagValueSeriesIDIterator(name, key []byte, value *regexp.Regexp, matches bool) (tsdb.SeriesIDIterator, error) {
+	release := i.sfile.Retain()
+	defer release()
+
+	itr, err := i.matchTagValueSeriesIDIterator(name, key, value, matches)
+	if err != nil {
+		return nil, err
+	}
+	return tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr), nil
+}
+
+// matchTagValueSeriesIDIterator returns a series iterator for tags which match
+// value. See MatchTagValueSeriesIDIterator for more details.
+//
+// It guarantees to never take any locks on the underlying series file.
+func (i *Index) matchTagValueSeriesIDIterator(name, key []byte, value *regexp.Regexp, matches bool) (tsdb.SeriesIDIterator, error) {
+	matchEmpty := value.MatchString("")
+	if matches {
+		if matchEmpty {
+			return i.matchTagValueEqualEmptySeriesIDIterator(name, key, value)
+		}
+		return i.matchTagValueEqualNotEmptySeriesIDIterator(name, key, value)
+	}
+
+	if matchEmpty {
+		return i.matchTagValueNotEqualEmptySeriesIDIterator(name, key, value)
+	}
+	return i.matchTagValueNotEqualNotEmptySeriesIDIterator(name, key, value)
+}
+
+func (i *Index) matchTagValueEqualEmptySeriesIDIterator(name, key []byte, value *regexp.Regexp) (tsdb.SeriesIDIterator, error) {
+	vitr, err := i.TagValueIterator(name, key)
+	if err != nil {
+		return nil, err
+	} else if vitr == nil {
+		return i.measurementSeriesIDIterator(name)
+	}
+	defer vitr.Close()
+
+	var itrs []tsdb.SeriesIDIterator
+	if err := func() error {
+		for {
+			e, err := vitr.Next()
+			if err != nil {
+				return err
+			} else if e == nil {
+				break
+			}
+
+			if !value.Match(e) {
+				itr, err := i.tagValueSeriesIDIterator(name, key, e)
+				if err != nil {
+					return err
+				} else if itr != nil {
+					itrs = append(itrs, itr)
+				}
+			}
+		}
+		return nil
+	}(); err != nil {
+		tsdb.SeriesIDIterators(itrs).Close()
+		return nil, err
+	}
+
+	mitr, err := i.measurementSeriesIDIterator(name)
+	if err != nil {
+		tsdb.SeriesIDIterators(itrs).Close()
+		return nil, err
+	}
+
+	return tsdb.DifferenceSeriesIDIterators(mitr, tsdb.MergeSeriesIDIterators(itrs...)), nil
+}
+
+func (i *Index) matchTagValueEqualNotEmptySeriesIDIterator(name, key []byte, value *regexp.Regexp) (tsdb.SeriesIDIterator, error) {
+	vitr, err := i.TagValueIterator(name, key)
+	if err != nil {
+		return nil, err
+	} else if vitr == nil {
+		return nil, nil
+	}
+	defer vitr.Close()
+
+	var itrs []tsdb.SeriesIDIterator
+	for {
+		e, err := vitr.Next()
+		if err != nil {
+			tsdb.SeriesIDIterators(itrs).Close()
+			return nil, err
+		} else if e == nil {
+			break
+		}
+
+		if value.Match(e) {
+			itr, err := i.tagValueSeriesIDIterator(name, key, e)
+			if err != nil {
+				tsdb.SeriesIDIterators(itrs).Close()
+				return nil, err
+			} else if itr != nil {
+				itrs = append(itrs, itr)
+			}
+		}
+	}
+	return tsdb.MergeSeriesIDIterators(itrs...), nil
+}
+
+func (i *Index) matchTagValueNotEqualEmptySeriesIDIterator(name, key []byte, value *regexp.Regexp) (tsdb.SeriesIDIterator, error) {
+	vitr, err := i.TagValueIterator(name, key)
+	if err != nil {
+		return nil, err
+	} else if vitr == nil {
+		return nil, nil
+	}
+	defer vitr.Close()
+
+	var itrs []tsdb.SeriesIDIterator
+	for {
+		e, err := vitr.Next()
+		if err != nil {
+			tsdb.SeriesIDIterators(itrs).Close()
+			return nil, err
+		} else if e == nil {
+			break
+		}
+
+		if !value.Match(e) {
+			itr, err := i.tagValueSeriesIDIterator(name, key, e)
+			if err != nil {
+				tsdb.SeriesIDIterators(itrs).Close()
+				return nil, err
+			} else if itr != nil {
+				itrs = append(itrs, itr)
+			}
+		}
+	}
+	return tsdb.MergeSeriesIDIterators(itrs...), nil
+}
+
+func (i *Index) matchTagValueNotEqualNotEmptySeriesIDIterator(name, key []byte, value *regexp.Regexp) (tsdb.SeriesIDIterator, error) {
+	vitr, err := i.TagValueIterator(name, key)
+	if err != nil {
+		return nil, err
+	} else if vitr == nil {
+		return i.measurementSeriesIDIterator(name)
+	}
+	defer vitr.Close()
+
+	var itrs []tsdb.SeriesIDIterator
+	for {
+		e, err := vitr.Next()
+		if err != nil {
+			tsdb.SeriesIDIterators(itrs).Close()
+			return nil, err
+		} else if e == nil {
+			break
+		}
+		if value.Match(e) {
+			itr, err := i.tagValueSeriesIDIterator(name, key, e)
+			if err != nil {
+				tsdb.SeriesIDIterators(itrs).Close()
+				return nil, err
+			} else if itr != nil {
+				itrs = append(itrs, itr)
+			}
+		}
+	}
+
+	mitr, err := i.measurementSeriesIDIterator(name)
+	if err != nil {
+		tsdb.SeriesIDIterators(itrs).Close()
+		return nil, err
+	}
+	return tsdb.DifferenceSeriesIDIterators(mitr, tsdb.MergeSeriesIDIterators(itrs...)), nil
+}
 
 // IsIndexDir returns true if directory contains at least one partition directory.
 func IsIndexDir(path string) (bool, error) {

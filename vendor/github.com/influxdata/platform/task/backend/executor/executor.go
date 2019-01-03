@@ -20,6 +20,7 @@ type queryServiceExecutor struct {
 	svc    query.QueryService
 	st     backend.Store
 	logger *zap.Logger
+	wg     sync.WaitGroup
 }
 
 var _ backend.Executor = (*queryServiceExecutor)(nil)
@@ -38,6 +39,10 @@ func (e *queryServiceExecutor) Execute(ctx context.Context, run backend.QueuedRu
 	}
 
 	return newSyncRunPromise(ctx, run, e, t), nil
+}
+
+func (e *queryServiceExecutor) Wait() {
+	e.wg.Wait()
 }
 
 // syncRunPromise implements backend.RunPromise for a synchronous QueryService.
@@ -60,7 +65,8 @@ var _ backend.RunPromise = (*syncRunPromise)(nil)
 
 func newSyncRunPromise(ctx context.Context, qr backend.QueuedRun, e *queryServiceExecutor, t *backend.StoreTask) *syncRunPromise {
 	ctx, cancel := context.WithCancel(ctx)
-	log, logEnd := logger.NewOperation(e.logger, "Executing task", "execute")
+	opLogger := e.logger.With(zap.Stringer("task_id", qr.TaskID), zap.Stringer("run_id", qr.RunID))
+	log, logEnd := logger.NewOperation(opLogger, "Executing task", "execute")
 	rp := &syncRunPromise{
 		qr:     qr,
 		svc:    e.svc,
@@ -72,8 +78,9 @@ func newSyncRunPromise(ctx context.Context, qr backend.QueuedRun, e *queryServic
 		ready:  make(chan struct{}),
 	}
 
-	go rp.doQuery()
-	go rp.cancelOnContextDone()
+	e.wg.Add(2)
+	go rp.doQuery(&e.wg)
+	go rp.cancelOnContextDone(&e.wg)
 
 	return rp
 }
@@ -118,7 +125,9 @@ func (p *syncRunPromise) finish(res *runResult, err error) {
 	})
 }
 
-func (p *syncRunPromise) doQuery() {
+func (p *syncRunPromise) doQuery(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	spec, err := flux.Compile(p.ctx, p.t.Script, time.Unix(p.qr.Now, 0))
 	if err != nil {
 		p.finish(nil, err)
@@ -137,17 +146,24 @@ func (p *syncRunPromise) doQuery() {
 		p.finish(nil, err)
 		return
 	}
+	defer it.Release()
 
 	// Drain the result iterator.
 	for it.More() {
-		// Is it okay to assume it.Err will be set if the query context is canceled?
-		_ = it.Next()
+		// Consume the full iterator so that we don't leak outstanding iterators.
+		res := it.Next()
+		if err := exhaustResultIterators(res); err != nil {
+			p.logger.Info("Error exhausting result iterator", zap.Error(err), zap.String("name", res.Name()))
+		}
 	}
 
+	// Is it okay to assume it.Err will be set if the query context is canceled?
 	p.finish(&runResult{err: it.Err()}, nil)
 }
 
-func (p *syncRunPromise) cancelOnContextDone() {
+func (p *syncRunPromise) cancelOnContextDone(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	select {
 	case <-p.ready:
 		// Nothing to do.
@@ -164,6 +180,7 @@ type asyncQueryServiceExecutor struct {
 	svc    query.AsyncQueryService
 	st     backend.Store
 	logger *zap.Logger
+	wg     sync.WaitGroup
 }
 
 var _ backend.Executor = (*asyncQueryServiceExecutor)(nil)
@@ -198,6 +215,10 @@ func (e *asyncQueryServiceExecutor) Execute(ctx context.Context, run backend.Que
 	return newAsyncRunPromise(run, q, e), nil
 }
 
+func (e *asyncQueryServiceExecutor) Wait() {
+	e.wg.Wait()
+}
+
 // asyncRunPromise implements backend.RunPromise for an AsyncQueryService.
 type asyncRunPromise struct {
 	qr backend.QueuedRun
@@ -215,7 +236,8 @@ type asyncRunPromise struct {
 var _ backend.RunPromise = (*asyncRunPromise)(nil)
 
 func newAsyncRunPromise(qr backend.QueuedRun, q flux.Query, e *asyncQueryServiceExecutor) *asyncRunPromise {
-	log, logEnd := logger.NewOperation(e.logger, "Executing task", "execute")
+	opLogger := e.logger.With(zap.Stringer("task_id", qr.TaskID), zap.Stringer("run_id", qr.RunID))
+	log, logEnd := logger.NewOperation(opLogger, "Executing task", "execute")
 
 	p := &asyncRunPromise{
 		qr:    qr,
@@ -226,7 +248,8 @@ func newAsyncRunPromise(qr backend.QueuedRun, q flux.Query, e *asyncQueryService
 		logEnd: logEnd,
 	}
 
-	go p.followQuery()
+	e.wg.Add(1)
+	go p.followQuery(&e.wg)
 	return p
 }
 
@@ -251,7 +274,8 @@ func (p *asyncRunPromise) Cancel() {
 // followQuery waits for the query to become ready and sets p's results.
 // If the promise is finished somewhere else first, such as if it is canceled,
 // followQuery will return.
-func (p *asyncRunPromise) followQuery() {
+func (p *asyncRunPromise) followQuery(wg *sync.WaitGroup) {
+	defer wg.Done()
 	// Always need to call Done after query is finished.
 	defer p.q.Done()
 
@@ -260,13 +284,27 @@ func (p *asyncRunPromise) followQuery() {
 		// The promise was finished somewhere else, so we don't need to call p.finish.
 		// But we do need to cancel the flux. This could be a no-op.
 		p.q.Cancel()
-	case _, ok := <-p.q.Ready():
+	case results, ok := <-p.q.Ready():
 		if !ok {
 			// Something went wrong with the flux. Set the error in the run result.
 			rr := &runResult{err: p.q.Err()}
 			p.finish(rr, nil)
 			return
 		}
+
+		// Exhaust the results so we don't leave unfinished iterators around.
+		var wg sync.WaitGroup
+		wg.Add(len(results))
+		for _, res := range results {
+			r := res
+			go func() {
+				defer wg.Done()
+				if err := exhaustResultIterators(r); err != nil {
+					p.logger.Info("Error exhausting result iterator", zap.Error(err), zap.String("name", r.Name()))
+				}
+			}()
+		}
+		wg.Wait()
 
 		// Otherwise, query was successful.
 		// TODO(mr): collect query statistics, once RunResult interface supports them?
@@ -300,3 +338,12 @@ var _ backend.RunResult = (*runResult)(nil)
 
 func (rr *runResult) Err() error        { return rr.err }
 func (rr *runResult) IsRetryable() bool { return rr.retryable }
+
+// exhaustResultIterators drains all the iterators from a flux query Result.
+func exhaustResultIterators(res flux.Result) error {
+	return res.Tables().Do(func(tbl flux.Table) error {
+		return tbl.Do(func(flux.ColReader) error {
+			return nil
+		})
+	})
+}

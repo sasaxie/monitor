@@ -19,7 +19,7 @@ import (
 type storageTable interface {
 	flux.Table
 	Close()
-	Done() chan struct{}
+	Cancel()
 }
 
 type storeReader struct {
@@ -57,7 +57,10 @@ type tableIterator struct {
 	s         Store
 	readSpec  fstorage.ReadSpec
 	predicate *datatypes.Predicate
+	stats     flux.Statistics
 }
+
+func (bi *tableIterator) Statistics() flux.Statistics { return bi.stats }
 
 func (bi *tableIterator) Do(f func(flux.Table) error) error {
 	src, err := bi.s.GetSource(bi.readSpec)
@@ -126,61 +129,83 @@ func (bi *tableIterator) Do(f func(flux.Table) error) error {
 }
 
 func (bi *tableIterator) handleRead(f func(flux.Table) error, rs ResultSet) error {
+	// these resources must be closed if not nil on return
+	var (
+		cur   cursors.Cursor
+		table storageTable
+	)
+
 	defer func() {
+		if table != nil {
+			table.Close()
+		}
+		if cur != nil {
+			cur.Close()
+		}
 		rs.Close()
 	}()
 
 READ:
 	for rs.Next() {
-		cur := rs.Cursor()
+		cur = rs.Cursor()
 		if cur == nil {
 			// no data for series key + field combination
 			continue
 		}
 
 		key := groupKeyForSeries(rs.Tags(), &bi.readSpec, bi.bounds)
-		var table storageTable
-
-		switch cur := cur.(type) {
+		done := make(chan struct{})
+		switch typedCur := cur.(type) {
 		case cursors.IntegerArrayCursor:
 			cols, defs := determineTableColsForSeries(rs.Tags(), flux.TInt)
-			table = newIntegerTable(cur, bi.bounds, key, cols, rs.Tags(), defs)
+			table = newIntegerTable(done, typedCur, bi.bounds, key, cols, rs.Tags(), defs)
 		case cursors.FloatArrayCursor:
 			cols, defs := determineTableColsForSeries(rs.Tags(), flux.TFloat)
-			table = newFloatTable(cur, bi.bounds, key, cols, rs.Tags(), defs)
+			table = newFloatTable(done, typedCur, bi.bounds, key, cols, rs.Tags(), defs)
 		case cursors.UnsignedArrayCursor:
 			cols, defs := determineTableColsForSeries(rs.Tags(), flux.TUInt)
-			table = newUnsignedTable(cur, bi.bounds, key, cols, rs.Tags(), defs)
+			table = newUnsignedTable(done, typedCur, bi.bounds, key, cols, rs.Tags(), defs)
 		case cursors.BooleanArrayCursor:
 			cols, defs := determineTableColsForSeries(rs.Tags(), flux.TBool)
-			table = newBooleanTable(cur, bi.bounds, key, cols, rs.Tags(), defs)
+			table = newBooleanTable(done, typedCur, bi.bounds, key, cols, rs.Tags(), defs)
 		case cursors.StringArrayCursor:
 			cols, defs := determineTableColsForSeries(rs.Tags(), flux.TString)
-			table = newStringTable(cur, bi.bounds, key, cols, rs.Tags(), defs)
+			table = newStringTable(done, typedCur, bi.bounds, key, cols, rs.Tags(), defs)
 		default:
-			panic(fmt.Sprintf("unreachable: %T", cur))
+			panic(fmt.Sprintf("unreachable: %T", typedCur))
 		}
 
-		if table.Empty() {
-			table.Close()
-			continue
+		cur = nil
+
+		if !table.Empty() {
+			if err := f(table); err != nil {
+				table.Close()
+				table = nil
+				return err
+			}
+			select {
+			case <-done:
+			case <-bi.ctx.Done():
+				table.Cancel()
+				break READ
+			}
 		}
 
-		if err := f(table); err != nil {
-			table.Close()
-			return err
-		}
-		select {
-		case <-table.Done():
-		case <-bi.ctx.Done():
-			break READ
-		}
+		table.Close()
+		bi.stats = bi.stats.Add(table.Statistics())
+		table = nil
 	}
-	return nil
+	return rs.Err()
 }
 
 func (bi *tableIterator) handleReadNoPoints(f func(flux.Table) error, rs ResultSet) error {
+	// these resources must be closed if not nil on return
+	var table storageTable
+
 	defer func() {
+		if table != nil {
+			table.Close()
+		}
 		rs.Close()
 	}()
 
@@ -193,30 +218,52 @@ READ:
 		}
 
 		key := groupKeyForSeries(rs.Tags(), &bi.readSpec, bi.bounds)
+		done := make(chan struct{})
 		cols, defs := determineTableColsForSeries(rs.Tags(), flux.TString)
-		table := newTableNoPoints(bi.bounds, key, cols, rs.Tags(), defs)
+		table = newTableNoPoints(done, bi.bounds, key, cols, rs.Tags(), defs)
 
 		if err := f(table); err != nil {
 			table.Close()
+			table = nil
 			return err
 		}
 		select {
-		case <-table.Done():
+		case <-done:
 		case <-bi.ctx.Done():
+			table.Cancel()
 			break READ
 		}
+
+		table.Close()
+		table = nil
 	}
-	return nil
+	return rs.Err()
 }
 
 func (bi *tableIterator) handleGroupRead(f func(flux.Table) error, rs GroupResultSet) error {
+	// these resources must be closed if not nil on return
+	var (
+		gc    GroupCursor
+		cur   cursors.Cursor
+		table storageTable
+	)
+
 	defer func() {
+		if table != nil {
+			table.Close()
+		}
+		if cur != nil {
+			cur.Close()
+		}
+		if gc != nil {
+			gc.Close()
+		}
 		rs.Close()
 	}()
-	gc := rs.Next()
+
+	gc = rs.Next()
 READ:
 	for gc != nil {
-		var cur cursors.Cursor
 		for gc.Next() {
 			cur = gc.Cursor()
 			if cur != nil {
@@ -225,75 +272,102 @@ READ:
 		}
 
 		if cur == nil {
+			gc.Close()
 			gc = rs.Next()
 			continue
 		}
 
 		key := groupKeyForGroup(gc.PartitionKeyVals(), &bi.readSpec, bi.bounds)
-		var table storageTable
-
-		switch cur := cur.(type) {
+		done := make(chan struct{})
+		switch typedCur := cur.(type) {
 		case cursors.IntegerArrayCursor:
 			cols, defs := determineTableColsForGroup(gc.Keys(), flux.TInt)
-			table = newIntegerGroupTable(gc, cur, bi.bounds, key, cols, gc.Tags(), defs)
+			table = newIntegerGroupTable(done, gc, typedCur, bi.bounds, key, cols, gc.Tags(), defs)
 		case cursors.FloatArrayCursor:
 			cols, defs := determineTableColsForGroup(gc.Keys(), flux.TFloat)
-			table = newFloatGroupTable(gc, cur, bi.bounds, key, cols, gc.Tags(), defs)
+			table = newFloatGroupTable(done, gc, typedCur, bi.bounds, key, cols, gc.Tags(), defs)
 		case cursors.UnsignedArrayCursor:
 			cols, defs := determineTableColsForGroup(gc.Keys(), flux.TUInt)
-			table = newUnsignedGroupTable(gc, cur, bi.bounds, key, cols, gc.Tags(), defs)
+			table = newUnsignedGroupTable(done, gc, typedCur, bi.bounds, key, cols, gc.Tags(), defs)
 		case cursors.BooleanArrayCursor:
 			cols, defs := determineTableColsForGroup(gc.Keys(), flux.TBool)
-			table = newBooleanGroupTable(gc, cur, bi.bounds, key, cols, gc.Tags(), defs)
+			table = newBooleanGroupTable(done, gc, typedCur, bi.bounds, key, cols, gc.Tags(), defs)
 		case cursors.StringArrayCursor:
 			cols, defs := determineTableColsForGroup(gc.Keys(), flux.TString)
-			table = newStringGroupTable(gc, cur, bi.bounds, key, cols, gc.Tags(), defs)
+			table = newStringGroupTable(done, gc, typedCur, bi.bounds, key, cols, gc.Tags(), defs)
 		default:
-			panic(fmt.Sprintf("unreachable: %T", cur))
+			panic(fmt.Sprintf("unreachable: %T", typedCur))
 		}
+
+		// table owns these resources and is responsible for closing them
+		cur = nil
+		gc = nil
 
 		if err := f(table); err != nil {
 			table.Close()
+			table = nil
 			return err
 		}
-		// Wait until the table has been read.
 		select {
-		case <-table.Done():
+		case <-done:
 		case <-bi.ctx.Done():
+			table.Cancel()
 			break READ
 		}
 
+		table.Close()
+		table = nil
+
 		gc = rs.Next()
 	}
-	return nil
+	return rs.Err()
 }
 
 func (bi *tableIterator) handleGroupReadNoPoints(f func(flux.Table) error, rs GroupResultSet) error {
+	// these resources must be closed if not nil on return
+	var (
+		gc    GroupCursor
+		table storageTable
+	)
+
 	defer func() {
+		if table != nil {
+			table.Close()
+		}
+		if gc != nil {
+			gc.Close()
+		}
 		rs.Close()
 	}()
-	gc := rs.Next()
+
+	gc = rs.Next()
 READ:
 	for gc != nil {
 		key := groupKeyForGroup(gc.PartitionKeyVals(), &bi.readSpec, bi.bounds)
+		done := make(chan struct{})
 		cols, defs := determineTableColsForGroup(gc.Keys(), flux.TString)
-		table := newGroupTableNoPoints(bi.bounds, key, cols, defs)
+		table = newGroupTableNoPoints(done, bi.bounds, key, cols, defs)
 		gc.Close()
+		gc = nil
 
 		if err := f(table); err != nil {
 			table.Close()
+			table = nil
 			return err
 		}
-		// Wait until the table has been read.
 		select {
-		case <-table.Done():
+		case <-done:
 		case <-bi.ctx.Done():
+			table.Cancel()
 			break READ
 		}
 
+		table.Close()
+		table = nil
+
 		gc = rs.Next()
 	}
-	return nil
+	return rs.Err()
 }
 
 func determineAggregateMethod(agg string) (datatypes.Aggregate_AggregateType, error) {
@@ -330,7 +404,7 @@ const (
 	valueColIdx = 3
 )
 
-func determineTableColsForSeries(tags models.Tags, typ flux.DataType) ([]flux.ColMeta, [][]byte) {
+func determineTableColsForSeries(tags models.Tags, typ flux.ColType) ([]flux.ColMeta, [][]byte) {
 	cols := make([]flux.ColMeta, 4+len(tags))
 	defs := make([][]byte, 4+len(tags))
 	cols[startColIdx] = flux.ColMeta{
@@ -366,12 +440,12 @@ func groupKeyForSeries(tags models.Tags, readSpec *fstorage.ReadSpec, bnds execu
 		Label: execute.DefaultStartColLabel,
 		Type:  flux.TTime,
 	}
-	vs[0] = values.NewTimeValue(bnds.Start)
+	vs[0] = values.NewTime(bnds.Start)
 	cols[1] = flux.ColMeta{
 		Label: execute.DefaultStopColLabel,
 		Type:  flux.TTime,
 	}
-	vs[1] = values.NewTimeValue(bnds.Stop)
+	vs[1] = values.NewTime(bnds.Stop)
 	switch readSpec.GroupMode {
 	case fstorage.GroupModeBy:
 		// group key in GroupKeys order, including tags in the GroupKeys slice
@@ -383,7 +457,7 @@ func groupKeyForSeries(tags models.Tags, readSpec *fstorage.ReadSpec, bnds execu
 						Label: k,
 						Type:  flux.TString,
 					})
-					vs = append(vs, values.NewStringValue(string(t.Value)))
+					vs = append(vs, values.NewString(string(t.Value)))
 				}
 			}
 		}
@@ -396,13 +470,13 @@ func groupKeyForSeries(tags models.Tags, readSpec *fstorage.ReadSpec, bnds execu
 				Label: string(tags[i].Key),
 				Type:  flux.TString,
 			})
-			vs = append(vs, values.NewStringValue(string(tags[i].Value)))
+			vs = append(vs, values.NewString(string(tags[i].Value)))
 		}
 	}
 	return execute.NewGroupKey(cols, vs)
 }
 
-func determineTableColsForGroup(tagKeys [][]byte, typ flux.DataType) ([]flux.ColMeta, [][]byte) {
+func determineTableColsForGroup(tagKeys [][]byte, typ flux.ColType) ([]flux.ColMeta, [][]byte) {
 	cols := make([]flux.ColMeta, 4+len(tagKeys))
 	defs := make([][]byte, 4+len(tagKeys))
 	cols[startColIdx] = flux.ColMeta{
@@ -439,18 +513,21 @@ func groupKeyForGroup(kv [][]byte, readSpec *fstorage.ReadSpec, bnds execute.Bou
 		Label: execute.DefaultStartColLabel,
 		Type:  flux.TTime,
 	}
-	vs[0] = values.NewTimeValue(bnds.Start)
+	vs[0] = values.NewTime(bnds.Start)
 	cols[1] = flux.ColMeta{
 		Label: execute.DefaultStopColLabel,
 		Type:  flux.TTime,
 	}
-	vs[1] = values.NewTimeValue(bnds.Stop)
+	vs[1] = values.NewTime(bnds.Stop)
 	for i := range readSpec.GroupKeys {
+		if readSpec.GroupKeys[i] == execute.DefaultStartColLabel || readSpec.GroupKeys[i] == execute.DefaultStopColLabel {
+			continue
+		}
 		cols = append(cols, flux.ColMeta{
 			Label: readSpec.GroupKeys[i],
 			Type:  flux.TString,
 		})
-		vs = append(vs, values.NewStringValue(string(kv[i])))
+		vs = append(vs, values.NewString(string(kv[i])))
 	}
 	return execute.NewGroupKey(cols, vs)
 }

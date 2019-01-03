@@ -22,6 +22,8 @@ import (
 const (
 	// MetricsPath exposes the prometheus metrics over /metrics.
 	MetricsPath = "/metrics"
+	// ReadyPath exposes the readiness of the service over /ready.
+	ReadyPath = "/ready"
 	// HealthPath exposes the health of the service over /health.
 	HealthPath = "/health"
 	// DebugPath exposes /debug/pprof for go debugging.
@@ -32,10 +34,12 @@ const (
 // All other requests are passed down to the sub handler.
 type Handler struct {
 	name string
-	// HealthHandler handles health requests
-	HealthHandler http.Handler
 	// MetricsHandler handles metrics requests
 	MetricsHandler http.Handler
+	// ReadyHandler handles readiness checks
+	ReadyHandler http.Handler
+	// HealthHandler handles health requests
+	HealthHandler http.Handler
 	// DebugHandler handles debug requests
 	DebugHandler http.Handler
 	// Handler handles all other requests
@@ -74,8 +78,9 @@ func NewHandlerFromRegistry(name string, reg *prom.Registry) *Handler {
 	h := &Handler{
 		name:           name,
 		MetricsHandler: reg.HTTPHandler(),
-		DebugHandler:   http.DefaultServeMux,
+		ReadyHandler:   http.HandlerFunc(ReadyHandler),
 		HealthHandler:  http.HandlerFunc(HealthHandler),
+		DebugHandler:   http.DefaultServeMux,
 	}
 	h.initMetrics()
 	reg.MustRegister(h.PrometheusCollectors()...)
@@ -136,7 +141,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				errReferenceField = zap.String("reference", errReference)
 			}
 
-			h.Logger.Info("Served http request",
+			h.Logger.Debug("Request",
 				zap.String("handler", h.name),
 				zap.String("method", r.Method),
 				zap.String("path", r.URL.Path),
@@ -151,6 +156,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.URL.Path == MetricsPath:
 		h.MetricsHandler.ServeHTTP(w, r)
+	case r.URL.Path == ReadyPath:
+		h.ReadyHandler.ServeHTTP(w, r)
 	case r.URL.Path == HealthPath:
 		h.HealthHandler.ServeHTTP(w, r)
 	case strings.HasPrefix(r.URL.Path, DebugPath):
@@ -194,6 +201,16 @@ func (h *Handler) initMetrics() {
 		// TODO(desa): determine what spacing these buckets should have.
 		Buckets: prometheus.ExponentialBuckets(0.001, 1.5, 25),
 	}, []string{"handler", "method", "path", "status"})
+}
+
+func logEncodingError(logger *zap.Logger, r *http.Request, err error) {
+	// If we encounter an error while encoding the response to an http request
+	// the best thing we can do is log that error, as we may have already written
+	// the headers for the http request in question.
+	logger.Info("error encoding response",
+		zap.String("path", r.URL.Path),
+		zap.String("method", r.Method),
+		zap.Error(err))
 }
 
 // InjectTrace writes any span from the request's context into the request headers.

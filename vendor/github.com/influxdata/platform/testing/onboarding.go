@@ -3,6 +3,7 @@ package testing
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/platform"
@@ -17,16 +18,9 @@ type OnboardingFields struct {
 	IsOnboarding   bool
 }
 
-// OnBoardingNBasicAuthService includes onboarding service
-// and basic auth service.
-type OnBoardingNBasicAuthService interface {
-	platform.OnboardingService
-	platform.BasicAuthService
-}
-
 // Generate testing
 func Generate(
-	init func(OnboardingFields, *testing.T) (OnBoardingNBasicAuthService, func()),
+	init func(OnboardingFields, *testing.T) (platform.OnboardingService, func()),
 	t *testing.T,
 ) {
 	type args struct {
@@ -144,10 +138,11 @@ func Generate(
 			},
 			args: args{
 				request: &platform.OnboardingRequest{
-					User:     "admin",
-					Org:      "org1",
-					Bucket:   "bucket1",
-					Password: "pass1",
+					User:            "admin",
+					Org:             "org1",
+					Bucket:          "bucket1",
+					Password:        "pass1",
+					RetentionPeriod: 24 * 7, // 1 week
 				},
 			},
 			wants: wants{
@@ -162,17 +157,19 @@ func Generate(
 						Name: "org1",
 					},
 					Bucket: &platform.Bucket{
-						ID:             MustIDBase16(threeID),
-						Name:           "bucket1",
-						Organization:   "org1",
-						OrganizationID: MustIDBase16(twoID),
+						ID:              MustIDBase16(threeID),
+						Name:            "bucket1",
+						Organization:    "org1",
+						OrganizationID:  MustIDBase16(twoID),
+						RetentionPeriod: time.Hour * 24 * 7,
 					},
 					Auth: &platform.Authorization{
-						ID:     MustIDBase16(fourID),
-						Token:  oneToken,
-						Status: platform.Active,
-						User:   "admin",
-						UserID: MustIDBase16(oneID),
+						ID:          MustIDBase16(fourID),
+						Token:       oneToken,
+						Status:      platform.Active,
+						User:        "admin",
+						UserID:      MustIDBase16(oneID),
+						Description: "admin's Token",
 						Permissions: []platform.Permission{
 							platform.CreateUserPermission,
 							platform.DeleteUserPermission,

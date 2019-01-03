@@ -8,20 +8,23 @@
 #    * All cmds must be added to this top level Makefile.
 #    * All binaries are placed in ./bin, its recommended to add this directory to your PATH.
 #    * Each package that has a need to run go generate, must have its own Makefile for that purpose.
-#    * All recursive Makefiles must support the targets: all and clean.
+#    * All recursive Makefiles must support the all and clean targets
 #
 
-SUBDIRS := query task
+# SUBDIRS are directories that have their own Makefile.
+# It is required that all subdirs have the `all` and `clean` targets.
+SUBDIRS := http ui chronograf query storage task
 
 GO_ARGS=-tags '$(GO_TAGS)'
 
 # Test vars can be used by all recursive Makefiles
 export GOOS=$(shell go env GOOS)
 export GO_BUILD=env GO111MODULE=on go build $(GO_ARGS)
-export GO_TEST=env GO111MODULE=on go test $(GO_ARGS)
+export GO_TEST=env GOTRACEBACK=all GO111MODULE=on go test $(GO_ARGS)
 # Do not add GO111MODULE=on to the call to go generate so it doesn't pollute the environment.
 export GO_GENERATE=go generate $(GO_ARGS)
 export GO_VET=env GO111MODULE=on go vet $(GO_ARGS)
+export GO_RUN=env GO111MODULE=on go run $(GO_ARGS)
 export PATH := $(PWD)/bin/$(GOOS):$(PATH)
 
 
@@ -32,7 +35,7 @@ SOURCES := $(shell find . -name '*.go' -not -name '*_test.go')
 SOURCES_NO_VENDOR := $(shell find . -path ./vendor -prune -o -name "*.go" -not -name '*_test.go' -print)
 
 # All assets for chronograf
-UISOURCES := $(shell find chronograf/ui -type f -not \( -path chronograf/ui/build/\* -o -path chronograf/ui/node_modules/\* -o -path chronograf/ui/.cache/\* -o -name Makefile -prune \) )
+UISOURCES := $(shell find ui -type f -not \( -path ui/build/\* -o -path ui/node_modules/\* -o -path ui/.cache/\* -o -name Makefile -prune \) )
 
 # All precanned dashboards
 PRECANNED := $(shell find chronograf/canned -name '*.json')
@@ -48,16 +51,12 @@ CMDS := \
 # This target sets up the dependencies to correctly build all go commands.
 # Other targets must depend on this target to correctly builds CMDS.
 all: GO_ARGS=-tags 'assets $(GO_TAGS)'
-all: node_modules subdirs chronograf/ui generate $(CMDS)
+all: subdirs generate $(CMDS)
 
 # Target to build subdirs.
 # Each subdirs must support the `all` target.
 subdirs: $(SUBDIRS)
 	@for d in $^; do $(MAKE) -C $$d all; done
-
-
-chronograf/ui:
-	$(MAKE) -C chronograf/ui all
 
 #
 # Define targets for commands
@@ -69,16 +68,13 @@ $(CMDS): $(SOURCES)
 # Define targets for the web ui
 #
 
-node_modules: chronograf/ui/node_modules
+node_modules: ui/node_modules
 
 chronograf_lint:
-	make -C chronograf/ui lint
+	make -C ui lint
 
-chronograf/ui/node_modules:
-	make -C chronograf/ui node_modules
-
-chronograf/ui/build:
-	mkdir -p chronograf/ui/build
+ui/node_modules:
+	make -C ui node_modules
 
 #
 # Define action only targets
@@ -96,27 +92,25 @@ tidy:
 checktidy:
 	./etc/checktidy.sh
 
-chronograf/dist/dist_gen.go: chronograf/ui/build $(UISOURCES)
-	 $(GO_GENERATE) ./chronograf/dist/...
+checkgenerate:
+	./etc/checkgenerate.sh
 
-chronograf/server/swagger_gen.go: chronograf/server/swagger.json
-	 $(GO_GENERATE) ./chronograf/server/...
-
-chronograf/canned/bin_gen.go: $(PRECANNED)
-	 $(GO_GENERATE) ./chronograf/canned/...
-
-generate: chronograf/dist/dist_gen.go chronograf/server/swagger_gen.go chronograf/canned/bin_gen.go
+generate: subdirs
 
 test-js: node_modules
-	make -C chronograf/ui test
+	make -C ui test
 
 test-go:
 	$(GO_TEST) ./...
 
+test-integration: GO_TAGS=integration
+test-integration:
+	$(GO_TEST) -count=1 ./...
+
 test: test-go test-js
 
 test-go-race:
-	$(GO_TEST) -race -count=1 ./...
+	$(GO_TEST) -v -race -count=1 ./...
 
 vet:
 	$(GO_VET) -v ./...
@@ -124,15 +118,17 @@ vet:
 bench:
 	$(GO_TEST) -bench=. -run=^$$ ./...
 
-nightly: all
-	env GO111MODULE=on go run github.com/goreleaser/goreleaser --snapshot --rm-dist --publish-snapshots
+build: all
 
-# Recursively clean all subdirs
-clean: $(SUBDIRS)
-	@for d in $^; do $(MAKE) -C $$d $(MAKECMDGOALS); done
-	$(MAKE) -C chronograf/ui $(MAKECMDGOALS)
+nightly:
+	$(GO_RUN) github.com/goreleaser/goreleaser --snapshot --rm-dist --publish-snapshots
+
+clean:
+	@for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 	rm -rf bin
 
+generate-typescript-client:
+	make -C http
 
 define CHRONOGIRAFFE
              ._ o o
@@ -153,4 +149,4 @@ run: chronogiraffe
 
 
 # .PHONY targets represent actions that do not create an actual file.
-.PHONY: all subdirs $(SUBDIRS) chronograf/ui run fmt checkfmt tidy checktidy test test-go test-js test-go-race bench clean node_modules vet nightly chronogiraffe
+.PHONY: all subdirs $(SUBDIRS) run fmt checkfmt tidy checktidy checkgenerate test test-go test-js test-go-race bench clean node_modules vet nightly chronogiraffe

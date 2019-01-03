@@ -3,6 +3,7 @@ vendor
 .vscode
 .vs
 .tern-project
+.DS_Store
 
 # binary databases
 influxd.bolt
@@ -17,7 +18,14 @@ influxd.bolt
 /transpilerd
 /bin
 
-chronograf/ui/node_modules
-chronograf/ui/yarn-error.log
-chronograf/ui/build
-chronograf/ui/.cache
+ui/node_modules
+ui/npm-error.log
+ui/yarn.lock
+ui/build
+ui/.cache
+
+ui/src/api/.gitignore
+ui/src/api/.openapi-generator-ignore
+ui/src/api/.openapi-generator/VERSION
+ui/src/api/git_push.sh
+

@@ -47,8 +47,8 @@ func TestService_handleGetViews(t *testing.T) {
 									ID:   platformtesting.MustIDBase16("7365637465747572"),
 									Name: "hello",
 								},
-								Properties: platform.LineViewProperties{
-									Type: "line",
+								Properties: platform.XYViewProperties{
+									Type: "xy",
 								},
 							},
 							{
@@ -81,9 +81,12 @@ func TestService_handleGetViews(t *testing.T) {
         "shape": "chronograf-v2",
         "queries": null,
         "axes": null,
-        "type": "line",
+        "type": "xy",
         "colors": null,
-        "legend": {}
+        "legend": {},
+        "geom": "",
+		"note": "",
+        "showNoteWhenEmpty": false
       }
     },
     {
@@ -126,7 +129,7 @@ func TestService_handleGetViews(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewViewHandler()
+			h := NewViewHandler(mock.NewUserResourceMappingService(), mock.NewLabelService(), mock.NewUserService())
 			h.ViewService = tt.fields.ViewService
 
 			r := httptest.NewRequest("GET", "http://any.url", nil)
@@ -219,7 +222,10 @@ func TestService_handleGetView(t *testing.T) {
 			fields: fields{
 				&mock.ViewService{
 					FindViewByIDF: func(ctx context.Context, id platform.ID) (*platform.View, error) {
-						return nil, platform.ErrViewNotFound
+						return nil, &platform.Error{
+							Code: platform.ENotFound,
+							Msg:  platform.ErrViewNotFound,
+						}
 					},
 				},
 			},
@@ -234,7 +240,7 @@ func TestService_handleGetView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewViewHandler()
+			h := NewViewHandler(mock.NewUserResourceMappingService(), mock.NewLabelService(), mock.NewUserService())
 			h.ViewService = tt.fields.ViewService
 
 			r := httptest.NewRequest("GET", "http://any.url", nil)
@@ -305,8 +311,8 @@ func TestService_handlePostViews(t *testing.T) {
 						ID:   platformtesting.MustIDBase16("020f755c3c082000"),
 						Name: "hello",
 					},
-					Properties: platform.LineViewProperties{
-						Type: "line",
+					Properties: platform.XYViewProperties{
+						Type: "xy",
 					},
 				},
 			},
@@ -324,9 +330,12 @@ func TestService_handlePostViews(t *testing.T) {
     "shape": "chronograf-v2",
     "queries": null,
     "axes": null,
-    "type": "line",
+    "type": "xy",
     "colors": null,
-    "legend": {}
+    "legend": {},
+    "geom": "",
+	"note": "",
+    "showNoteWhenEmpty": false
   }
 }
 `,
@@ -336,7 +345,7 @@ func TestService_handlePostViews(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewViewHandler()
+			h := NewViewHandler(mock.NewUserResourceMappingService(), mock.NewLabelService(), mock.NewUserService())
 			h.ViewService = tt.fields.ViewService
 
 			b, err := json.Marshal(tt.args.view)
@@ -410,7 +419,10 @@ func TestService_handleDeleteView(t *testing.T) {
 			fields: fields{
 				&mock.ViewService{
 					DeleteViewF: func(ctx context.Context, id platform.ID) error {
-						return platform.ErrViewNotFound
+						return &platform.Error{
+							Code: platform.ENotFound,
+							Msg:  platform.ErrViewNotFound,
+						}
 					},
 				},
 			},
@@ -425,7 +437,7 @@ func TestService_handleDeleteView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewViewHandler()
+			h := NewViewHandler(mock.NewUserResourceMappingService(), mock.NewLabelService(), mock.NewUserService())
 			h.ViewService = tt.fields.ViewService
 
 			r := httptest.NewRequest("GET", "http://any.url", nil)
@@ -493,8 +505,8 @@ func TestService_handlePatchView(t *testing.T) {
 									ID:   platformtesting.MustIDBase16("020f755c3c082000"),
 									Name: "example",
 								},
-								Properties: platform.LineViewProperties{
-									Type: "line",
+								Properties: platform.XYViewProperties{
+									Type: "xy",
 								},
 							}, nil
 						}
@@ -521,9 +533,12 @@ func TestService_handlePatchView(t *testing.T) {
     "shape": "chronograf-v2",
     "queries": null,
     "axes": null,
-    "type": "line",
+    "type": "xy",
     "colors": null,
-    "legend": {}
+    "legend": {},
+	"geom": "",
+	"note": "",
+    "showNoteWhenEmpty": false
   }
 }
 `,
@@ -540,8 +555,8 @@ func TestService_handlePatchView(t *testing.T) {
 									ID:   platformtesting.MustIDBase16("020f755c3c082000"),
 									Name: "example",
 								},
-								Properties: platform.LineViewProperties{
-									Type: "line",
+								Properties: platform.XYViewProperties{
+									Type: "xy",
 								},
 							}, nil
 						}
@@ -562,7 +577,10 @@ func TestService_handlePatchView(t *testing.T) {
 			fields: fields{
 				&mock.ViewService{
 					UpdateViewF: func(ctx context.Context, id platform.ID, upd platform.ViewUpdate) (*platform.View, error) {
-						return nil, platform.ErrViewNotFound
+						return nil, &platform.Error{
+							Code: platform.ENotFound,
+							Msg:  platform.ErrViewNotFound,
+						}
 					},
 				},
 			},
@@ -578,7 +596,7 @@ func TestService_handlePatchView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewViewHandler()
+			h := NewViewHandler(mock.NewUserResourceMappingService(), mock.NewLabelService(), mock.NewUserService())
 			h.ViewService = tt.fields.ViewService
 
 			upd := platform.ViewUpdate{}

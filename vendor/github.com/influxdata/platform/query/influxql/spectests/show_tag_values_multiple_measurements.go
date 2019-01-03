@@ -30,26 +30,20 @@ func init() {
 								Relative:   -time.Hour,
 								IsRelative: true,
 							},
+							Stop: flux.Now,
 						},
 					},
 					{
 						ID: "filter0",
 						Spec: &transformations.FilterOpSpec{
 							Fn: &semantic.FunctionExpression{
-								Params: []*semantic.FunctionParam{
-									{Key: &semantic.Identifier{Name: "r"}},
-								},
-								Body: &semantic.LogicalExpression{
-									Operator: ast.OrOperator,
-									Left: &semantic.BinaryExpression{
-										Operator: ast.EqualOperator,
-										Left: &semantic.MemberExpression{
-											Object:   &semantic.IdentifierExpression{Name: "r"},
-											Property: "_measurement",
+								Block: &semantic.FunctionBlock{
+									Parameters: &semantic.FunctionParameters{
+										List: []*semantic.FunctionParameter{
+											{Key: &semantic.Identifier{Name: "r"}},
 										},
-										Right: &semantic.StringLiteral{Value: "cpu"},
 									},
-									Right: &semantic.LogicalExpression{
+									Body: &semantic.LogicalExpression{
 										Operator: ast.OrOperator,
 										Left: &semantic.BinaryExpression{
 											Operator: ast.EqualOperator,
@@ -57,15 +51,26 @@ func init() {
 												Object:   &semantic.IdentifierExpression{Name: "r"},
 												Property: "_measurement",
 											},
-											Right: &semantic.StringLiteral{Value: "mem"},
+											Right: &semantic.StringLiteral{Value: "cpu"},
 										},
-										Right: &semantic.BinaryExpression{
-											Operator: ast.EqualOperator,
-											Left: &semantic.MemberExpression{
-												Object:   &semantic.IdentifierExpression{Name: "r"},
-												Property: "_measurement",
+										Right: &semantic.LogicalExpression{
+											Operator: ast.OrOperator,
+											Left: &semantic.BinaryExpression{
+												Operator: ast.EqualOperator,
+												Left: &semantic.MemberExpression{
+													Object:   &semantic.IdentifierExpression{Name: "r"},
+													Property: "_measurement",
+												},
+												Right: &semantic.StringLiteral{Value: "mem"},
 											},
-											Right: &semantic.StringLiteral{Value: "gpu"},
+											Right: &semantic.BinaryExpression{
+												Operator: ast.EqualOperator,
+												Left: &semantic.MemberExpression{
+													Object:   &semantic.IdentifierExpression{Name: "r"},
+													Property: "_measurement",
+												},
+												Right: &semantic.StringLiteral{Value: "gpu"},
+											},
 										},
 									},
 								},
@@ -75,13 +80,14 @@ func init() {
 					{
 						ID: "keyValues0",
 						Spec: &transformations.KeyValuesOpSpec{
-							KeyCols: []string{"host"},
+							KeyColumns: []string{"host"},
 						},
 					},
 					{
 						ID: "group0",
 						Spec: &transformations.GroupOpSpec{
-							By: []string{"_measurement", "_key"},
+							Columns: []string{"_measurement", "_key"},
+							Mode:    "by",
 						},
 					},
 					{
@@ -93,13 +99,14 @@ func init() {
 					{
 						ID: "group1",
 						Spec: &transformations.GroupOpSpec{
-							By: []string{"_measurement"},
+							Columns: []string{"_measurement"},
+							Mode:    "by",
 						},
 					},
 					{
 						ID: "rename0",
 						Spec: &transformations.RenameOpSpec{
-							Cols: map[string]string{
+							Columns: map[string]string{
 								"_key":   "key",
 								"_value": "value",
 							},

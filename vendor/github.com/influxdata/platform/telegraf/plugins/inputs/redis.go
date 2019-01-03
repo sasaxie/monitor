@@ -1,6 +1,7 @@
 package inputs
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -8,8 +9,14 @@ import (
 
 // Redis is based on telegraf Redis plugin.
 type Redis struct {
+	baseInput
 	Servers  []string `json:"servers"`
 	Password string   `json:"password"`
+}
+
+// PluginName is based on telegraf plugin name.
+func (r *Redis) PluginName() string {
+	return "redis"
 }
 
 // TOML encodes to toml string
@@ -22,7 +29,7 @@ func (r *Redis) TOML() string {
 	if r.Password != "" {
 		password = fmt.Sprintf(`  password = "%s"`, r.Password)
 	}
-	return fmt.Sprintf(`[[inputs.redis]]
+	return fmt.Sprintf(`[[inputs.%s]]
   ## specify servers via a url matching:
   ##  [protocol://][:password]@address[:port]
   ##  e.g.
@@ -36,5 +43,24 @@ func (r *Redis) TOML() string {
 
   ## specify server password
 %s
-`, strings.Join(s, ", "), password)
+`, r.PluginName(), strings.Join(s, ", "), password)
+}
+
+// UnmarshalTOML decodes the parsed data to the object
+func (r *Redis) UnmarshalTOML(data interface{}) error {
+	dataOK, ok := data.(map[string]interface{})
+	if !ok {
+		return errors.New("bad servers for redis input plugin")
+	}
+	servers, ok := dataOK["servers"].([]interface{})
+	if !ok {
+		return errors.New("servers is not an array for redis input plugin")
+	}
+	for _, server := range servers {
+		r.Servers = append(r.Servers, server.(string))
+	}
+
+	r.Password, _ = dataOK["password"].(string)
+
+	return nil
 }

@@ -8,11 +8,14 @@ import (
 
 	"github.com/influxdata/platform"
 	"github.com/julienschmidt/httprouter"
+	"go.uber.org/zap"
 )
 
 // SetupHandler represents an HTTP API handler for onboarding setup.
 type SetupHandler struct {
 	*httprouter.Router
+
+	Logger *zap.Logger
 
 	OnboardingService platform.OnboardingService
 }
@@ -24,7 +27,8 @@ const (
 // NewSetupHandler returns a new instance of SetupHandler.
 func NewSetupHandler() *SetupHandler {
 	h := &SetupHandler{
-		Router: httprouter.New(),
+		Router: NewRouter(),
+		Logger: zap.NewNop(),
 	}
 	h.HandlerFunc("POST", setupPath, h.handlePostSetup)
 	h.HandlerFunc("GET", setupPath, h.isOnboarding)
@@ -44,7 +48,7 @@ func (h *SetupHandler) isOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := encodeResponse(ctx, w, http.StatusOK, isOnboardingResponse{result}); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -64,7 +68,7 @@ func (h *SetupHandler) handlePostSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := encodeResponse(ctx, w, http.StatusCreated, newOnboardingResponse(results)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -148,8 +152,9 @@ func (s *SetupService) Generate(ctx context.Context, or *platform.OnboardingRequ
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	// TODO(jsternberg): Should this check for a 201 explicitly?
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -158,13 +163,14 @@ func (s *SetupService) Generate(ctx context.Context, or *platform.OnboardingRequ
 		return nil, err
 	}
 
+	bkt, err := oResp.Bucket.toPlatform()
+	if err != nil {
+		return nil, err
+	}
 	return &platform.OnboardingResults{
-		User: &oResp.User.User,
-		Auth: &oResp.Auth.Authorization,
-		Org:  &oResp.Organization.Organization,
-		Bucket: &platform.Bucket{
-			ID:   oResp.Bucket.ID,
-			Name: oResp.Bucket.Name,
-		},
+		User:   &oResp.User.User,
+		Auth:   &oResp.Auth.Authorization,
+		Org:    &oResp.Organization.Organization,
+		Bucket: bkt,
 	}, nil
 }

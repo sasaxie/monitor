@@ -96,6 +96,43 @@ func TestErrorMessage(t *testing.T) {
 		}
 	}
 }
+
+func TestErrorOp(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "nil error",
+		},
+		{
+			name: "simple error",
+			err:  &platform.Error{Op: "op1"},
+			want: "op1",
+		},
+		{
+			name: "embeded error",
+			err:  &platform.Error{Op: "op1", Err: &platform.Error{Code: platform.EInvalid}},
+			want: "op1",
+		},
+		{
+			name: "embeded error without op in root level",
+			err:  &platform.Error{Err: &platform.Error{Code: platform.EInvalid, Op: "op2"}},
+			want: "op2",
+		},
+		{
+			name: "default error",
+			err:  errors.New("s"),
+			want: "",
+		},
+	}
+	for _, c := range cases {
+		if result := platform.ErrorOp(c.err); c.want != result {
+			t.Fatalf("%s failed, want %s, got %s", c.name, c.want, result)
+		}
+	}
+}
 func TestErrorCode(t *testing.T) {
 	cases := []struct {
 		name string
@@ -116,6 +153,11 @@ func TestErrorCode(t *testing.T) {
 			want: platform.ENotFound,
 		},
 		{
+			name: "embeded error with root level code",
+			err:  &platform.Error{Err: &platform.Error{Code: platform.EInvalid}},
+			want: platform.EInvalid,
+		},
+		{
 			name: "default error",
 			err:  errors.New("s"),
 			want: platform.EInternal,
@@ -130,13 +172,14 @@ func TestErrorCode(t *testing.T) {
 
 func TestJSON(t *testing.T) {
 	cases := []struct {
-		name string
-		err  *platform.Error
-		json string
+		name    string
+		err     *platform.Error
+		encoded string
 	}{
 		{
-			name: "simple error",
-			err:  &platform.Error{Code: platform.ENotFound},
+			name:    "simple error",
+			err:     &platform.Error{Code: platform.ENotFound},
+			encoded: `{"code":"not found"}`,
 		},
 		{
 			name: "with op",
@@ -144,14 +187,16 @@ func TestJSON(t *testing.T) {
 				Code: platform.ENotFound,
 				Op:   "bolt.FindAuthorizationByID",
 			},
+			encoded: `{"code":"not found","op":"bolt.FindAuthorizationByID"}`,
 		},
 		{
 			name: "with op and value",
 			err: &platform.Error{
 				Code: platform.ENotFound,
-				Op:   "bolt.FindAuthorizationByID",
+				Op:   "bolt/FindAuthorizationByID",
 				Msg:  fmt.Sprintf("with ID %d", 323),
 			},
+			encoded: `{"code":"not found","message":"with ID 323","op":"bolt/FindAuthorizationByID"}`,
 		},
 		{
 			name: "with a third party error",
@@ -160,6 +205,7 @@ func TestJSON(t *testing.T) {
 				Op:   "cmd/fluxd.injectDeps",
 				Err:  errors.New("empty value"),
 			},
+			encoded: `{"code":"failed to get the storage host","op":"cmd/fluxd.injectDeps","error":"empty value"}`,
 		},
 		{
 			name: "with a internal error",
@@ -168,6 +214,23 @@ func TestJSON(t *testing.T) {
 				Op:   "cmd/fluxd.injectDeps",
 				Err:  &platform.Error{Code: platform.EEmptyValue, Op: "cmd/fluxd.getStrList"},
 			},
+			encoded: `{"code":"failed to get the storage host","op":"cmd/fluxd.injectDeps","error":{"code":"empty value","op":"cmd/fluxd.getStrList"}}`,
+		},
+		{
+			name: "with a deep internal error",
+			err: &platform.Error{
+				Code: EFailedToGetStorageHost,
+				Op:   "cmd/fluxd.injectDeps",
+				Err: &platform.Error{
+					Code: platform.EInvalid,
+					Op:   "cmd/fluxd.getStrList",
+					Err: &platform.Error{
+						Code: platform.EEmptyValue,
+						Err:  errors.New("an err"),
+					},
+				},
+			},
+			encoded: `{"code":"failed to get the storage host","op":"cmd/fluxd.injectDeps","error":{"code":"invalid","op":"cmd/fluxd.getStrList","error":{"code":"empty value","error":"an err"}}}`,
 		},
 	}
 	for _, c := range cases {
@@ -176,9 +239,13 @@ func TestJSON(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s encode failed, want err: %v, should be nil", c.name, err)
 		}
+
+		if string(result) != c.encoded {
+			t.Fatalf("%s encode failed, want result: %s, got %s", c.name, c.encoded, string(result))
+		}
 		// decode testing
 		got := new(platform.Error)
-		err = json.Unmarshal([]byte(result), got)
+		err = json.Unmarshal(result, got)
 		if err != nil {
 			t.Fatalf("%s decode failed, want err: %v, should be nil", c.name, err)
 		}

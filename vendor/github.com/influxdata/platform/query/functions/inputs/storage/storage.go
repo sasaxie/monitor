@@ -3,11 +3,13 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
 
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/execute"
+	"github.com/influxdata/flux/functions"
 	"github.com/influxdata/flux/semantic"
 	"github.com/influxdata/platform"
 	"github.com/pkg/errors"
@@ -75,6 +77,8 @@ type source struct {
 
 	currentTime execute.Time
 	overflow    bool
+
+	stats flux.Statistics
 }
 
 func NewSource(id execute.DatasetID, r Reader, readSpec ReadSpec, bounds execute.Bounds, w execute.Window, currentTime execute.Time) execute.Source {
@@ -118,6 +122,7 @@ func (s *source) run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		s.stats = s.stats.Add(tables.Statistics())
 		for _, t := range s.ts {
 			if err := t.UpdateWatermark(s.id, mark); err != nil {
 				return err
@@ -160,6 +165,10 @@ func (s *source) next(ctx context.Context) (flux.TableIterator, execute.Time, bo
 	return bi, stop, true
 }
 
+func (s *source) Statistics() flux.Statistics {
+	return s.stats
+}
+
 type GroupMode int
 
 const (
@@ -174,6 +183,20 @@ const (
 	// GroupModeExcept produces a table for the unique values of all keys, except those specified by GroupKeys.
 	GroupModeExcept
 )
+
+// ToGroupMode accepts the group mode from Flux and produces the appropriate storage group mode.
+func ToGroupMode(fluxMode functions.GroupMode) GroupMode {
+	switch fluxMode {
+	case functions.GroupModeNone:
+		return GroupModeDefault
+	case functions.GroupModeBy:
+		return GroupModeBy
+	case functions.GroupModeExcept:
+		return GroupModeExcept
+	default:
+		panic(fmt.Sprint("unknown group mode: ", fluxMode))
+	}
+}
 
 type ReadSpec struct {
 	OrganizationID platform.ID

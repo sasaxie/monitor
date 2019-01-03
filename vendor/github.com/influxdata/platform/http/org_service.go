@@ -7,49 +7,79 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strconv"
 
 	"github.com/influxdata/platform"
 	kerrors "github.com/influxdata/platform/kit/errors"
 	"github.com/julienschmidt/httprouter"
+	"go.uber.org/zap"
 )
 
 // OrgHandler represents an HTTP API handler for orgs.
 type OrgHandler struct {
 	*httprouter.Router
 
-	OrganizationService        platform.OrganizationService
-	BucketService              platform.BucketService
-	UserResourceMappingService platform.UserResourceMappingService
+	Logger *zap.Logger
+
+	OrganizationService             platform.OrganizationService
+	OrganizationOperationLogService platform.OrganizationOperationLogService
+	BucketService                   platform.BucketService
+	UserResourceMappingService      platform.UserResourceMappingService
+	SecretService                   platform.SecretService
+	LabelService                    platform.LabelService
+	UserService                     platform.UserService
 }
 
 const (
 	organizationsPath            = "/api/v2/orgs"
 	organizationsIDPath          = "/api/v2/orgs/:id"
+	organizationsIDLogPath       = "/api/v2/orgs/:id/log"
 	organizationsIDMembersPath   = "/api/v2/orgs/:id/members"
 	organizationsIDMembersIDPath = "/api/v2/orgs/:id/members/:userID"
 	organizationsIDOwnersPath    = "/api/v2/orgs/:id/owners"
 	organizationsIDOwnersIDPath  = "/api/v2/orgs/:id/owners/:userID"
+	organizationsIDSecretsPath   = "/api/v2/orgs/:id/secrets"
+	// TODO(desa): need a way to specify which secrets to delete. this should work for now
+	organizationsIDSecretsDeletePath = "/api/v2/orgs/:id/secrets/delete"
+	organizationsIDLabelsPath        = "/api/v2/orgs/:id/labels"
+	organizationsIDLabelsNamePath    = "/api/v2/orgs/:id/labels/:name"
 )
 
 // NewOrgHandler returns a new instance of OrgHandler.
-func NewOrgHandler() *OrgHandler {
+func NewOrgHandler(mappingService platform.UserResourceMappingService,
+	labelService platform.LabelService, userService platform.UserService) *OrgHandler {
 	h := &OrgHandler{
-		Router: httprouter.New(),
+		Router:                     NewRouter(),
+		Logger:                     zap.NewNop(),
+		UserResourceMappingService: mappingService,
+		LabelService:               labelService,
+		UserService:                userService,
 	}
 
 	h.HandlerFunc("POST", organizationsPath, h.handlePostOrg)
 	h.HandlerFunc("GET", organizationsPath, h.handleGetOrgs)
 	h.HandlerFunc("GET", organizationsIDPath, h.handleGetOrg)
+	h.HandlerFunc("GET", organizationsIDLogPath, h.handleGetOrgLog)
 	h.HandlerFunc("PATCH", organizationsIDPath, h.handlePatchOrg)
 	h.HandlerFunc("DELETE", organizationsIDPath, h.handleDeleteOrg)
 
-	h.HandlerFunc("POST", organizationsIDMembersPath, newPostMemberHandler(h.UserResourceMappingService, platform.OrgResourceType, platform.Member))
-	h.HandlerFunc("GET", organizationsIDMembersPath, newGetMembersHandler(h.UserResourceMappingService, platform.Member))
+	h.HandlerFunc("POST", organizationsIDMembersPath, newPostMemberHandler(h.UserResourceMappingService, h.UserService, platform.OrgResourceType, platform.Member))
+	h.HandlerFunc("GET", organizationsIDMembersPath, newGetMembersHandler(h.UserResourceMappingService, h.UserService, platform.OrgResourceType, platform.Member))
 	h.HandlerFunc("DELETE", organizationsIDMembersIDPath, newDeleteMemberHandler(h.UserResourceMappingService, platform.Member))
 
-	h.HandlerFunc("POST", organizationsIDOwnersPath, newPostMemberHandler(h.UserResourceMappingService, platform.OrgResourceType, platform.Owner))
-	h.HandlerFunc("GET", organizationsIDOwnersPath, newGetMembersHandler(h.UserResourceMappingService, platform.Owner))
+	h.HandlerFunc("POST", organizationsIDOwnersPath, newPostMemberHandler(h.UserResourceMappingService, h.UserService, platform.OrgResourceType, platform.Owner))
+	h.HandlerFunc("GET", organizationsIDOwnersPath, newGetMembersHandler(h.UserResourceMappingService, h.UserService, platform.OrgResourceType, platform.Owner))
 	h.HandlerFunc("DELETE", organizationsIDOwnersIDPath, newDeleteMemberHandler(h.UserResourceMappingService, platform.Owner))
+
+	h.HandlerFunc("GET", organizationsIDSecretsPath, h.handleGetSecrets)
+	h.HandlerFunc("PATCH", organizationsIDSecretsPath, h.handlePatchSecrets)
+	// TODO(desa): need a way to specify which secrets to delete. this should work for now
+	h.HandlerFunc("POST", organizationsIDSecretsDeletePath, h.handleDeleteSecrets)
+
+	h.HandlerFunc("GET", organizationsIDLabelsPath, newGetLabelsHandler(h.LabelService))
+	h.HandlerFunc("POST", organizationsIDLabelsPath, newPostLabelHandler(h.LabelService))
+	h.HandlerFunc("DELETE", organizationsIDLabelsNamePath, newDeleteLabelHandler(h.LabelService))
+	h.HandlerFunc("PATCH", organizationsIDLabelsNamePath, newPatchLabelHandler(h.LabelService))
 
 	return h
 }
@@ -89,12 +119,28 @@ func newOrgResponse(o *platform.Organization) *orgResponse {
 	return &orgResponse{
 		Links: map[string]string{
 			"self":       fmt.Sprintf("/api/v2/orgs/%s", o.ID),
+			"log":        fmt.Sprintf("/api/v2/orgs/%s/log", o.ID),
 			"members":    fmt.Sprintf("/api/v2/orgs/%s/members", o.ID),
 			"buckets":    fmt.Sprintf("/api/v2/buckets?org=%s", o.Name),
 			"tasks":      fmt.Sprintf("/api/v2/tasks?org=%s", o.Name),
 			"dashboards": fmt.Sprintf("/api/v2/dashboards?org=%s", o.Name),
 		},
 		Organization: *o,
+	}
+}
+
+type secretsResponse struct {
+	Links   map[string]string `json:"links"`
+	Secrets []string          `json:"secrets"`
+}
+
+func newSecretsResponse(orgID platform.ID, ks []string) *secretsResponse {
+	return &secretsResponse{
+		Links: map[string]string{
+			"org":     fmt.Sprintf("/api/v2/orgs/%s", orgID),
+			"secrets": fmt.Sprintf("/api/v2/orgs/%s/secrets", orgID),
+		},
+		Secrets: ks,
 	}
 }
 
@@ -114,7 +160,7 @@ func (h *OrgHandler) handlePostOrg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusCreated, newOrgResponse(req.Org)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -151,7 +197,7 @@ func (h *OrgHandler) handleGetOrg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newOrgResponse(b)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -196,7 +242,7 @@ func (h *OrgHandler) handleGetOrgs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newOrgsResponse(orgs)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -239,7 +285,7 @@ func (h *OrgHandler) handleDeleteOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type deleteOrganizationRequest struct {
@@ -281,7 +327,7 @@ func (h *OrgHandler) handlePatchOrg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := encodeResponse(ctx, w, http.StatusOK, newOrgResponse(o)); err != nil {
-		EncodeError(ctx, err, w)
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
@@ -314,72 +360,137 @@ func decodePatchOrgRequest(ctx context.Context, r *http.Request) (*patchOrgReque
 	}, nil
 }
 
-func (h *OrgHandler) handlePostOrgMember(w http.ResponseWriter, r *http.Request) {
+// handleGetSecrets is the HTTP handler for the GET /api/v2/orgs/:id/secrets route.
+func (h *OrgHandler) handleGetSecrets(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	req, err := decodePostOrgMemberRequest(ctx, r)
+	req, err := decodeGetSecretsRequest(ctx, r)
 	if err != nil {
 		EncodeError(ctx, err, w)
 		return
 	}
 
-	mapping := &platform.UserResourceMapping{
-		ResourceID: req.OrgID,
-		UserID:     req.MemberID,
-		UserType:   platform.Member,
-	}
-
-	if err := h.UserResourceMappingService.CreateUserResourceMapping(ctx, mapping); err != nil {
+	ks, err := h.SecretService.GetSecretKeys(ctx, req.orgID)
+	if err != nil {
 		EncodeError(ctx, err, w)
 		return
 	}
 
-	if err := encodeResponse(ctx, w, http.StatusCreated, mapping); err != nil {
-		EncodeError(ctx, err, w)
+	if err := encodeResponse(ctx, w, http.StatusOK, newSecretsResponse(req.orgID, ks)); err != nil {
+		logEncodingError(h.Logger, r, err)
 		return
 	}
 }
 
-func (h *OrgHandler) handleGetOrgMembers(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	req, err := decodeGetOrgRequest(ctx, r)
-	if err != nil {
-		EncodeError(ctx, err, w)
-		return
-	}
-
-	filter := platform.UserResourceMappingFilter{
-		ResourceID: req.OrgID,
-		UserType:   platform.Member,
-	}
-	mappings, _, err := h.UserResourceMappingService.FindUserResourceMappings(ctx, filter)
-	if err != nil {
-		EncodeError(ctx, err, w)
-		return
-	}
-
-	if err := encodeResponse(ctx, w, http.StatusOK, mappings); err != nil {
-		EncodeError(ctx, err, w)
-		return
-	}
+type getSecretsRequest struct {
+	orgID platform.ID
 }
 
-func (h *OrgHandler) handleDeleteOrgMember(w http.ResponseWriter, r *http.Request) {
+func decodeGetSecretsRequest(ctx context.Context, r *http.Request) (*getSecretsRequest, error) {
+	req := &getSecretsRequest{}
+	params := httprouter.ParamsFromContext(ctx)
+	id := params.ByName("id")
+	if id == "" {
+		return nil, kerrors.InvalidDataf("url missing id")
+	}
+
+	var i platform.ID
+	if err := i.DecodeFromString(id); err != nil {
+		return nil, err
+	}
+	req.orgID = i
+
+	return req, nil
+}
+
+// handleGetPatchSecrets is the HTTP handler for the PATCH /api/v2/orgs/:id/secrets route.
+func (h *OrgHandler) handlePatchSecrets(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	req, err := decodeDeleteOrgMemberRequest(ctx, r)
+	req, err := decodePatchSecretsRequest(ctx, r)
 	if err != nil {
 		EncodeError(ctx, err, w)
 		return
 	}
 
-	if err := h.UserResourceMappingService.DeleteUserResourceMapping(ctx, req.OrgID, req.MemberID); err != nil {
+	if err := h.SecretService.PatchSecrets(ctx, req.orgID, req.secrets); err != nil {
 		EncodeError(ctx, err, w)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type patchSecretsRequest struct {
+	orgID   platform.ID
+	secrets map[string]string
+}
+
+func decodePatchSecretsRequest(ctx context.Context, r *http.Request) (*patchSecretsRequest, error) {
+	req := &patchSecretsRequest{}
+	params := httprouter.ParamsFromContext(ctx)
+	id := params.ByName("id")
+	if id == "" {
+		return nil, kerrors.InvalidDataf("url missing id")
+	}
+
+	var i platform.ID
+	if err := i.DecodeFromString(id); err != nil {
+		return nil, err
+	}
+	req.orgID = i
+	req.secrets = map[string]string{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req.secrets); err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// handleDeleteSecrets is the HTTP handler for the DELETE /api/v2/orgs/:id/secrets route.
+func (h *OrgHandler) handleDeleteSecrets(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	req, err := decodeDeleteSecretsRequest(ctx, r)
+	if err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if err := h.SecretService.DeleteSecret(ctx, req.orgID, req.secrets...); err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type deleteSecretsRequest struct {
+	orgID   platform.ID
+	secrets []string
+}
+
+func decodeDeleteSecretsRequest(ctx context.Context, r *http.Request) (*deleteSecretsRequest, error) {
+	req := &deleteSecretsRequest{}
+	params := httprouter.ParamsFromContext(ctx)
+	id := params.ByName("id")
+	if id == "" {
+		return nil, kerrors.InvalidDataf("url missing id")
+	}
+
+	var i platform.ID
+	if err := i.DecodeFromString(id); err != nil {
+		return nil, err
+	}
+	req.orgID = i
+	req.secrets = []string{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req.secrets); err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 const (
@@ -391,23 +502,39 @@ type OrganizationService struct {
 	Addr               string
 	Token              string
 	InsecureSkipVerify bool
+	// OpPrefix is for not found errors.
+	OpPrefix string
 }
 
 // FindOrganizationByID gets a single organization with a given id using HTTP.
 func (s *OrganizationService) FindOrganizationByID(ctx context.Context, id platform.ID) (*platform.Organization, error) {
 	filter := platform.OrganizationFilter{ID: &id}
-	return s.FindOrganization(ctx, filter)
+	o, err := s.FindOrganization(ctx, filter)
+	if err != nil {
+		return nil, &platform.Error{
+			Err: err,
+			Op:  s.OpPrefix + platform.OpFindOrganizationByID,
+		}
+	}
+	return o, nil
 }
 
 // FindOrganization gets a single organization matching the filter using HTTP.
 func (s *OrganizationService) FindOrganization(ctx context.Context, filter platform.OrganizationFilter) (*platform.Organization, error) {
 	os, n, err := s.FindOrganizations(ctx, filter)
 	if err != nil {
-		return nil, err
+		return nil, &platform.Error{
+			Err: err,
+			Op:  s.OpPrefix + platform.OpFindOrganization,
+		}
 	}
 
 	if n == 0 {
-		return nil, ErrNotFound
+		return nil, &platform.Error{
+			Code: platform.ENotFound,
+			Op:   s.OpPrefix + platform.OpFindOrganization,
+			Msg:  "organization not found",
+		}
 	}
 
 	return os[0], nil
@@ -442,7 +569,7 @@ func (s *OrganizationService) FindOrganizations(ctx context.Context, filter plat
 		return nil, 0, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, 0, err
 	}
 
@@ -488,7 +615,7 @@ func (s *OrganizationService) CreateOrganization(ctx context.Context, o *platfor
 	}
 
 	// TODO(jsternberg): Should this check for a 201 explicitly?
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return err
 	}
 
@@ -526,7 +653,7 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, id platfor
 		return nil, err
 	}
 
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -557,9 +684,88 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, id platfor
 	if err != nil {
 		return err
 	}
-	return CheckError(resp)
+
+	return CheckErrorStatus(http.StatusNoContent, resp, true)
 }
 
 func organizationIDPath(id platform.ID) string {
 	return path.Join(organizationPath, id.String())
+}
+
+// hanldeGetOrganizationLog retrieves a organization log by the organizations ID.
+func (h *OrgHandler) handleGetOrgLog(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	req, err := decodeGetOrganizationLogRequest(ctx, r)
+	if err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	log, _, err := h.OrganizationOperationLogService.GetOrganizationOperationLog(ctx, req.OrganizationID, req.opts)
+	if err != nil {
+		EncodeError(ctx, err, w)
+		return
+	}
+
+	if err := encodeResponse(ctx, w, http.StatusOK, newOrganizationLogResponse(req.OrganizationID, log)); err != nil {
+		logEncodingError(h.Logger, r, err)
+		return
+	}
+}
+
+type getOrganizationLogRequest struct {
+	OrganizationID platform.ID
+	opts           platform.FindOptions
+}
+
+func decodeGetOrganizationLogRequest(ctx context.Context, r *http.Request) (*getOrganizationLogRequest, error) {
+	params := httprouter.ParamsFromContext(ctx)
+	id := params.ByName("id")
+	if id == "" {
+		return nil, kerrors.InvalidDataf("url missing id")
+	}
+
+	var i platform.ID
+	if err := i.DecodeFromString(id); err != nil {
+		return nil, err
+	}
+
+	opts := platform.DefaultOperationLogFindOptions
+	qp := r.URL.Query()
+	if v := qp.Get("desc"); v == "false" {
+		opts.Descending = false
+	}
+	if v := qp.Get("limit"); v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, err
+		}
+		opts.Limit = i
+	}
+	if v := qp.Get("offset"); v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, err
+		}
+		opts.Offset = i
+	}
+
+	return &getOrganizationLogRequest{
+		OrganizationID: i,
+		opts:           opts,
+	}, nil
+}
+
+func newOrganizationLogResponse(id platform.ID, es []*platform.OperationLogEntry) *operationLogResponse {
+	log := make([]*operationLogEntryResponse, 0, len(es))
+	for _, e := range es {
+		log = append(log, newOperationLogEntryResponse(e))
+	}
+	return &operationLogResponse{
+		Links: map[string]string{
+			"self": fmt.Sprintf("/api/v2/organizations/%s/log", id),
+		},
+		Log: log,
+	}
 }

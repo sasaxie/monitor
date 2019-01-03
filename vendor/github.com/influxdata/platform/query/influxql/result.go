@@ -37,7 +37,7 @@ func (e *MultiResultEncoder) Encode(w io.Writer, results flux.ResultIterator) (i
 		id, err := strconv.Atoi(name)
 		if err != nil {
 			resp.error(fmt.Errorf("unable to parse statement id from result name: %s", err))
-			results.Cancel()
+			results.Release()
 			break
 		}
 
@@ -80,6 +80,12 @@ func (e *MultiResultEncoder) Encode(w io.Writer, results flux.ResultIterator) (i
 				} else if !tbl.Key().HasCol(c.Label) {
 					resultColMap[c.Label] = j
 					j++
+				}
+			}
+
+			if _, ok := resultColMap[execute.DefaultTimeColLabel]; !ok {
+				for k, v := range resultColMap {
+					resultColMap[k] = v - 1
 				}
 			}
 
@@ -131,7 +137,7 @@ func (e *MultiResultEncoder) Encode(w io.Writer, results flux.ResultIterator) (i
 						}
 					case flux.TTime:
 						for i, v := range cr.Times(idx) {
-							values[i][j] = v.Time().Format(time.RFC3339)
+							values[i][j] = v.Time().Format(time.RFC3339Nano)
 						}
 					default:
 						return fmt.Errorf("unsupported column type: %s", c.Type)
@@ -148,7 +154,7 @@ func (e *MultiResultEncoder) Encode(w io.Writer, results flux.ResultIterator) (i
 			return nil
 		}); err != nil {
 			resp.error(err)
-			results.Cancel()
+			results.Release()
 			break
 		}
 		resp.Results = append(resp.Results, result)

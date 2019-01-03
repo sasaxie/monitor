@@ -24,12 +24,11 @@ func NewStoreTest(name string, cf CreateStoreFunc, df DestroyStoreFunc, funcName
 	if len(funcNames) == 0 {
 		funcNames = []string{
 			"CreateTask",
-			"ModifyTask",
+			"UpdateTask",
 			"ListTasks",
 			"FindTask",
 			"FindMeta",
 			"FindTaskByIDWithMeta",
-			"EnableDisableTask",
 			"DeleteTask",
 			"CreateNextRun",
 			"FinishRun",
@@ -38,12 +37,11 @@ func NewStoreTest(name string, cf CreateStoreFunc, df DestroyStoreFunc, funcName
 	}
 	availableFuncs := map[string]TestFunc{
 		"CreateTask":           testStoreCreate,
-		"ModifyTask":           testStoreModify,
+		"UpdateTask":           testStoreUpdate,
 		"ListTasks":            testStoreListTasks,
 		"FindTask":             testStoreFindTask,
 		"FindMeta":             testStoreFindMeta,
 		"FindTaskByIDWithMeta": testStoreFindByIDWithMeta,
-		"EnableDisableTask":    testStoreTaskEnableDisable,
 		"DeleteTask":           testStoreDelete,
 		"CreateNextRun":        testStoreCreateNextRun,
 		"FinishRun":            testStoreFinishRun,
@@ -82,11 +80,11 @@ from(bucket:"test") |> range(start:-1h)`
 	defer destroy(t, s)
 
 	for _, args := range []struct {
-		caseName     string
-		org, user    platform.ID
-		name, script string
-		status       backend.TaskStatus
-		noerr        bool
+		caseName  string
+		org, user platform.ID
+		script    string
+		status    backend.TaskStatus
+		noerr     bool
 	}{
 		{caseName: "happy path", org: platform.ID(1), user: platform.ID(2), script: script, noerr: true},
 		{caseName: "missing org", org: platform.ID(0), user: platform.ID(2), script: script},
@@ -117,7 +115,7 @@ from(bucket:"test") |> range(start:-1h)`
 	}
 }
 
-func testStoreModify(t *testing.T, create CreateStoreFunc, destroy DestroyStoreFunc) {
+func testStoreUpdate(t *testing.T, create CreateStoreFunc, destroy DestroyStoreFunc) {
 	const script = `option task = {
 		name: "a task",
 		cron: "* * * * *",
@@ -129,12 +127,6 @@ from(bucket:"x") |> range(start:-1h)`
 		name: "a task2",
 		cron: "* * * * *",
 	}
-
-from(bucket:"y") |> range(start:-1h)`
-	const script3 = `option task = {
-	name: "a task3",
-	cron: "* * * * *",
-}
 
 from(bucket:"y") |> range(start:-1h)`
 	const scriptNoName = `option task = {
@@ -151,37 +143,96 @@ from(bucket:"y") |> range(start:-1h)`
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.ModifyTask(context.Background(), id, script2); err != nil {
-			t.Fatal(err)
-		}
 
-		task, err := s.FindTaskByID(context.Background(), id)
+		// Modify just the script.
+		res, err := s.UpdateTask(context.Background(), backend.UpdateTaskRequest{ID: id, Script: script2})
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		task := res.NewTask
+		meta := res.NewMeta
 		if task.Script != script2 {
 			t.Fatalf("Task didnt update: %s", task.Script)
 		}
 		if task.Name != "a task2" {
 			t.Fatalf("Task didn't update name, expected 'a task2' but got '%s' for task %v", task.Name, task)
 		}
+		if meta.Status != string(backend.TaskActive) {
+			// Other tests explicitly check the initial status against DefaultTaskStatus,
+			// but in this case we need to be certain of the initial status so we can toggle it correctly.
+			t.Fatalf("expected task to be created active, got %q", meta.Status)
+		}
+
+		// Modify just the status.
+		res, err = s.UpdateTask(context.Background(), backend.UpdateTaskRequest{ID: id, Status: backend.TaskInactive})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		task = res.NewTask
+		meta = res.NewMeta
+		if task.Script != script2 {
+			t.Fatalf("Task script unexpectedly updated: %s", task.Script)
+		}
+		if task.Name != "a task2" {
+			t.Fatalf("Task name unexpectedly updated: %q", task.Name)
+		}
+		if meta.Status != string(backend.TaskInactive) {
+			t.Fatalf("expected task status to be inactive, got %q", meta.Status)
+		}
+
+		// Modify the status to active, and change the script.
+		res, err = s.UpdateTask(context.Background(), backend.UpdateTaskRequest{ID: id, Status: backend.TaskActive, Script: script})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		task = res.NewTask
+		meta = res.NewMeta
+		if task.Script != script {
+			t.Fatalf("Task script did not update: %s", task.Script)
+		}
+		if task.Name != "a task" {
+			t.Fatalf("Task name did not update: %s", task.Name)
+		}
+		if meta.Status != string(backend.TaskActive) {
+			t.Fatalf("expected task status to be active, got %q", meta.Status)
+		}
+
+		// Modify the status to inactive, and change the script again.
+		res, err = s.UpdateTask(context.Background(), backend.UpdateTaskRequest{ID: id, Status: backend.TaskInactive, Script: script2})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		task = res.NewTask
+		meta = res.NewMeta
+		if task.Script != script2 {
+			t.Fatalf("Task script did not update: %s", task.Script)
+		}
+		if task.Name != "a task2" {
+			t.Fatalf("Task name did not update: %s", task.Name)
+		}
+		if meta.Status != string(backend.TaskInactive) {
+			t.Fatalf("expected task status to be inactive, got %q", meta.Status)
+		}
 	})
 
 	for _, args := range []struct {
 		caseName string
-		id       platform.ID
-		script   string
+		req      backend.UpdateTaskRequest
 	}{
-		{caseName: "missing id", id: platform.ID(0), script: script},
-		{caseName: "not found", id: platform.ID(7123), script: script},
-		{caseName: "missing script", id: platform.ID(1), script: ""},
-		{caseName: "missing name", id: platform.ID(1), script: scriptNoName},
+		{caseName: "missing id", req: backend.UpdateTaskRequest{Script: script}},
+		{caseName: "not found", req: backend.UpdateTaskRequest{ID: platform.ID(7123), Script: script}},
+		{caseName: "missing script and status", req: backend.UpdateTaskRequest{ID: platform.ID(1)}},
+		{caseName: "missing name", req: backend.UpdateTaskRequest{ID: platform.ID(1), Script: scriptNoName}},
 	} {
 		t.Run(args.caseName, func(t *testing.T) {
 			s := create(t)
 			defer destroy(t, s)
 
-			if err := s.ModifyTask(context.Background(), args.id, args.script); err == nil {
+			if _, err := s.UpdateTask(context.Background(), args.req); err == nil {
 				t.Fatal("expected error but did not receive one")
 			}
 		})
@@ -197,7 +248,7 @@ from(bucket:"y") |> range(start:-1h)`
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.ModifyTask(context.Background(), id1, script2); err != nil {
+		if _, err := s.UpdateTask(context.Background(), backend.UpdateTaskRequest{ID: id1, Script: script2}); err != nil {
 			t.Fatalf("expected to be allowed to reuse name when modifying task, but got %v", err)
 		}
 	})
@@ -229,8 +280,15 @@ from(bucket:"test") |> range(start:-1h)`
 		if len(ts) != 1 {
 			t.Fatalf("expected 1 result, got %d", len(ts))
 		}
-		if ts[0].ID != id {
-			t.Fatalf("got task ID %v, exp %v", ts[0].ID, id)
+		if ts[0].Task.ID != id {
+			t.Fatalf("got task ID %v, exp %v", ts[0].Task.ID, id)
+		}
+		meta, err := s.FindTaskMetaByID(context.Background(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ts[0].Meta.Equal(*meta) {
+			t.Fatalf("exp meta %v, got meta %v", *meta, ts[0].Meta)
 		}
 
 		ts, err = s.ListTasks(context.Background(), backend.TaskSearchParams{User: userID})
@@ -240,8 +298,15 @@ from(bucket:"test") |> range(start:-1h)`
 		if len(ts) != 1 {
 			t.Fatalf("expected 1 result, got %d", len(ts))
 		}
-		if ts[0].ID != id {
-			t.Fatalf("got task ID %v, exp %v", ts[0].ID, id)
+		if ts[0].Task.ID != id {
+			t.Fatalf("got task ID %v, exp %v", ts[0].Task.ID, id)
+		}
+		meta, err = s.FindTaskMetaByID(context.Background(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ts[0].Meta.Equal(*meta) {
+			t.Fatalf("exp meta %v, got meta %v", *meta, ts[0].Meta)
 		}
 
 		ts, err = s.ListTasks(context.Background(), backend.TaskSearchParams{Org: platform.ID(123)})
@@ -260,7 +325,7 @@ from(bucket:"test") |> range(start:-1h)`
 			t.Fatalf("expected no results for bad user ID, got %d result(s)", len(ts))
 		}
 
-		newID, err := s.CreateTask(context.Background(), backend.CreateTaskRequest{Org: orgID, User: userID, Script: fmt.Sprintf(scriptFmt, 1)})
+		newID, err := s.CreateTask(context.Background(), backend.CreateTaskRequest{Org: orgID, User: userID, Script: fmt.Sprintf(scriptFmt, 1), Status: backend.TaskInactive})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -272,8 +337,15 @@ from(bucket:"test") |> range(start:-1h)`
 		if len(ts) != 1 {
 			t.Fatalf("expected 1 result, got %d", len(ts))
 		}
-		if ts[0].ID != newID {
-			t.Fatalf("got task ID %v, exp %v", ts[0].ID, newID)
+		if ts[0].Task.ID != newID {
+			t.Fatalf("got task ID %v, exp %v", ts[0].Task.ID, newID)
+		}
+		meta, err = s.FindTaskMetaByID(context.Background(), newID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ts[0].Meta.Equal(*meta) {
+			t.Fatalf("exp meta %v, got meta %v", *meta, ts[0].Meta)
 		}
 	})
 
@@ -327,24 +399,24 @@ from(bucket:"test") |> range(start:-1h)`
 			}
 
 			for i, g := range got {
-				if tasks[i].id != g.ID {
-					t.Fatalf("task ID mismatch at index %d: got %x, expected %x", i, g.ID, tasks[i].id)
+				if tasks[i].id != g.Task.ID {
+					t.Fatalf("task ID mismatch at index %d: got %x, expected %x", i, g.Task.ID, tasks[i].id)
 				}
 
-				if orgID != g.Org {
-					t.Fatalf("task org mismatch at index %d: got %x, expected %x", i, g.Org, orgID)
+				if orgID != g.Task.Org {
+					t.Fatalf("task org mismatch at index %d: got %x, expected %x", i, g.Task.Org, orgID)
 				}
 
-				if userID != g.User {
-					t.Fatalf("task user mismatch at index %d: got %x, expected %x", i, g.User, userID)
+				if userID != g.Task.User {
+					t.Fatalf("task user mismatch at index %d: got %x, expected %x", i, g.Task.User, userID)
 				}
 
-				if tasks[i].name != g.Name {
-					t.Fatalf("task name mismatch at index %d: got %q, expected %q", i, g.Name, tasks[i].name)
+				if tasks[i].name != g.Task.Name {
+					t.Fatalf("task name mismatch at index %d: got %q, expected %q", i, g.Task.Name, tasks[i].name)
 				}
 
-				if tasks[i].script != g.Script {
-					t.Fatalf("task script mismatch at index %d: got %q, expected %q", i, g.Script, tasks[i].script)
+				if tasks[i].script != g.Task.Script {
+					t.Fatalf("task script mismatch at index %d: got %q, expected %q", i, g.Task.Script, tasks[i].script)
 				}
 			}
 		}
@@ -388,7 +460,7 @@ from(bucket:"test") |> range(start:-1h)`
 			t.Fatal(err)
 		}
 
-		task, err := s.FindTaskByID(context.Background(), id)
+		task, meta, err := s.FindTaskByIDWithMeta(context.Background(), id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -408,6 +480,9 @@ from(bucket:"test") |> range(start:-1h)`
 		if task.Script != script {
 			t.Fatalf("unexpected script %q", task.Script)
 		}
+		if meta.Status != string(backend.DefaultTaskStatus) {
+			t.Fatalf("unexpected default status: got %q, exp %q", meta.Status, backend.DefaultTaskStatus)
+		}
 
 		badID := id + 1
 
@@ -426,7 +501,7 @@ func testStoreFindMeta(t *testing.T, create CreateStoreFunc, destroy DestroyStor
 		name: "a task",
 		cron: "* * * * *",
 		concurrency: 3,
-		delay: 5s,
+		offset: 5s,
 	}
 
 from(bucket:"test") |> range(start:-1h)`
@@ -460,8 +535,8 @@ from(bucket:"test") |> range(start:-1h)`
 			t.Fatalf("unexpected cron stored in meta: %q", meta.EffectiveCron)
 		}
 
-		if time.Duration(meta.Delay)*time.Second != 5*time.Second {
-			t.Fatalf("unexpected delay stored in meta: %v", meta.Delay)
+		if time.Duration(meta.Offset)*time.Second != 5*time.Second {
+			t.Fatalf("unexpected delay stored in meta: %v", meta.Offset)
 		}
 
 		if meta.Status != string(backend.DefaultTaskStatus) {
@@ -526,6 +601,43 @@ from(bucket:"test") |> range(start:-1h)`
 			}
 		}
 	})
+
+	t.Run("schedule alignment with 'every' option", func(t *testing.T) {
+		s := create(t)
+		defer destroy(t, s)
+
+		const secondsPerDay = 60 * 60 * 24
+		const scriptFmt = `option task = {
+	name: "task with every",
+	every: %s,
+}
+from(bucket: "b") |> range(start:-1h) |> toHTTP(url: "http://example.com")`
+
+		for _, tc := range []struct {
+			e  string // every option in task
+			sa int64  // ScheduleAfter when creating
+			lc int64  // expected meta.LatestCompleted
+		}{
+			{e: "1m", sa: 65, lc: 60},
+			{e: "1m", sa: 60, lc: 120},
+			{e: "10s", sa: 27, lc: 20},
+			{e: "2d", sa: (2 * secondsPerDay) + 1, lc: 2 * secondsPerDay},
+		} {
+			script := fmt.Sprintf(scriptFmt, tc.e)
+			id, err := s.CreateTask(context.Background(), backend.CreateTaskRequest{Org: 1, User: 2, Script: script, ScheduleAfter: tc.sa})
+			if err != nil {
+				t.Fatal(err)
+			}
+			meta, err := s.FindTaskMetaByID(context.Background(), id)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if meta.LatestCompleted != tc.lc {
+				t.Errorf("with every = %q, Create.ScheduleAfter = %d: got LatestCompleted %d, expected %d", tc.e, tc.sa, meta.LatestCompleted, tc.lc)
+			}
+		}
+	})
 }
 
 func testStoreFindByIDWithMeta(t *testing.T, create CreateStoreFunc, destroy DestroyStoreFunc) {
@@ -533,7 +645,7 @@ func testStoreFindByIDWithMeta(t *testing.T, create CreateStoreFunc, destroy Des
 		name: "a task",
 		cron: "* * * * *",
 		concurrency: 3,
-		delay: 5s,
+		offset: 5s,
 	}
 
 from(bucket:"test") |> range(start:-1h)`
@@ -582,8 +694,8 @@ from(bucket:"test") |> range(start:-1h)`
 		t.Fatalf("unexpected cron stored in meta: %q", meta.EffectiveCron)
 	}
 
-	if time.Duration(meta.Delay)*time.Second != 5*time.Second {
-		t.Fatalf("unexpected delay stored in meta: %v", meta.Delay)
+	if time.Duration(meta.Offset)*time.Second != 5*time.Second {
+		t.Fatalf("unexpected delay stored in meta: %v", meta.Offset)
 	}
 
 	badID := task.ID + 1
@@ -593,71 +705,6 @@ from(bucket:"test") |> range(start:-1h)`
 	}
 	if meta != nil || task != nil {
 		t.Fatalf("expected nil meta and task when finding nonexistent ID, got meta: %#v, task: %#v", meta, task)
-	}
-}
-
-func testStoreTaskEnableDisable(t *testing.T, create CreateStoreFunc, destroy DestroyStoreFunc) {
-	const script = `option task = {
-		name: "a task",
-		cron: "* * * * *",
-	}
-
-	from(bucket:"test") |> range(start:-1h)`
-
-	s := create(t)
-	defer destroy(t, s)
-
-	org := platform.ID(1)
-	user := platform.ID(2)
-
-	id, err := s.CreateTask(context.Background(), backend.CreateTaskRequest{Org: org, User: user, Script: script})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	meta, err := s.FindTaskMetaByID(context.Background(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if meta.Status != string(backend.TaskActive) {
-		t.Fatal("task status not set to active on create")
-	}
-
-	if err := s.DisableTask(context.Background(), id); err != nil {
-		t.Fatal(err)
-	}
-
-	meta, err = s.FindTaskMetaByID(context.Background(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if meta.Status != string(backend.TaskInactive) {
-		t.Fatal("task status not set to inactive after disabling")
-	}
-
-	if err := s.EnableTask(context.Background(), id); err != nil {
-		t.Fatal(err)
-	}
-
-	meta, err = s.FindTaskMetaByID(context.Background(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if meta.Status != string(backend.TaskActive) {
-		t.Fatal("task status not set to active after enabling")
-	}
-
-	badID := id + 1
-
-	meta, err = s.FindTaskMetaByID(context.Background(), badID)
-	if err != backend.ErrTaskNotFound {
-		t.Fatalf("expected %v when task not found, got %v", backend.ErrTaskNotFound, err)
-	}
-	if meta != nil {
-		t.Fatal("expected nil meta when task not found, got non-nil")
 	}
 }
 
@@ -696,9 +743,12 @@ from(bucket:"test") |> range(start:-1h)`
 			t.Fatal("previously deleted task reported as deleted")
 		}
 
-		// The deleted task should not be found.
+		// Neither the deleted task nor its meta should not be found.
 		if _, err := s.FindTaskByID(context.Background(), id); err != backend.ErrTaskNotFound {
 			t.Fatalf("expected task not to be found, got %v", err)
+		}
+		if _, err := s.FindTaskMetaByID(context.Background(), id); err != backend.ErrTaskNotFound {
+			t.Fatalf("expected task meta not to be found, got %v", err)
 		}
 
 		// It's safe to reuse the same name, for the same org with a new user, after deleting the original.
@@ -721,7 +771,7 @@ func testStoreCreateNextRun(t *testing.T, create CreateStoreFunc, destroy Destro
 	const script = `option task = {
 		name: "a task",
 		cron: "* * * * *",
-		delay: 5s,
+		offset: 5s,
 		concurrency: 2,
 	}
 
@@ -753,9 +803,8 @@ from(bucket:"test") |> range(start:-1h)`
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		if rc.Created.TaskID != taskID {
-			t.Fatalf("bad created task ID; exp %x got %x", taskID, rc.Created.TaskID)
+			t.Fatalf("bad created task ID; exp %s got %s", taskID, rc.Created.TaskID)
 		}
 		if rc.Created.Now != 60 {
 			t.Fatalf("unexpected time for created run: %d", rc.Created.Now)
@@ -784,7 +833,7 @@ from(bucket:"test") |> range(start:-1h)`
 		const script = `option task = {
 			name: "a task",
 			cron: "* * * * *",
-			delay: 5s,
+			offset: 5s,
 			concurrency: 9,
 		}
 
@@ -795,12 +844,12 @@ from(bucket:"test") |> range(start:-1h)`
 		}
 
 		// Task is set to every minute. Should schedule once on 0 and once on 60.
-		if err := s.ManuallyRunTimeRange(context.Background(), taskID, 0, 60, 3000); err != nil {
+		if _, err := s.ManuallyRunTimeRange(context.Background(), taskID, 0, 60, 3000); err != nil {
 			t.Fatal(err)
 		}
 
 		// Should schedule once exactly on 180.
-		if err := s.ManuallyRunTimeRange(context.Background(), taskID, 180, 180, 3001); err != nil {
+		if _, err := s.ManuallyRunTimeRange(context.Background(), taskID, 180, 180, 3001); err != nil {
 			t.Fatal(err)
 		}
 
@@ -913,7 +962,7 @@ from(bucket:"test") |> range(start:-1h)`
 		t.Fatal(err)
 	}
 
-	if err := s.ManuallyRunTimeRange(context.Background(), taskID, 1, 10, 0); err != nil {
+	if _, err := s.ManuallyRunTimeRange(context.Background(), taskID, 1, 10, 0); err != nil {
 		t.Fatal(err)
 	}
 

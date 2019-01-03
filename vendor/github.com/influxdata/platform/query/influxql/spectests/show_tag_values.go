@@ -1,12 +1,12 @@
 package spectests
 
 import (
-	"github.com/influxdata/flux/functions/inputs"
-	"github.com/influxdata/flux/functions/transformations"
 	"time"
 
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/execute"
+	"github.com/influxdata/flux/functions/inputs"
+	"github.com/influxdata/flux/functions/transformations"
 )
 
 func init() {
@@ -28,18 +28,20 @@ func init() {
 								Relative:   -time.Hour,
 								IsRelative: true,
 							},
+							Stop: flux.Now,
 						},
 					},
 					{
 						ID: "keyValues0",
 						Spec: &transformations.KeyValuesOpSpec{
-							KeyCols: []string{"host"},
+							KeyColumns: []string{"host"},
 						},
 					},
 					{
 						ID: "group0",
 						Spec: &transformations.GroupOpSpec{
-							By: []string{"_measurement", "_key"},
+							Columns: []string{"_measurement", "_key"},
+							Mode:    "by",
 						},
 					},
 					{
@@ -51,13 +53,14 @@ func init() {
 					{
 						ID: "group1",
 						Spec: &transformations.GroupOpSpec{
-							By: []string{"_measurement"},
+							Columns: []string{"_measurement"},
+							Mode:    "by",
 						},
 					},
 					{
 						ID: "rename0",
 						Spec: &transformations.RenameOpSpec{
-							Cols: map[string]string{
+							Columns: map[string]string{
 								"_key":   "key",
 								"_value": "value",
 							},

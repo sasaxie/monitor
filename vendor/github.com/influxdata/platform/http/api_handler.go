@@ -24,6 +24,7 @@ type APIHandler struct {
 	SourceHandler        *SourceHandler
 	MacroHandler         *MacroHandler
 	TaskHandler          *TaskHandler
+	TelegrafHandler      *TelegrafHandler
 	QueryHandler         *FluxHandler
 	WriteHandler         *WriteHandler
 	SetupHandler         *SetupHandler
@@ -33,28 +34,35 @@ type APIHandler struct {
 // APIBackend is all services and associated parameters required to construct
 // an APIHandler.
 type APIBackend struct {
-	Logger *zap.Logger
+	DeveloperMode bool
+	Logger        *zap.Logger
 
 	NewBucketService func(*platform.Source) (platform.BucketService, error)
 	NewQueryService  func(*platform.Source) (query.ProxyQueryService, error)
 
-	PointsWriter               storage.PointsWriter
-	AuthorizationService       platform.AuthorizationService
-	BucketService              platform.BucketService
-	SessionService             platform.SessionService
-	UserService                platform.UserService
-	OrganizationService        platform.OrganizationService
-	UserResourceMappingService platform.UserResourceMappingService
-	DashboardService           platform.DashboardService
-	ViewService                platform.ViewService
-	SourceService              platform.SourceService
-	MacroService               platform.MacroService
-	BasicAuthService           platform.BasicAuthService
-	OnboardingService          platform.OnboardingService
-	ProxyQueryService          query.ProxyQueryService
-	TaskService                platform.TaskService
-	ScraperTargetStoreService  platform.ScraperTargetStoreService
-	ChronografService          *server.Service
+	PointsWriter                    storage.PointsWriter
+	AuthorizationService            platform.AuthorizationService
+	BucketService                   platform.BucketService
+	SessionService                  platform.SessionService
+	UserService                     platform.UserService
+	OrganizationService             platform.OrganizationService
+	UserResourceMappingService      platform.UserResourceMappingService
+	LabelService                    platform.LabelService
+	DashboardService                platform.DashboardService
+	DashboardOperationLogService    platform.DashboardOperationLogService
+	BucketOperationLogService       platform.BucketOperationLogService
+	UserOperationLogService         platform.UserOperationLogService
+	OrganizationOperationLogService platform.OrganizationOperationLogService
+	ViewService                     platform.ViewService
+	SourceService                   platform.SourceService
+	MacroService                    platform.MacroService
+	BasicAuthService                platform.BasicAuthService
+	OnboardingService               platform.OnboardingService
+	ProxyQueryService               query.ProxyQueryService
+	TaskService                     platform.TaskService
+	TelegrafService                 platform.TelegrafConfigStore
+	ScraperTargetStoreService       platform.ScraperTargetStoreService
+	ChronografService               *server.Service
 }
 
 // NewAPIHandler constructs all api handlers beneath it and returns an APIHandler
@@ -63,31 +71,33 @@ func NewAPIHandler(b *APIBackend) *APIHandler {
 	h.SessionHandler = NewSessionHandler()
 	h.SessionHandler.BasicAuthService = b.BasicAuthService
 	h.SessionHandler.SessionService = b.SessionService
+	h.SessionHandler.Logger = b.Logger.With(zap.String("handler", "basicAuth"))
 
-	h.BucketHandler = NewBucketHandler()
+	h.BucketHandler = NewBucketHandler(b.UserResourceMappingService, b.LabelService, b.UserService)
 	h.BucketHandler.BucketService = b.BucketService
-	h.BucketHandler.UserResourceMappingService = b.UserResourceMappingService
+	h.BucketHandler.BucketOperationLogService = b.BucketOperationLogService
 
-	h.OrgHandler = NewOrgHandler()
+	h.OrgHandler = NewOrgHandler(b.UserResourceMappingService, b.LabelService, b.UserService)
 	h.OrgHandler.OrganizationService = b.OrganizationService
 	h.OrgHandler.BucketService = b.BucketService
-	h.OrgHandler.UserResourceMappingService = b.UserResourceMappingService
+	h.OrgHandler.OrganizationOperationLogService = b.OrganizationOperationLogService
 
 	h.UserHandler = NewUserHandler()
 	h.UserHandler.UserService = b.UserService
+	h.UserHandler.BasicAuthService = b.BasicAuthService
+	h.UserHandler.UserOperationLogService = b.UserOperationLogService
 
-	h.DashboardHandler = NewDashboardHandler()
+	h.DashboardHandler = NewDashboardHandler(b.UserResourceMappingService, b.LabelService, b.UserService)
 	h.DashboardHandler.DashboardService = b.DashboardService
-	h.DashboardHandler.UserResourceMappingService = b.UserResourceMappingService
+	h.DashboardHandler.DashboardOperationLogService = b.DashboardOperationLogService
 
-	h.ViewHandler = NewViewHandler()
+	h.ViewHandler = NewViewHandler(b.UserResourceMappingService, b.LabelService, b.UserService)
 	h.ViewHandler.ViewService = b.ViewService
-	h.ViewHandler.UserResourceMappingService = b.UserResourceMappingService
 
 	h.MacroHandler = NewMacroHandler()
 	h.MacroHandler.MacroService = b.MacroService
 
-	h.AuthorizationHandler = NewAuthorizationHandler()
+	h.AuthorizationHandler = NewAuthorizationHandler(b.UserService)
 	h.AuthorizationHandler.AuthorizationService = b.AuthorizationService
 	h.AuthorizationHandler.Logger = b.Logger.With(zap.String("handler", "auth"))
 
@@ -99,18 +109,25 @@ func NewAPIHandler(b *APIBackend) *APIHandler {
 	h.SetupHandler = NewSetupHandler()
 	h.SetupHandler.OnboardingService = b.OnboardingService
 
-	h.TaskHandler = NewTaskHandler(b.Logger)
+	h.TaskHandler = NewTaskHandler(b.UserResourceMappingService, b.LabelService, b.Logger, b.UserService)
 	h.TaskHandler.TaskService = b.TaskService
+	h.TaskHandler.AuthorizationService = b.AuthorizationService
 	h.TaskHandler.UserResourceMappingService = b.UserResourceMappingService
 
+	h.TelegrafHandler = NewTelegrafHandler(
+		b.Logger.With(zap.String("handler", "telegraf")),
+		b.UserResourceMappingService,
+		b.LabelService,
+		b.TelegrafService,
+		b.UserService,
+	)
+
 	h.WriteHandler = NewWriteHandler(b.PointsWriter)
-	h.WriteHandler.AuthorizationService = b.AuthorizationService
 	h.WriteHandler.OrganizationService = b.OrganizationService
 	h.WriteHandler.BucketService = b.BucketService
 	h.WriteHandler.Logger = b.Logger.With(zap.String("handler", "write"))
 
 	h.QueryHandler = NewFluxHandler()
-	h.QueryHandler.AuthorizationService = b.AuthorizationService
 	h.QueryHandler.OrganizationService = b.OrganizationService
 	h.QueryHandler.Logger = b.Logger.With(zap.String("handler", "query"))
 	h.QueryHandler.ProxyQueryService = b.ProxyQueryService
@@ -121,34 +138,38 @@ func NewAPIHandler(b *APIBackend) *APIHandler {
 }
 
 var apiLinks = map[string]interface{}{
-	"signin":     "/api/v2/signin",
-	"signout":    "/api/v2/signout",
-	"setup":      "/api/v2/setup",
-	"sources":    "/api/v2/sources",
-	"dashboards": "/api/v2/dashboards",
-	"views":      "/api/v2/views",
-	"write":      "/api/v2/write",
-	"orgs":       "/api/v2/orgs",
-	"auths":      "/api/v2/authorizations",
-	"buckets":    "/api/v2/buckets",
-	"users":      "/api/v2/users",
-	"me":         "/api/v2/me",
-	"tasks":      "/api/v2/tasks",
-	"macros":     "/api/v2/macros",
-	"query": map[string]string{
-		"self":        "/api/v2/query",
-		"ast":         "/api/v2/query/ast",
-		"spec":        "/api/v2/query/spec",
-		"suggestions": "/api/v2/query/suggestions",
-	},
+	// when adding new links, please take care to keep this list alphabetical
+	// as this makes it easier to verify values against the swagger document.
+	"authorizations": "/api/v2/authorizations",
+	"buckets":        "/api/v2/buckets",
+	"dashboards":     "/api/v2/dashboards",
 	"external": map[string]string{
 		"statusFeed": "https://www.influxdata.com/feed/json",
 	},
+	"macros": "/api/v2/macros",
+	"me":     "/api/v2/me",
+	"orgs":   "/api/v2/orgs",
+	"query": map[string]string{
+		"self":        "/api/v2/query",
+		"ast":         "/api/v2/query/ast",
+		"analyze":     "/api/v2/query/analyze",
+		"spec":        "/api/v2/query/spec",
+		"suggestions": "/api/v2/query/suggestions",
+	},
+	"setup":   "/api/v2/setup",
+	"signin":  "/api/v2/signin",
+	"signout": "/api/v2/signout",
+	"sources": "/api/v2/sources",
 	"system": map[string]string{
 		"metrics": "/metrics",
 		"debug":   "/debug/pprof",
 		"health":  "/health",
 	},
+	"tasks":     "/api/v2/tasks",
+	"telegrafs": "/api/v2/telegrafs",
+	"users":     "/api/v2/users",
+	"views":     "/api/v2/views",
+	"write":     "/api/v2/write",
 }
 
 func (h *APIHandler) serveLinks(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +253,11 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasPrefix(r.URL.Path, "/api/v2/telegrafs") {
+		h.TelegrafHandler.ServeHTTP(w, r)
+		return
+	}
+
 	if strings.HasPrefix(r.URL.Path, "/api/v2/views") {
 		h.ViewHandler.ServeHTTP(w, r)
 		return
@@ -247,5 +273,5 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.NotFound(w, r)
+	notFoundHandler(w, r)
 }

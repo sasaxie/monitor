@@ -15,6 +15,11 @@ import (
 	"github.com/influxdata/platform/models"
 )
 
+func init() {
+	// Force uint support to be enabled for testing.
+	models.EnableUintSupport()
+}
+
 var (
 	tags   = models.NewTags(map[string]string{"foo": "bar", "apple": "orange", "host": "serverA", "region": "uswest"})
 	fields = models.Fields{
@@ -82,7 +87,7 @@ func TestMarshalFields(t *testing.T) {
 }
 
 func TestTags_HashKey(t *testing.T) {
-	tags = models.NewTags(map[string]string{"A FOO": "bar", "APPLE": "orange", "host": "serverA", "region": "uswest"})
+	tags := models.NewTags(map[string]string{"A FOO": "bar", "APPLE": "orange", "host": "serverA", "region": "uswest"})
 	got := tags.HashKey()
 	if exp := ",A\\ FOO=bar,APPLE=orange,host=serverA,region=uswest"; string(got) != exp {
 		t.Log("got: ", string(got))
@@ -96,6 +101,7 @@ func BenchmarkMarshal(b *testing.B) {
 		tags.HashKey()
 	}
 }
+
 func TestPoint_Tags(t *testing.T) {
 	examples := []struct {
 		Point string
@@ -128,7 +134,6 @@ func TestPoint_Tags(t *testing.T) {
 					t.Fatalf("got %#v (%s), expected %#v", tags, tags.String(), example.Tags)
 				}
 			}
-
 		})
 	}
 }
@@ -142,7 +147,6 @@ func TestPoint_StringSize(t *testing.T) {
 			t.Errorf("Incorrect length for %q. got %v, exp %v", s, l, len(s))
 		}
 	})
-
 }
 
 func TestPoint_AppendString(t *testing.T) {
@@ -262,7 +266,7 @@ func BenchmarkParsePointWithPrecisionN(b *testing.B) {
 	line := `cpu value=1i 1000000000`
 	defaultTime := time.Now().UTC()
 	for i := 0; i < b.N; i++ {
-		models.ParsePointsWithPrecision([]byte(line), defaultTime, "n")
+		models.ParsePointsWithPrecision([]byte(line), defaultTime, "ns")
 		b.SetBytes(int64(len(line)))
 	}
 }
@@ -271,7 +275,7 @@ func BenchmarkParsePointWithPrecisionU(b *testing.B) {
 	line := `cpu value=1i 1000000000`
 	defaultTime := time.Now().UTC()
 	for i := 0; i < b.N; i++ {
-		models.ParsePointsWithPrecision([]byte(line), defaultTime, "u")
+		models.ParsePointsWithPrecision([]byte(line), defaultTime, "us")
 		b.SetBytes(int64(len(line)))
 	}
 }
@@ -361,7 +365,7 @@ func NewTestPoint(name string, tags models.Tags, fields models.Fields, time time
 }
 
 func test(t *testing.T, line string, point TestPoint) {
-	pts, err := models.ParsePointsWithPrecision([]byte(line), time.Unix(0, 0), "n")
+	pts, err := models.ParsePointsWithPrecision([]byte(line), time.Unix(0, 0), "ns")
 	if err != nil {
 		t.Fatalf(`ParsePoints("%s") mismatch. got %v, exp nil`, line, err)
 	}
@@ -1779,13 +1783,13 @@ func TestParsePointsWithPrecision(t *testing.T) {
 		{
 			name:      "nanosecond",
 			line:      `cpu,host=serverA,region=us-east value=1.0 946730096789012345`,
-			precision: "n",
+			precision: "ns",
 			exp:       "cpu,host=serverA,region=us-east value=1.0 946730096789012345",
 		},
 		{
 			name:      "microsecond",
 			line:      `cpu,host=serverA,region=us-east value=1.0 946730096789012`,
-			precision: "u",
+			precision: "us",
 			exp:       "cpu,host=serverA,region=us-east value=1.0 946730096789012000",
 		},
 		{
@@ -1799,18 +1803,6 @@ func TestParsePointsWithPrecision(t *testing.T) {
 			line:      `cpu,host=serverA,region=us-east value=1.0 946730096`,
 			precision: "s",
 			exp:       "cpu,host=serverA,region=us-east value=1.0 946730096000000000",
-		},
-		{
-			name:      "minute",
-			line:      `cpu,host=serverA,region=us-east value=1.0 15778834`,
-			precision: "m",
-			exp:       "cpu,host=serverA,region=us-east value=1.0 946730040000000000",
-		},
-		{
-			name:      "hour",
-			line:      `cpu,host=serverA,region=us-east value=1.0 262980`,
-			precision: "h",
-			exp:       "cpu,host=serverA,region=us-east value=1.0 946728000000000000",
 		},
 	}
 	for _, test := range tests {
@@ -1845,12 +1837,12 @@ func TestParsePointsWithPrecisionNoTime(t *testing.T) {
 		},
 		{
 			name:      "nanosecond precision",
-			precision: "n",
+			precision: "ns",
 			exp:       "cpu,host=serverA,region=us-east value=1.0 946730096789012345",
 		},
 		{
 			name:      "microsecond precision",
-			precision: "u",
+			precision: "us",
 			exp:       "cpu,host=serverA,region=us-east value=1.0 946730096789012000",
 		},
 		{
@@ -1862,16 +1854,6 @@ func TestParsePointsWithPrecisionNoTime(t *testing.T) {
 			name:      "second precision",
 			precision: "s",
 			exp:       "cpu,host=serverA,region=us-east value=1.0 946730096000000000",
-		},
-		{
-			name:      "minute precision",
-			precision: "m",
-			exp:       "cpu,host=serverA,region=us-east value=1.0 946730040000000000",
-		},
-		{
-			name:      "hour precision",
-			precision: "h",
-			exp:       "cpu,host=serverA,region=us-east value=1.0 946728000000000000",
 		},
 	}
 
@@ -2037,7 +2019,7 @@ func TestPrecisionString(t *testing.T) {
 		},
 		{
 			name:      "microsecond precision",
-			precision: "u",
+			precision: "us",
 			exp:       "cpu value=1 946730096789012",
 		},
 		{
@@ -2049,16 +2031,6 @@ func TestPrecisionString(t *testing.T) {
 			name:      "second precision",
 			precision: "s",
 			exp:       "cpu value=1 946730096",
-		},
-		{
-			name:      "minute precision",
-			precision: "m",
-			exp:       "cpu value=1 15778834",
-		},
-		{
-			name:      "hour precision",
-			precision: "h",
-			exp:       "cpu value=1 262980",
 		},
 	}
 
@@ -2105,16 +2077,6 @@ func TestRoundedString(t *testing.T) {
 			name:      "second precision",
 			precision: time.Second,
 			exp:       "cpu value=1 946730097000000000",
-		},
-		{
-			name:      "minute precision",
-			precision: time.Minute,
-			exp:       "cpu value=1 946730100000000000",
-		},
-		{
-			name:      "hour precision",
-			precision: time.Hour,
-			exp:       "cpu value=1 946731600000000000",
 		},
 	}
 
@@ -2257,7 +2219,6 @@ func TestNewPointsRejectsMaxKey(t *testing.T) {
 }
 
 func TestPoint_FieldIterator_Simple(t *testing.T) {
-
 	p, err := models.ParsePoints([]byte(`m v=42i,f=42 36`))
 	if err != nil {
 		t.Fatal(err)
@@ -2336,7 +2297,6 @@ func toFields(fi models.FieldIterator) models.Fields {
 }
 
 func TestPoint_FieldIterator_FieldMap(t *testing.T) {
-
 	points, err := models.ParsePointsString(`
 m v=42
 m v=42i
@@ -2543,9 +2503,4 @@ func BenchmarkMakeKey(b *testing.B) {
 			}
 		})
 	}
-}
-
-func init() {
-	// Force uint support to be enabled for testing.
-	models.EnableUintSupport()
 }

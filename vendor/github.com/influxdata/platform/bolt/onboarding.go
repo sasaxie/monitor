@@ -2,6 +2,8 @@ package bolt
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	bolt "github.com/coreos/bbolt"
 	"github.com/influxdata/platform"
@@ -99,16 +101,26 @@ func (c *Client) Generate(ctx context.Context, req *platform.OnboardingRequest) 
 		return nil, err
 	}
 	bucket := &platform.Bucket{
-		Name:           req.Bucket,
-		Organization:   o.Name,
-		OrganizationID: o.ID,
+		Name:            req.Bucket,
+		Organization:    o.Name,
+		OrganizationID:  o.ID,
+		RetentionPeriod: time.Duration(req.RetentionPeriod) * time.Hour,
+	}
+	if err := c.CreateUserResourceMapping(ctx, &platform.UserResourceMapping{
+		ResourceType: platform.OrgResourceType,
+		ResourceID:   o.ID,
+		UserID:       u.ID,
+		UserType:     platform.Owner,
+	}); err != nil {
+		return nil, err
 	}
 	if err = c.CreateBucket(ctx, bucket); err != nil {
 		return nil, err
 	}
 	auth := &platform.Authorization{
-		User:   u.Name,
-		UserID: u.ID,
+		User:        u.Name,
+		UserID:      u.ID,
+		Description: fmt.Sprintf("%s's Token", u.Name),
 		Permissions: []platform.Permission{
 			platform.CreateUserPermission,
 			platform.DeleteUserPermission,

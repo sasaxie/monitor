@@ -4,6 +4,15 @@ import (
 	"context"
 )
 
+// ops for ScraperTarget Store
+const (
+	OpListTargets   = "ListTargets"
+	OpAddTarget     = "AddTarget"
+	OpGetTargetByID = "GetTargetByID"
+	OpRemoveTarget  = "RemoveTarget"
+	OpUpdateTarget  = "UpdateTarget"
+)
+
 // ScraperTarget is a target to scrape
 type ScraperTarget struct {
 	ID         ID          `json:"id,omitempty"`
@@ -37,10 +46,6 @@ const (
 	// PrometheusScraperType parses metrics from a prometheus endpoint.
 	PrometheusScraperType = "prometheus"
 )
-
-var validScraperTypes = map[ScraperType]bool{
-	PrometheusScraperType: false,
-}
 
 // ValidScraperType returns true is the type string is valid
 func ValidScraperType(s string) bool {

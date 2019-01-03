@@ -29,6 +29,7 @@ func filterMappingsFn(filter platform.UserResourceMappingFilter) func(m *platfor
 	}
 }
 
+// FindUserResourceMappings returns a list of UserResourceMappings that match filter and the total count of matching mappings.
 func (c *Client) FindUserResourceMappings(ctx context.Context, filter platform.UserResourceMappingFilter, opt ...platform.FindOptions) ([]*platform.UserResourceMapping, int, error) {
 	ms := []*platform.UserResourceMapping{}
 	err := c.db.View(func(tx *bolt.Tx) error {
@@ -64,53 +65,78 @@ func (c *Client) findUserResourceMappings(ctx context.Context, tx *bolt.Tx, filt
 	return ms, nil
 }
 
-func (c *Client) findUserResourceMapping(ctx context.Context, tx *bolt.Tx, resourceID platform.ID, userID platform.ID) (*platform.UserResourceMapping, error) {
-	var m platform.UserResourceMapping
-
-	key, err := userResourceKey(&platform.UserResourceMapping{
-		ResourceID: resourceID,
-		UserID:     userID,
-	})
+func (c *Client) findUserResourceMapping(ctx context.Context, tx *bolt.Tx, filter platform.UserResourceMappingFilter) (*platform.UserResourceMapping, error) {
+	ms, err := c.findUserResourceMappings(ctx, tx, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	v := tx.Bucket(userResourceMappingBucket).Get(key)
-	if len(v) == 0 {
+	if len(ms) == 0 {
 		return nil, fmt.Errorf("userResource mapping not found")
 	}
 
-	if err := json.Unmarshal(v, &m); err != nil {
-		return nil, err
-	}
-
-	return &m, nil
+	return ms[0], nil
 }
 
 func (c *Client) CreateUserResourceMapping(ctx context.Context, m *platform.UserResourceMapping) error {
 	return c.db.Update(func(tx *bolt.Tx) error {
-		unique := c.uniqueUserResourceMapping(ctx, tx, m)
-
-		if !unique {
-			return fmt.Errorf("mapping for user %s already exists", m.UserID.String())
-		}
-
-		v, err := json.Marshal(m)
-		if err != nil {
+		if err := c.createUserResourceMapping(ctx, tx, m); err != nil {
 			return err
 		}
 
-		key, err := userResourceKey(m)
-		if err != nil {
-			return err
-		}
-
-		if err := tx.Bucket(userResourceMappingBucket).Put(key, v); err != nil {
-			return err
+		if m.ResourceType == platform.OrgResourceType {
+			return c.createOrgDependentMappings(ctx, tx, m)
 		}
 
 		return nil
 	})
+}
+
+func (c *Client) createUserResourceMapping(ctx context.Context, tx *bolt.Tx, m *platform.UserResourceMapping) error {
+	unique := c.uniqueUserResourceMapping(ctx, tx, m)
+
+	if !unique {
+		return fmt.Errorf("mapping for user %s already exists", m.UserID.String())
+	}
+
+	v, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	key, err := userResourceKey(m)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Bucket(userResourceMappingBucket).Put(key, v); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// This method creates the user/resource mappings for resources that belong to an organization.
+func (c *Client) createOrgDependentMappings(ctx context.Context, tx *bolt.Tx, m *platform.UserResourceMapping) error {
+	bf := platform.BucketFilter{OrganizationID: &m.ResourceID}
+	bs, err := c.findBuckets(ctx, tx, bf)
+	if err != nil {
+		return err
+	}
+	for _, b := range bs {
+		m := &platform.UserResourceMapping{
+			ResourceType: platform.BucketResourceType,
+			ResourceID:   b.ID,
+			UserType:     m.UserType,
+			UserID:       m.UserID,
+		}
+		if err := c.createUserResourceMapping(ctx, tx, m); err != nil {
+			return err
+		}
+		// TODO(desa): add support for all other resource types.
+	}
+
+	return nil
 }
 
 func userResourceKey(m *platform.UserResourceMapping) ([]byte, error) {
@@ -156,22 +182,83 @@ func (c *Client) uniqueUserResourceMapping(ctx context.Context, tx *bolt.Tx, m *
 	return len(v) == 0
 }
 
+// DeleteUserResourceMapping deletes a user resource mapping.
 func (c *Client) DeleteUserResourceMapping(ctx context.Context, resourceID platform.ID, userID platform.ID) error {
 	return c.db.Update(func(tx *bolt.Tx) error {
-		return c.deleteUserResourceMapping(ctx, tx, resourceID, userID)
+		m, err := c.findUserResourceMapping(ctx, tx, platform.UserResourceMappingFilter{
+			ResourceID: resourceID,
+			UserID:     userID,
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := c.deleteUserResourceMapping(ctx, tx, platform.UserResourceMappingFilter{
+			ResourceID: resourceID,
+			UserID:     userID,
+		}); err != nil {
+			return err
+		}
+
+		if m.ResourceType == platform.OrgResourceType {
+			return c.deleteOrgDependentMappings(ctx, tx, m)
+		}
+
+		return nil
 	})
 }
 
-func (c *Client) deleteUserResourceMapping(ctx context.Context, tx *bolt.Tx, resourceID platform.ID, userID platform.ID) error {
-	m, err := c.findUserResourceMapping(ctx, tx, resourceID, userID)
+func (c *Client) deleteUserResourceMapping(ctx context.Context, tx *bolt.Tx, filter platform.UserResourceMappingFilter) error {
+	ms, err := c.findUserResourceMappings(ctx, tx, filter)
 	if err != nil {
 		return err
 	}
+	if len(ms) == 0 {
+		return fmt.Errorf("userResource mapping not found")
+	}
 
-	key, err := userResourceKey(m)
+	key, err := userResourceKey(ms[0])
 	if err != nil {
 		return err
 	}
 
 	return tx.Bucket(userResourceMappingBucket).Delete(key)
+}
+
+func (c *Client) deleteUserResourceMappings(ctx context.Context, tx *bolt.Tx, filter platform.UserResourceMappingFilter) error {
+	ms, err := c.findUserResourceMappings(ctx, tx, filter)
+	if err != nil {
+		return err
+	}
+	for _, m := range ms {
+		key, err := userResourceKey(m)
+		if err != nil {
+			return err
+		}
+		if err = tx.Bucket(userResourceMappingBucket).Delete(key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// This method deletes the user/resource mappings for resources that belong to an organization.
+func (c *Client) deleteOrgDependentMappings(ctx context.Context, tx *bolt.Tx, m *platform.UserResourceMapping) error {
+	bf := platform.BucketFilter{OrganizationID: &m.ResourceID}
+	bs, err := c.findBuckets(ctx, tx, bf)
+	if err != nil {
+		return err
+	}
+	for _, b := range bs {
+		if err := c.deleteUserResourceMapping(ctx, tx, platform.UserResourceMappingFilter{
+			ResourceType: platform.BucketResourceType,
+			ResourceID:   b.ID,
+			UserID:       m.UserID,
+		}); err != nil {
+			return err
+		}
+		// TODO(desa): add support for all other resource types.
+	}
+
+	return nil
 }

@@ -7,8 +7,11 @@ Monitor is a open source monitor for java-tron. It's useful for monitoring nodes
 
 ## Features
 
-- Monitor NowBlockNum, gRPC's ping, LastSolidityBlockNum.
-- Monitor Node's Basic Information, Important Configuration, MachineInformation, etc.
+- Node block number does not update alarm;
+- Witness lost block alarm.
+- Witness list change alarm.
+- Proposed value change alarm.
+- Witness lost block daily report.
 
 ## Getting Started
 
@@ -59,11 +62,12 @@ nodes.json
 {
   "addresses": [
     {
-      "ip": "172.16.21.39",
+      "ip": "127.0.0.1",
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node",
-      "tag": "局域网"
+      "tag": "MainNet",
+      "monitor": "NowBlock,BlockMissed"
     }
   ]
 }
@@ -78,6 +82,11 @@ Type:
 - sr_witness_b_node
 - gr_witness_node
 - solidity_node
+
+Monitor type:
+
+- NowBlock
+- BlockMissed
 
 ## Show
 

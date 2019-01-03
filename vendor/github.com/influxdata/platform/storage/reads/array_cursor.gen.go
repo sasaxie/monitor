@@ -10,7 +10,13 @@ import (
 	"errors"
 
 	"github.com/influxdata/platform/tsdb/cursors"
-	"github.com/influxdata/platform/tsdb/defaults"
+)
+
+const (
+	// MaxPointsPerBlock is the maximum number of points in an encoded
+	// block in a TSM file. It should match the value in the tsm1
+	// package, but we don't want to import it.
+	MaxPointsPerBlock = 1000
 )
 
 // ********************
@@ -28,7 +34,7 @@ func newFloatFilterArrayCursor(cond expression) *floatArrayFilterCursor {
 	return &floatArrayFilterCursor{
 		cond: cond,
 		m:    &singleValue{},
-		res:  cursors.NewFloatArrayLen(defaults.DefaultMaxPointsPerBlock),
+		res:  cursors.NewFloatArrayLen(MaxPointsPerBlock),
 		tmp:  &cursors.FloatArray{},
 	}
 }
@@ -38,11 +44,16 @@ func (c *floatArrayFilterCursor) reset(cur cursors.FloatArrayCursor) {
 	c.tmp.Timestamps, c.tmp.Values = nil, nil
 }
 
+func (c *floatArrayFilterCursor) Stats() cursors.CursorStats { return c.FloatArrayCursor.Stats() }
+
 func (c *floatArrayFilterCursor) Next() *cursors.FloatArray {
 	pos := 0
+	c.res.Timestamps = c.res.Timestamps[:cap(c.res.Timestamps)]
+	c.res.Values = c.res.Values[:cap(c.res.Values)]
+
 	var a *cursors.FloatArray
 
-	if a.Len() > 0 {
+	if c.tmp.Len() > 0 {
 		a = c.tmp
 		c.tmp.Timestamps = nil
 		c.tmp.Values = nil
@@ -58,7 +69,7 @@ LOOP:
 				c.res.Timestamps[pos] = a.Timestamps[i]
 				c.res.Values[pos] = v
 				pos++
-				if pos >= defaults.DefaultMaxPointsPerBlock {
+				if pos >= MaxPointsPerBlock {
 					c.tmp.Timestamps = a.Timestamps[i+1:]
 					c.tmp.Values = a.Values[i+1:]
 					break LOOP
@@ -96,6 +107,10 @@ func (c *floatMultiShardArrayCursor) reset(cur cursors.FloatArrayCursor, itrs cu
 }
 
 func (c *floatMultiShardArrayCursor) Err() error { return c.err }
+
+func (c *floatMultiShardArrayCursor) Stats() cursors.CursorStats {
+	return c.FloatArrayCursor.Stats()
+}
 
 func (c *floatMultiShardArrayCursor) Next() *cursors.FloatArray {
 	for {
@@ -168,6 +183,8 @@ func newFloatArraySumCursor(cur cursors.FloatArrayCursor) *floatArraySumCursor {
 	}
 }
 
+func (c floatArraySumCursor) Stats() cursors.CursorStats { return c.FloatArrayCursor.Stats() }
+
 func (c floatArraySumCursor) Next() *cursors.FloatArray {
 	a := c.FloatArrayCursor.Next()
 	if len(a.Timestamps) == 0 {
@@ -196,6 +213,10 @@ type integerFloatCountArrayCursor struct {
 	cursors.FloatArrayCursor
 }
 
+func (c *integerFloatCountArrayCursor) Stats() cursors.CursorStats {
+	return c.FloatArrayCursor.Stats()
+}
+
 func (c *integerFloatCountArrayCursor) Next() *cursors.IntegerArray {
 	a := c.FloatArrayCursor.Next()
 	if len(a.Timestamps) == 0 {
@@ -222,9 +243,10 @@ type floatEmptyArrayCursor struct {
 
 var FloatEmptyArrayCursor cursors.FloatArrayCursor = &floatEmptyArrayCursor{}
 
-func (c *floatEmptyArrayCursor) Err() error                { return nil }
-func (c *floatEmptyArrayCursor) Close()                    {}
-func (c *floatEmptyArrayCursor) Next() *cursors.FloatArray { return &c.res }
+func (c *floatEmptyArrayCursor) Err() error                 { return nil }
+func (c *floatEmptyArrayCursor) Close()                     {}
+func (c *floatEmptyArrayCursor) Stats() cursors.CursorStats { return cursors.CursorStats{} }
+func (c *floatEmptyArrayCursor) Next() *cursors.FloatArray  { return &c.res }
 
 // ********************
 // Integer Array Cursor
@@ -241,7 +263,7 @@ func newIntegerFilterArrayCursor(cond expression) *integerArrayFilterCursor {
 	return &integerArrayFilterCursor{
 		cond: cond,
 		m:    &singleValue{},
-		res:  cursors.NewIntegerArrayLen(defaults.DefaultMaxPointsPerBlock),
+		res:  cursors.NewIntegerArrayLen(MaxPointsPerBlock),
 		tmp:  &cursors.IntegerArray{},
 	}
 }
@@ -251,11 +273,16 @@ func (c *integerArrayFilterCursor) reset(cur cursors.IntegerArrayCursor) {
 	c.tmp.Timestamps, c.tmp.Values = nil, nil
 }
 
+func (c *integerArrayFilterCursor) Stats() cursors.CursorStats { return c.IntegerArrayCursor.Stats() }
+
 func (c *integerArrayFilterCursor) Next() *cursors.IntegerArray {
 	pos := 0
+	c.res.Timestamps = c.res.Timestamps[:cap(c.res.Timestamps)]
+	c.res.Values = c.res.Values[:cap(c.res.Values)]
+
 	var a *cursors.IntegerArray
 
-	if a.Len() > 0 {
+	if c.tmp.Len() > 0 {
 		a = c.tmp
 		c.tmp.Timestamps = nil
 		c.tmp.Values = nil
@@ -271,7 +298,7 @@ LOOP:
 				c.res.Timestamps[pos] = a.Timestamps[i]
 				c.res.Values[pos] = v
 				pos++
-				if pos >= defaults.DefaultMaxPointsPerBlock {
+				if pos >= MaxPointsPerBlock {
 					c.tmp.Timestamps = a.Timestamps[i+1:]
 					c.tmp.Values = a.Values[i+1:]
 					break LOOP
@@ -309,6 +336,10 @@ func (c *integerMultiShardArrayCursor) reset(cur cursors.IntegerArrayCursor, itr
 }
 
 func (c *integerMultiShardArrayCursor) Err() error { return c.err }
+
+func (c *integerMultiShardArrayCursor) Stats() cursors.CursorStats {
+	return c.IntegerArrayCursor.Stats()
+}
 
 func (c *integerMultiShardArrayCursor) Next() *cursors.IntegerArray {
 	for {
@@ -381,6 +412,8 @@ func newIntegerArraySumCursor(cur cursors.IntegerArrayCursor) *integerArraySumCu
 	}
 }
 
+func (c integerArraySumCursor) Stats() cursors.CursorStats { return c.IntegerArrayCursor.Stats() }
+
 func (c integerArraySumCursor) Next() *cursors.IntegerArray {
 	a := c.IntegerArrayCursor.Next()
 	if len(a.Timestamps) == 0 {
@@ -407,6 +440,10 @@ func (c integerArraySumCursor) Next() *cursors.IntegerArray {
 
 type integerIntegerCountArrayCursor struct {
 	cursors.IntegerArrayCursor
+}
+
+func (c *integerIntegerCountArrayCursor) Stats() cursors.CursorStats {
+	return c.IntegerArrayCursor.Stats()
 }
 
 func (c *integerIntegerCountArrayCursor) Next() *cursors.IntegerArray {
@@ -437,6 +474,7 @@ var IntegerEmptyArrayCursor cursors.IntegerArrayCursor = &integerEmptyArrayCurso
 
 func (c *integerEmptyArrayCursor) Err() error                  { return nil }
 func (c *integerEmptyArrayCursor) Close()                      {}
+func (c *integerEmptyArrayCursor) Stats() cursors.CursorStats  { return cursors.CursorStats{} }
 func (c *integerEmptyArrayCursor) Next() *cursors.IntegerArray { return &c.res }
 
 // ********************
@@ -454,7 +492,7 @@ func newUnsignedFilterArrayCursor(cond expression) *unsignedArrayFilterCursor {
 	return &unsignedArrayFilterCursor{
 		cond: cond,
 		m:    &singleValue{},
-		res:  cursors.NewUnsignedArrayLen(defaults.DefaultMaxPointsPerBlock),
+		res:  cursors.NewUnsignedArrayLen(MaxPointsPerBlock),
 		tmp:  &cursors.UnsignedArray{},
 	}
 }
@@ -464,11 +502,16 @@ func (c *unsignedArrayFilterCursor) reset(cur cursors.UnsignedArrayCursor) {
 	c.tmp.Timestamps, c.tmp.Values = nil, nil
 }
 
+func (c *unsignedArrayFilterCursor) Stats() cursors.CursorStats { return c.UnsignedArrayCursor.Stats() }
+
 func (c *unsignedArrayFilterCursor) Next() *cursors.UnsignedArray {
 	pos := 0
+	c.res.Timestamps = c.res.Timestamps[:cap(c.res.Timestamps)]
+	c.res.Values = c.res.Values[:cap(c.res.Values)]
+
 	var a *cursors.UnsignedArray
 
-	if a.Len() > 0 {
+	if c.tmp.Len() > 0 {
 		a = c.tmp
 		c.tmp.Timestamps = nil
 		c.tmp.Values = nil
@@ -484,7 +527,7 @@ LOOP:
 				c.res.Timestamps[pos] = a.Timestamps[i]
 				c.res.Values[pos] = v
 				pos++
-				if pos >= defaults.DefaultMaxPointsPerBlock {
+				if pos >= MaxPointsPerBlock {
 					c.tmp.Timestamps = a.Timestamps[i+1:]
 					c.tmp.Values = a.Values[i+1:]
 					break LOOP
@@ -522,6 +565,10 @@ func (c *unsignedMultiShardArrayCursor) reset(cur cursors.UnsignedArrayCursor, i
 }
 
 func (c *unsignedMultiShardArrayCursor) Err() error { return c.err }
+
+func (c *unsignedMultiShardArrayCursor) Stats() cursors.CursorStats {
+	return c.UnsignedArrayCursor.Stats()
+}
 
 func (c *unsignedMultiShardArrayCursor) Next() *cursors.UnsignedArray {
 	for {
@@ -594,6 +641,8 @@ func newUnsignedArraySumCursor(cur cursors.UnsignedArrayCursor) *unsignedArraySu
 	}
 }
 
+func (c unsignedArraySumCursor) Stats() cursors.CursorStats { return c.UnsignedArrayCursor.Stats() }
+
 func (c unsignedArraySumCursor) Next() *cursors.UnsignedArray {
 	a := c.UnsignedArrayCursor.Next()
 	if len(a.Timestamps) == 0 {
@@ -620,6 +669,10 @@ func (c unsignedArraySumCursor) Next() *cursors.UnsignedArray {
 
 type integerUnsignedCountArrayCursor struct {
 	cursors.UnsignedArrayCursor
+}
+
+func (c *integerUnsignedCountArrayCursor) Stats() cursors.CursorStats {
+	return c.UnsignedArrayCursor.Stats()
 }
 
 func (c *integerUnsignedCountArrayCursor) Next() *cursors.IntegerArray {
@@ -650,6 +703,7 @@ var UnsignedEmptyArrayCursor cursors.UnsignedArrayCursor = &unsignedEmptyArrayCu
 
 func (c *unsignedEmptyArrayCursor) Err() error                   { return nil }
 func (c *unsignedEmptyArrayCursor) Close()                       {}
+func (c *unsignedEmptyArrayCursor) Stats() cursors.CursorStats   { return cursors.CursorStats{} }
 func (c *unsignedEmptyArrayCursor) Next() *cursors.UnsignedArray { return &c.res }
 
 // ********************
@@ -667,7 +721,7 @@ func newStringFilterArrayCursor(cond expression) *stringArrayFilterCursor {
 	return &stringArrayFilterCursor{
 		cond: cond,
 		m:    &singleValue{},
-		res:  cursors.NewStringArrayLen(defaults.DefaultMaxPointsPerBlock),
+		res:  cursors.NewStringArrayLen(MaxPointsPerBlock),
 		tmp:  &cursors.StringArray{},
 	}
 }
@@ -677,11 +731,16 @@ func (c *stringArrayFilterCursor) reset(cur cursors.StringArrayCursor) {
 	c.tmp.Timestamps, c.tmp.Values = nil, nil
 }
 
+func (c *stringArrayFilterCursor) Stats() cursors.CursorStats { return c.StringArrayCursor.Stats() }
+
 func (c *stringArrayFilterCursor) Next() *cursors.StringArray {
 	pos := 0
+	c.res.Timestamps = c.res.Timestamps[:cap(c.res.Timestamps)]
+	c.res.Values = c.res.Values[:cap(c.res.Values)]
+
 	var a *cursors.StringArray
 
-	if a.Len() > 0 {
+	if c.tmp.Len() > 0 {
 		a = c.tmp
 		c.tmp.Timestamps = nil
 		c.tmp.Values = nil
@@ -697,7 +756,7 @@ LOOP:
 				c.res.Timestamps[pos] = a.Timestamps[i]
 				c.res.Values[pos] = v
 				pos++
-				if pos >= defaults.DefaultMaxPointsPerBlock {
+				if pos >= MaxPointsPerBlock {
 					c.tmp.Timestamps = a.Timestamps[i+1:]
 					c.tmp.Values = a.Values[i+1:]
 					break LOOP
@@ -735,6 +794,10 @@ func (c *stringMultiShardArrayCursor) reset(cur cursors.StringArrayCursor, itrs 
 }
 
 func (c *stringMultiShardArrayCursor) Err() error { return c.err }
+
+func (c *stringMultiShardArrayCursor) Stats() cursors.CursorStats {
+	return c.StringArrayCursor.Stats()
+}
 
 func (c *stringMultiShardArrayCursor) Next() *cursors.StringArray {
 	for {
@@ -797,6 +860,10 @@ type integerStringCountArrayCursor struct {
 	cursors.StringArrayCursor
 }
 
+func (c *integerStringCountArrayCursor) Stats() cursors.CursorStats {
+	return c.StringArrayCursor.Stats()
+}
+
 func (c *integerStringCountArrayCursor) Next() *cursors.IntegerArray {
 	a := c.StringArrayCursor.Next()
 	if len(a.Timestamps) == 0 {
@@ -825,6 +892,7 @@ var StringEmptyArrayCursor cursors.StringArrayCursor = &stringEmptyArrayCursor{}
 
 func (c *stringEmptyArrayCursor) Err() error                 { return nil }
 func (c *stringEmptyArrayCursor) Close()                     {}
+func (c *stringEmptyArrayCursor) Stats() cursors.CursorStats { return cursors.CursorStats{} }
 func (c *stringEmptyArrayCursor) Next() *cursors.StringArray { return &c.res }
 
 // ********************
@@ -842,7 +910,7 @@ func newBooleanFilterArrayCursor(cond expression) *booleanArrayFilterCursor {
 	return &booleanArrayFilterCursor{
 		cond: cond,
 		m:    &singleValue{},
-		res:  cursors.NewBooleanArrayLen(defaults.DefaultMaxPointsPerBlock),
+		res:  cursors.NewBooleanArrayLen(MaxPointsPerBlock),
 		tmp:  &cursors.BooleanArray{},
 	}
 }
@@ -852,11 +920,16 @@ func (c *booleanArrayFilterCursor) reset(cur cursors.BooleanArrayCursor) {
 	c.tmp.Timestamps, c.tmp.Values = nil, nil
 }
 
+func (c *booleanArrayFilterCursor) Stats() cursors.CursorStats { return c.BooleanArrayCursor.Stats() }
+
 func (c *booleanArrayFilterCursor) Next() *cursors.BooleanArray {
 	pos := 0
+	c.res.Timestamps = c.res.Timestamps[:cap(c.res.Timestamps)]
+	c.res.Values = c.res.Values[:cap(c.res.Values)]
+
 	var a *cursors.BooleanArray
 
-	if a.Len() > 0 {
+	if c.tmp.Len() > 0 {
 		a = c.tmp
 		c.tmp.Timestamps = nil
 		c.tmp.Values = nil
@@ -872,7 +945,7 @@ LOOP:
 				c.res.Timestamps[pos] = a.Timestamps[i]
 				c.res.Values[pos] = v
 				pos++
-				if pos >= defaults.DefaultMaxPointsPerBlock {
+				if pos >= MaxPointsPerBlock {
 					c.tmp.Timestamps = a.Timestamps[i+1:]
 					c.tmp.Values = a.Values[i+1:]
 					break LOOP
@@ -910,6 +983,10 @@ func (c *booleanMultiShardArrayCursor) reset(cur cursors.BooleanArrayCursor, itr
 }
 
 func (c *booleanMultiShardArrayCursor) Err() error { return c.err }
+
+func (c *booleanMultiShardArrayCursor) Stats() cursors.CursorStats {
+	return c.BooleanArrayCursor.Stats()
+}
 
 func (c *booleanMultiShardArrayCursor) Next() *cursors.BooleanArray {
 	for {
@@ -972,6 +1049,10 @@ type integerBooleanCountArrayCursor struct {
 	cursors.BooleanArrayCursor
 }
 
+func (c *integerBooleanCountArrayCursor) Stats() cursors.CursorStats {
+	return c.BooleanArrayCursor.Stats()
+}
+
 func (c *integerBooleanCountArrayCursor) Next() *cursors.IntegerArray {
 	a := c.BooleanArrayCursor.Next()
 	if len(a.Timestamps) == 0 {
@@ -1000,4 +1081,5 @@ var BooleanEmptyArrayCursor cursors.BooleanArrayCursor = &booleanEmptyArrayCurso
 
 func (c *booleanEmptyArrayCursor) Err() error                  { return nil }
 func (c *booleanEmptyArrayCursor) Close()                      {}
+func (c *booleanEmptyArrayCursor) Stats() cursors.CursorStats  { return cursors.CursorStats{} }
 func (c *booleanEmptyArrayCursor) Next() *cursors.BooleanArray { return &c.res }

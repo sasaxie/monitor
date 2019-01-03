@@ -10,7 +10,6 @@ import (
 	"github.com/influxdata/platform/chronograf"
 	"github.com/influxdata/platform/chronograf/enterprise"
 	"github.com/influxdata/platform/chronograf/influx"
-	"github.com/influxdata/platform/chronograf/log"
 )
 
 func Test_Enterprise_FetchesDataNodes(t *testing.T) {
@@ -34,7 +33,7 @@ func Test_Enterprise_FetchesDataNodes(t *testing.T) {
 		t.Fatal("Unexpected error while creating enterprise client. err:", err)
 	}
 
-	if showClustersCalled != true {
+	if !showClustersCalled {
 		t.Fatal("Expected request to meta node but none was issued")
 	}
 }
@@ -54,7 +53,7 @@ func Test_Enterprise_IssuesQueries(t *testing.T) {
 
 	cl := &enterprise.Client{
 		Ctrl:   NewMockControlClient(ts.URL),
-		Logger: log.New(log.DebugLevel),
+		Logger: &chronograf.NoopLogger{},
 	}
 
 	err := cl.Connect(context.Background(), &chronograf.Source{})
@@ -68,7 +67,7 @@ func Test_Enterprise_IssuesQueries(t *testing.T) {
 		t.Fatal("Unexpected error while querying data node: err:", err)
 	}
 
-	if called == false {
+	if !called {
 		t.Fatal("Expected request to data node but none was received")
 	}
 }
@@ -77,7 +76,7 @@ func Test_Enterprise_AdvancesDataNodes(t *testing.T) {
 	m1 := NewMockTimeSeries("http://host-1.example.com:8086")
 	m2 := NewMockTimeSeries("http://host-2.example.com:8086")
 	cl, err := enterprise.NewClientWithTimeSeries(
-		log.New(log.DebugLevel),
+		&chronograf.NoopLogger{},
 		"http://meta.example.com:8091",
 		&influx.BasicAuth{
 			Username: "marty",
@@ -173,7 +172,7 @@ func Test_Enterprise_NewClientWithURL(t *testing.T) {
 			},
 			testURL.tls,
 			testURL.insecureSkipVerify,
-			log.New(log.DebugLevel))
+			&chronograf.NoopLogger{})
 		if err != nil && !testURL.wantErr {
 			t.Errorf("Unexpected error creating Client with URL %s and TLS preference %t. err: %s", testURL.url, testURL.tls, err.Error())
 		} else if err == nil && testURL.wantErr {
@@ -185,7 +184,7 @@ func Test_Enterprise_NewClientWithURL(t *testing.T) {
 func Test_Enterprise_ComplainsIfNotOpened(t *testing.T) {
 	m1 := NewMockTimeSeries("http://host-1.example.com:8086")
 	cl, err := enterprise.NewClientWithTimeSeries(
-		log.New(log.DebugLevel),
+		&chronograf.NoopLogger{},
 		"http://meta.example.com:8091",
 		&influx.BasicAuth{
 			Username: "docbrown",

@@ -1,6 +1,7 @@
 package tsm1
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/influxdata/platform/pkg/bytesutil"
 	"github.com/influxdata/platform/pkg/file"
-	"github.com/influxdata/platform/tsdb"
 )
 
 // ErrFileInUse is returned when attempting to remove or close a TSM file that is still being used.
@@ -251,7 +251,10 @@ func NewTSMReader(f *os.File, options ...tsmReaderOption) (*TSMReader, error) {
 }
 
 // WithObserver sets the observer for the TSM reader.
-func (t *TSMReader) WithObserver(obs tsdb.FileStoreObserver) {
+func (t *TSMReader) WithObserver(obs FileStoreObserver) {
+	if obs == nil {
+		obs = noFileStoreObserver{}
+	}
 	t.tombstoner.WithObserver(obs)
 }
 
@@ -370,7 +373,7 @@ func (t *TSMReader) MeasurementStats() (MeasurementStats, error) {
 	defer f.Close()
 
 	stats := make(MeasurementStats)
-	if _, err := stats.ReadFrom(f); err != nil {
+	if _, err := stats.ReadFrom(bufio.NewReader(f)); err != nil {
 		return nil, err
 	}
 	return stats, err
@@ -1030,7 +1033,7 @@ func (d *indirectIndex) DeleteRange(keys [][]byte, minTime, maxTime int64) {
 	tombstones := map[string][]TimeRange{}
 	var ie []IndexEntry
 
-	for i := 0; len(keys) > 0 && i < d.KeyCount(); i++ {
+	for i := d.searchOffset(keys[0]); len(keys) > 0 && i < d.KeyCount(); i++ {
 		k, entries := d.readEntriesAt(d.offset(i), &ie)
 
 		// Skip any keys that don't exist.  These are less than the current key.

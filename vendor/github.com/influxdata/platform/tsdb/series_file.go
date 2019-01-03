@@ -10,9 +10,13 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/influxdata/platform/logger"
+	"github.com/influxdata/platform/pkg/rhh"
+
 	"github.com/cespare/xxhash"
 	"github.com/influxdata/platform/models"
 	"github.com/influxdata/platform/pkg/binaryutil"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -35,6 +39,13 @@ type SeriesFile struct {
 	path       string
 	partitions []*SeriesPartition
 
+	// N.B we have many partitions, but they must share the same metrics, so the
+	// metrics are managed in a single shared package variable and
+	// each partition decorates the same metric measurements with different
+	// partition id label values.
+	defaultMetricLabels prometheus.Labels
+	metricsEnabled      bool
+
 	refs sync.RWMutex // RWMutex to track references to the SeriesFile that are in use.
 
 	Logger *zap.Logger
@@ -43,8 +54,9 @@ type SeriesFile struct {
 // NewSeriesFile returns a new instance of SeriesFile.
 func NewSeriesFile(path string) *SeriesFile {
 	return &SeriesFile{
-		path:   path,
-		Logger: zap.NewNop(),
+		path:           path,
+		metricsEnabled: true,
+		Logger:         zap.NewNop(),
 	}
 }
 
@@ -53,8 +65,26 @@ func (f *SeriesFile) WithLogger(log *zap.Logger) {
 	f.Logger = log.With(zap.String("service", "series-file"))
 }
 
+// SetDefaultMetricLabels sets the default labels for metrics on the Series File.
+// It must be called before the SeriesFile is opened.
+func (f *SeriesFile) SetDefaultMetricLabels(labels prometheus.Labels) {
+	f.defaultMetricLabels = make(prometheus.Labels, len(labels))
+	for k, v := range labels {
+		f.defaultMetricLabels[k] = v
+	}
+}
+
+// DisableMetrics ensures that activity is not collected via the prometheus metrics.
+// DisableMetrics must be called before Open.
+func (f *SeriesFile) DisableMetrics() {
+	f.metricsEnabled = false
+}
+
 // Open memory maps the data file at the file's path.
 func (f *SeriesFile) Open() error {
+	_, logEnd := logger.NewOperation(f.Logger, "Opening Series File", "series_file_open", zap.String("path", f.path))
+	defer logEnd()
+
 	// Wait for all references to be released and prevent new ones from being acquired.
 	f.refs.Lock()
 	defer f.refs.Unlock()
@@ -64,12 +94,46 @@ func (f *SeriesFile) Open() error {
 		return err
 	}
 
+	// Initialise metrics for trackers.
+	mmu.Lock()
+	if sms == nil && f.metricsEnabled {
+		sms = newSeriesFileMetrics(f.defaultMetricLabels)
+	}
+	if ims == nil && f.metricsEnabled {
+		// Make a copy of the default labels so that another label can be provided.
+		labels := make(prometheus.Labels, len(f.defaultMetricLabels))
+		for k, v := range f.defaultMetricLabels {
+			labels[k] = v
+		}
+		labels["series_file_partition"] = "" // All partitions have this label.
+		ims = rhh.NewMetrics(namespace, seriesFileSubsystem+"_index", labels)
+	}
+	mmu.Unlock()
+
 	// Open partitions.
 	f.partitions = make([]*SeriesPartition, 0, SeriesFilePartitionN)
 	for i := 0; i < SeriesFilePartitionN; i++ {
 		// TODO(edd): These partition initialisation should be moved up to NewSeriesFile.
 		p := NewSeriesPartition(i, f.SeriesPartitionPath(i))
 		p.Logger = f.Logger.With(zap.Int("partition", p.ID()))
+
+		// For each series file index, rhh trackers are used to track the RHH Hashmap.
+		// Each of the trackers needs to be given slightly different default
+		// labels to ensure the correct partition_ids are set as labels.
+		labels := make(prometheus.Labels, len(f.defaultMetricLabels))
+		for k, v := range f.defaultMetricLabels {
+			labels[k] = v
+		}
+		labels["series_file_partition"] = fmt.Sprint(p.ID())
+
+		p.index.rhhMetrics = ims
+		p.index.rhhLabels = labels
+		p.index.rhhMetricsEnabled = f.metricsEnabled
+
+		// Set the metric trackers on the partition with any injected default labels.
+		p.tracker = newSeriesPartitionTracker(sms, labels)
+		p.tracker.enabled = f.metricsEnabled
+
 		if err := p.Open(); err != nil {
 			f.Close()
 			return err
@@ -190,6 +254,20 @@ func (f *SeriesFile) SeriesKey(id SeriesID) []byte {
 		return nil
 	}
 	return p.SeriesKey(id)
+}
+
+// SeriesKeyName returns the measurement name for a series id.
+func (f *SeriesFile) SeriesKeyName(id SeriesID) []byte {
+	if id.IsZero() {
+		return nil
+	}
+	data := f.SeriesIDPartition(id).SeriesKey(id)
+	if data == nil {
+		return nil
+	}
+	_, data = ReadSeriesKeyLen(data)
+	name, _ := ReadSeriesKeyMeasurement(data)
+	return name
 }
 
 // SeriesKeys returns a list of series keys from a list of ids.
@@ -497,14 +575,6 @@ func SeriesKeySize(name []byte, tags models.Tags) int {
 	}
 	n += binaryutil.UvarintSize(uint64(n))
 	return n
-}
-
-type seriesKeys [][]byte
-
-func (a seriesKeys) Len() int      { return len(a) }
-func (a seriesKeys) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a seriesKeys) Less(i, j int) bool {
-	return CompareSeriesKeys(a[i], a[j]) == -1
 }
 
 func nop() {}

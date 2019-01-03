@@ -4,8 +4,10 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/influxdata/platform"
 	pcontext "github.com/influxdata/platform/context"
@@ -23,22 +25,27 @@ type WriteHandler struct {
 
 	Logger *zap.Logger
 
-	AuthorizationService platform.AuthorizationService
-	BucketService        platform.BucketService
-	OrganizationService  platform.OrganizationService
+	BucketService       platform.BucketService
+	OrganizationService platform.OrganizationService
 
 	PointsWriter storage.PointsWriter
 }
 
+const (
+	writePath            = "/api/v2/write"
+	errInvalidGzipHeader = "gzipped HTTP body contains an invalid header"
+	errInvalidPrecision  = "invalid precision; valid precision units are ns, us, ms, and s"
+)
+
 // NewWriteHandler creates a new handler at /api/v2/write to receive line protocol.
 func NewWriteHandler(writer storage.PointsWriter) *WriteHandler {
 	h := &WriteHandler{
-		Router:       httprouter.New(),
+		Router:       NewRouter(),
 		Logger:       zap.NewNop(),
 		PointsWriter: writer,
 	}
 
-	h.HandlerFunc("POST", "/api/v2/write", h.handleWrite)
+	h.HandlerFunc("POST", writePath, h.handleWrite)
 	return h
 }
 
@@ -51,7 +58,12 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 		var err error
 		in, err = gzip.NewReader(r.Body)
 		if err != nil {
-			EncodeError(ctx, errors.Wrap(err, "invalid gzip", errors.InvalidData), w)
+			EncodeError(ctx, &platform.Error{
+				Code: platform.EInvalid,
+				Op:   "http/handleWrite",
+				Msg:  errInvalidGzipHeader,
+				Err:  err,
+			}, w)
 			return
 		}
 		defer in.Close()
@@ -63,13 +75,7 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth, err := h.AuthorizationService.FindAuthorizationByID(ctx, a.Identifier())
-	if err != nil {
-		EncodeError(ctx, err, w)
-		return
-	}
-
-	req := decodeWriteRequest(ctx, r)
+	req, err := decodeWriteRequest(ctx, r)
 	if err != nil {
 		EncodeError(ctx, err, w)
 		return
@@ -83,7 +89,7 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 		o, err := h.OrganizationService.FindOrganizationByID(ctx, *id)
 		if err == nil {
 			org = o
-		} else if err != ErrNotFound {
+		} else if platform.ErrorCode(err) != platform.ENotFound {
 			EncodeError(ctx, err, w)
 			return
 		}
@@ -108,7 +114,7 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 		})
 		if err == nil {
 			bucket = b
-		} else if err != ErrNotFound {
+		} else if platform.ErrorCode(err) != platform.ENotFound {
 			EncodeError(ctx, err, w)
 			return
 		}
@@ -121,14 +127,19 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			logger.Info("Failed to find bucket", zap.Stringer("org_id", org.ID), zap.Error(err))
-			EncodeError(ctx, fmt.Errorf("bucket %q not found", req.Bucket), w)
+			EncodeError(ctx, &platform.Error{
+				Code: platform.ENotFound,
+				Op:   "http/handleWrite",
+				Err:  err,
+				Msg:  fmt.Sprintf("bucket %q not found", req.Bucket),
+			}, w)
 			return
 		}
 
 		bucket = b
 	}
 
-	if !auth.Allowed(platform.WriteBucketPermission(bucket.ID)) {
+	if !a.Allowed(platform.WriteBucketPermission(bucket.ID)) {
 		EncodeError(ctx, errors.Forbiddenf("insufficient permissions for write"), w)
 		return
 	}
@@ -143,7 +154,7 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	points, err := models.ParsePoints(data)
+	points, err := models.ParsePointsWithPrecision(data, time.Now(), req.Precision)
 	if err != nil {
 		logger.Info("Error parsing points", zap.Error(err))
 		EncodeError(ctx, err, w)
@@ -165,16 +176,113 @@ func (h *WriteHandler) handleWrite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func decodeWriteRequest(ctx context.Context, r *http.Request) *postWriteRequest {
+func decodeWriteRequest(ctx context.Context, r *http.Request) (*postWriteRequest, error) {
 	qp := r.URL.Query()
+	p := qp.Get("precision")
+	if p == "" {
+		p = "ns"
+	}
+
+	if !models.ValidPrecision(p) {
+		return nil, &platform.Error{
+			Code: platform.EInvalid,
+			Op:   "http/decodeWriteRequest",
+			Msg:  errInvalidPrecision,
+		}
+	}
 
 	return &postWriteRequest{
-		Bucket: qp.Get("bucket"),
-		Org:    qp.Get("org"),
-	}
+		Bucket:    qp.Get("bucket"),
+		Org:       qp.Get("org"),
+		Precision: p,
+	}, nil
 }
 
 type postWriteRequest struct {
-	Org    string
-	Bucket string
+	Org       string
+	Bucket    string
+	Precision string
+}
+
+// WriteService sends data over HTTP to influxdb via line protocol.
+type WriteService struct {
+	Addr               string
+	Token              string
+	Precision          string
+	InsecureSkipVerify bool
+}
+
+var _ platform.WriteService = (*WriteService)(nil)
+
+func (s *WriteService) Write(ctx context.Context, orgID, bucketID platform.ID, r io.Reader) error {
+	precision := s.Precision
+	if precision == "" {
+		precision = "ns"
+	}
+
+	if !models.ValidPrecision(precision) {
+		return &platform.Error{
+			Code: platform.EInvalid,
+			Op:   "http/Write",
+			Msg:  errInvalidPrecision,
+		}
+	}
+
+	u, err := newURL(s.Addr, writePath)
+	if err != nil {
+		return err
+	}
+
+	r, err = compressWithGzip(r)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", u.String(), r)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	req.Header.Set("Content-Encoding", "gzip")
+	SetToken(s.Token, req)
+
+	org, err := orgID.Encode()
+	if err != nil {
+		return err
+	}
+
+	bucket, err := bucketID.Encode()
+	if err != nil {
+		return err
+	}
+
+	params := req.URL.Query()
+	params.Set("org", string(org))
+	params.Set("bucket", string(bucket))
+	params.Set("precision", string(precision))
+	req.URL.RawQuery = params.Encode()
+
+	hc := newClient(u.Scheme, s.InsecureSkipVerify)
+
+	resp, err := hc.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return CheckError(resp, true)
+}
+
+func compressWithGzip(data io.Reader) (io.Reader, error) {
+	pr, pw := io.Pipe()
+	gw := gzip.NewWriter(pw)
+	var err error
+
+	go func() {
+		_, err = io.Copy(gw, data)
+		gw.Close()
+		pw.Close()
+	}()
+
+	return pr, err
 }

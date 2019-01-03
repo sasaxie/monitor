@@ -10,11 +10,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxql"
 	"github.com/influxdata/platform/logger"
 	"github.com/influxdata/platform/models"
-	"github.com/influxdata/platform/pkg/slices"
+	"github.com/influxdata/platform/query"
 	"github.com/influxdata/platform/tsdb"
 	"github.com/influxdata/platform/tsdb/tsi1"
 )
@@ -62,51 +61,6 @@ func TestMergeSeriesIDIterators(t *testing.T) {
 	}
 }
 
-func TestIndexSet_MeasurementNamesByExpr(t *testing.T) {
-	// Setup indexes
-	indexes := map[string]*Index{}
-	for _, name := range tsdb.RegisteredIndexes() {
-		idx := MustOpenNewIndex(tsi1.NewConfig())
-		idx.AddSeries("cpu", map[string]string{"region": "east"}, models.Integer)
-		idx.AddSeries("cpu", map[string]string{"region": "west", "secret": "foo"}, models.Integer)
-		idx.AddSeries("disk", map[string]string{"secret": "foo"}, models.Integer)
-		idx.AddSeries("mem", map[string]string{"region": "west"}, models.Integer)
-		idx.AddSeries("gpu", map[string]string{"region": "east"}, models.Integer)
-		idx.AddSeries("pci", map[string]string{"region": "east", "secret": "foo"}, models.Integer)
-		indexes[name] = idx
-		defer idx.Close()
-	}
-
-	type example struct {
-		name     string
-		expr     influxql.Expr
-		expected [][]byte
-	}
-
-	examples := []example{
-		{name: "all", expected: slices.StringsToBytes("cpu", "disk", "gpu", "mem", "pci")},
-		{name: "EQ", expr: influxql.MustParseExpr(`region = 'west'`), expected: slices.StringsToBytes("cpu", "mem")},
-		{name: "NEQ", expr: influxql.MustParseExpr(`region != 'west'`), expected: slices.StringsToBytes("gpu", "pci")},
-		{name: "EQREGEX", expr: influxql.MustParseExpr(`region =~ /.*st/`), expected: slices.StringsToBytes("cpu", "gpu", "mem", "pci")},
-		{name: "NEQREGEX", expr: influxql.MustParseExpr(`region !~ /.*est/`), expected: slices.StringsToBytes("gpu", "pci")},
-	}
-
-	for _, idx := range tsdb.RegisteredIndexes() {
-		t.Run(idx, func(t *testing.T) {
-			for _, example := range examples {
-				t.Run(example.name, func(t *testing.T) {
-					names, err := indexes[idx].IndexSet().MeasurementNamesByExpr(nil, example.expr)
-					if err != nil {
-						t.Fatal(err)
-					} else if !reflect.DeepEqual(names, example.expected) {
-						t.Fatalf("got names: %v, expected %v", slices.BytesToStrings(names), slices.BytesToStrings(example.expected))
-					}
-				})
-			}
-		})
-	}
-}
-
 // Index wraps a series file and index.
 type Index struct {
 	rootPath string
@@ -126,7 +80,7 @@ func MustNewIndex(c tsi1.Config) *Index {
 		panic(err)
 	}
 
-	seriesPath, err := ioutil.TempDir(rootPath, tsdb.SeriesFileDirectory)
+	seriesPath, err := ioutil.TempDir(rootPath, "_series")
 	if err != nil {
 		panic(err)
 	}
@@ -136,7 +90,7 @@ func MustNewIndex(c tsi1.Config) *Index {
 		panic(err)
 	}
 
-	i := tsi1.NewIndex(sfile, "remove-me", c, tsi1.WithPath(filepath.Join(rootPath, "index")))
+	i := tsi1.NewIndex(sfile, c, tsi1.WithPath(filepath.Join(rootPath, "index")))
 
 	if testing.Verbose() {
 		i.WithLogger(logger.New(os.Stderr))
@@ -166,16 +120,6 @@ func (i *Index) MustOpen() {
 	}
 }
 
-func (idx *Index) IndexSet() *tsdb.IndexSet {
-	return &tsdb.IndexSet{Indexes: []tsdb.Index{idx.Index}, SeriesFile: idx.sfile}
-}
-
-func (idx *Index) AddSeries(name string, tags map[string]string, typ models.FieldType) error {
-	t := models.NewTags(tags)
-	key := fmt.Sprintf("%s,%s", name, t.HashKey())
-	return idx.CreateSeriesIfNotExists([]byte(key), []byte(name), t, typ)
-}
-
 // Reopen closes and re-opens the underlying index, without removing any data.
 func (i *Index) Reopen() error {
 	if err := i.Index.Close(); err != nil {
@@ -191,7 +135,8 @@ func (i *Index) Reopen() error {
 		return err
 	}
 
-	i.Index = tsi1.NewIndex(i.SeriesFile(), "remove-me", i.config, tsi1.WithPath(filepath.Join(i.rootPath, "index")))
+	i.Index = tsi1.NewIndex(i.SeriesFile(), i.config,
+		tsi1.WithPath(filepath.Join(i.rootPath, "index")))
 	return i.Index.Open()
 }
 
@@ -215,8 +160,8 @@ func (i *Index) Close() error {
 //
 // Typical results on an i7 laptop.
 //
-// BenchmarkIndexSet_TagSets/1M_series/tsi1-8    	     100	  18995530 ns/op	 5221180 B/op	   20379 allocs/op
-func BenchmarkIndexSet_TagSets(b *testing.B) {
+// BenchmarkIndex_TagSets/1M_series/tsi1-8    	     100	  18995530 ns/op	 5221180 B/op	   20379 allocs/op
+func BenchmarkIndex_TagSets(b *testing.B) {
 	// Read line-protocol and coerce into tsdb format.
 	// 1M series generated with:
 	// $inch -b 10000 -c 1 -t 10,10,10,10,10,10 -f 1 -m 5 -p 1
@@ -262,36 +207,30 @@ func BenchmarkIndexSet_TagSets(b *testing.B) {
 
 	// This benchmark will merge eight bitsets each containing ~10,000 series IDs.
 	b.Run("1M series", func(b *testing.B) {
+		idx := MustOpenNewIndex(tsi1.NewConfig())
+		setup(idx)
+		defer idx.Close()
+
+		name := []byte("m4")
+		opt := query.IteratorOptions{Condition: influxql.MustParseExpr(`"tag5"::tag = 'value0'`)}
+
+		ts := func() ([]*query.TagSet, error) {
+			return idx.Index.TagSets(name, opt)
+		}
+
 		b.ReportAllocs()
-		for _, indexType := range tsdb.RegisteredIndexes() {
-			idx := MustOpenNewIndex(tsi1.NewConfig())
-			setup(idx)
+		b.ResetTimer()
 
-			name := []byte("m4")
-			opt := query.IteratorOptions{Condition: influxql.MustParseExpr(`"tag5"::tag = 'value0'`)}
-			indexSet := tsdb.IndexSet{
-				SeriesFile: idx.sfile,
-				Indexes:    []tsdb.Index{idx.Index},
-			} // For TSI implementation
-
-			var ts func() ([]*query.TagSet, error)
-			ts = func() ([]*query.TagSet, error) {
-				return indexSet.TagSets(idx.sfile, name, opt)
-			}
-
-			b.Run(indexType, func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					// Will call TagSets on the appropriate implementation.
-					_, errResult = ts()
-					if errResult != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-
-			if err := idx.Close(); err != nil {
+		for i := 0; i < b.N; i++ {
+			// Will call TagSets on the appropriate implementation.
+			_, errResult = ts()
+			if errResult != nil {
 				b.Fatal(err)
 			}
+		}
+
+		if err := idx.Close(); err != nil {
+			b.Fatal(err)
 		}
 	})
 }
@@ -334,8 +273,10 @@ func BenchmarkIndex_ConcurrentWriteQuery(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	runBenchmark := func(b *testing.B, index string, queryN int) {
-		idx := MustOpenNewIndex(tsi1.NewConfig())
+	runBenchmark := func(b *testing.B, queryN int, cacheSize uint64) {
+		config := tsi1.NewConfig()
+		config.SeriesIDSetCacheSize = cacheSize
+		idx := MustOpenNewIndex(config)
 		var wg sync.WaitGroup
 		begin := make(chan struct{})
 
@@ -401,21 +342,15 @@ func BenchmarkIndex_ConcurrentWriteQuery(b *testing.B) {
 	}
 
 	queries := []int{1e5}
-	for _, indexType := range tsdb.RegisteredIndexes() {
-		b.Run(indexType, func(b *testing.B) {
-			for _, queryN := range queries {
-				b.Run(fmt.Sprintf("queries %d", queryN), func(b *testing.B) {
-					b.Run("cache", func(b *testing.B) {
-						tsi1.EnableBitsetCache = true
-						runBenchmark(b, indexType, queryN)
-					})
+	for _, queryN := range queries {
+		b.Run(fmt.Sprintf("queries %d", queryN), func(b *testing.B) {
+			b.Run("cache", func(b *testing.B) {
+				runBenchmark(b, queryN, tsi1.DefaultSeriesIDSetCacheSize)
+			})
 
-					b.Run("no cache", func(b *testing.B) {
-						tsi1.EnableBitsetCache = false
-						runBenchmark(b, indexType, queryN)
-					})
-				})
-			}
+			b.Run("no cache", func(b *testing.B) {
+				runBenchmark(b, queryN, 0)
+			})
 		})
 	}
 }

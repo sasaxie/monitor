@@ -17,7 +17,7 @@ import (
 const (
 	queryPath = "/api/v2/querysvc"
 
-	statsTrailer = "Influx-Query-Statistics"
+	queryStatisticsTrailer = "Influx-Query-Statistics"
 )
 
 type QueryHandler struct {
@@ -34,7 +34,7 @@ type QueryHandler struct {
 // NewQueryHandler returns a new instance of QueryHandler.
 func NewQueryHandler() *QueryHandler {
 	h := &QueryHandler{
-		Router: httprouter.New(),
+		Router: NewRouter(),
 		csvDialect: csv.Dialect{
 			ResultEncoderConfig: csv.DefaultEncoderConfig(),
 		},
@@ -54,7 +54,6 @@ func (h *QueryHandler) handlePing(w http.ResponseWriter, r *http.Request) {
 // handlePostQuery is the HTTP handler for the POST /api/v2/query route.
 func (h *QueryHandler) handlePostQuery(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
 	var req query.Request
 	req.WithCompilerMappings(h.CompilerMappings)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -69,12 +68,12 @@ func (h *QueryHandler) handlePostQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	// Always cancel the results to free resources.
 	// If all results were consumed cancelling does nothing.
-	defer results.Cancel()
+	defer results.Release()
 
 	// Setup headers
 	stats, hasStats := results.(flux.Statisticser)
 	if hasStats {
-		w.Header().Set("Trailer", statsTrailer)
+		w.Header().Set("Trailer", queryStatisticsTrailer)
 	}
 
 	// NOTE: We do not write out the headers here.
@@ -110,7 +109,7 @@ func (h *QueryHandler) handlePostQuery(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Write statisitcs trailer
-		w.Header().Set(statsTrailer, string(data))
+		w.Header().Set(queryStatisticsTrailer, string(data))
 	}
 }
 
@@ -126,6 +125,30 @@ type QueryService struct {
 	InsecureSkipVerify bool
 }
 
+// Ping checks to see if the server is responding to a ping request.
+func (s *QueryService) Ping(ctx context.Context) error {
+	u, err := newURL(s.Addr, "/ping")
+	if err != nil {
+		return err
+	}
+
+	hreq, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	SetToken(s.Token, hreq)
+	hreq = hreq.WithContext(ctx)
+
+	hc := newClient(u.Scheme, s.InsecureSkipVerify)
+	resp, err := hc.Do(hreq)
+	if err != nil {
+		return err
+	}
+
+	return CheckError(resp)
+}
+
+// Query calls the query route with the requested query and returns a result iterator.
 func (s *QueryService) Query(ctx context.Context, req *query.Request) (flux.ResultIterator, error) {
 	u, err := newURL(s.Addr, queryPath)
 	if err != nil {
@@ -148,7 +171,7 @@ func (s *QueryService) Query(ctx context.Context, req *query.Request) (flux.Resu
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckError(resp); err != nil {
+	if err := CheckError(resp, true); err != nil {
 		return nil, err
 	}
 
@@ -187,8 +210,8 @@ func (s *statsResultIterator) Next() flux.Result {
 	return s.results.Next()
 }
 
-func (s *statsResultIterator) Cancel() {
-	s.results.Cancel()
+func (s *statsResultIterator) Release() {
+	s.results.Release()
 	s.readStats()
 }
 
@@ -206,7 +229,7 @@ func (s *statsResultIterator) Statistics() flux.Statistics {
 
 // readStats reads the query statisitcs off the response trailers.
 func (s *statsResultIterator) readStats() {
-	data := s.resp.Trailer.Get(statsTrailer)
+	data := s.resp.Trailer.Get(queryStatisticsTrailer)
 	if data != "" {
 		s.err = json.Unmarshal([]byte(data), &s.statisitcs)
 	}
