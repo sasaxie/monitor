@@ -5,9 +5,9 @@ import (
 	"github.com/astaxie/beego/logs"
 	"github.com/robfig/cron"
 	"github.com/sasaxie/monitor/alerts"
+	"github.com/sasaxie/monitor/collector"
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
-	"github.com/sasaxie/monitor/datamanger"
 	"github.com/sasaxie/monitor/reports"
 	_ "github.com/sasaxie/monitor/routers"
 	"time"
@@ -60,10 +60,6 @@ func change() {
 }
 
 func start() {
-	for _, r := range datamanger.Requests {
-		r.Load()
-	}
-
 	getNowBlockAlert := new(alerts.GetNowBlockAlert)
 	getNowBlockAlert.Load()
 
@@ -83,8 +79,8 @@ func start() {
 		case <-ticker.C:
 			logs.Debug("start")
 
-			for _, r := range datamanger.Requests {
-				go r.Request()
+			for _, r := range collector.Collectors {
+				go r.Collect()
 			}
 
 			time.Sleep(10 * time.Second)

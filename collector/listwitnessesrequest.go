@@ -1,4 +1,4 @@
-package datamanger
+package collector
 
 import (
 	"encoding/json"
@@ -27,7 +27,7 @@ const (
 )
 
 type ListWitnessesRequest struct {
-	RequestCommon
+	Common
 }
 
 type WitnessList struct {
@@ -42,47 +42,56 @@ type Witness struct {
 }
 
 func init() {
-	Requests = append(Requests, new(ListWitnessesRequest))
+	Collectors = append(Collectors, new(ListWitnessesRequest))
 }
 
-func (l *ListWitnessesRequest) Load() {
+func (g *ListWitnessesRequest) Collect() {
+	if !g.HasInitNodes {
+		g.initNodes()
+		g.HasInitNodes = true
+	}
+
+	g.start()
+}
+
+func (l *ListWitnessesRequest) initNodes() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
 		panic("list witnesses request load() error")
 	}
 
-	if l.Parameters == nil {
-		l.Parameters = make([]*Parameter, 0)
+	if l.Nodes == nil {
+		l.Nodes = make([]*Node, 0)
 	}
 
 	for _, node := range models.NodeList.Addresses {
-		param := new(Parameter)
-		param.RequestUrl = fmt.Sprintf(
+		n := new(Node)
+		n.CollectionUrl = fmt.Sprintf(
 			urlTemplateListWitnesses,
 			node.Ip,
 			node.HttpPort,
 			config.NewNodeType(node.Type).GetApiPathByNodeType())
-		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
-		param.Type = node.Type
-		param.TagName = node.TagName
+		n.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
+		n.Type = node.Type
+		n.TagName = node.TagName
 
-		l.Parameters = append(l.Parameters, param)
+		l.Nodes = append(l.Nodes, n)
 	}
 
 	logs.Info(
 		"list witnesses request load() success, node size:",
-		len(l.Parameters),
+		len(l.Nodes),
 	)
 }
 
-func (l *ListWitnessesRequest) Request() {
-	if l.Parameters == nil || len(l.Parameters) == 0 {
+func (l *ListWitnessesRequest) start() {
+	if l.Nodes == nil || len(l.Nodes) == 0 {
 		return
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(l.Parameters))
-	for _, param := range l.Parameters {
-		go l.request(param, &wg)
+	wg.Add(len(l.Nodes))
+	for _, node := range l.Nodes {
+		go l.request(node, &wg)
 	}
 
 	wg.Wait()
@@ -92,19 +101,19 @@ func (l *ListWitnessesRequest) Save2db() {
 
 }
 
-func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
+func (l *ListWitnessesRequest) request(node *Node, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	response, err := http.Get(param.RequestUrl)
+	response, err := http.Get(node.CollectionUrl)
 
 	if err != nil {
-		logs.Debug("(", param.RequestUrl, ")", "[http get]", err)
+		logs.Debug("(", node.CollectionUrl, ")", "[http get]", err)
 		return
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("list witnesses request (", param.RequestUrl,
+		logs.Warn("list witnesses request (", node.CollectionUrl,
 			") response status code",
 			response.StatusCode)
 		return
@@ -112,7 +121,7 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		logs.Warn("(", param.RequestUrl, ") ", "[read body]", err)
+		logs.Warn("(", node.CollectionUrl, ") ", "[read body]", err)
 		return
 	}
 
@@ -120,7 +129,7 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	err = json.Unmarshal(body, &witnesses)
 
 	if err != nil {
-		logs.Warn("(", param.RequestUrl, ") ", "[json unmarshal]", err)
+		logs.Warn("(", node.CollectionUrl, ") ", "[json unmarshal]", err)
 		return
 	}
 
@@ -130,16 +139,16 @@ func (l *ListWitnessesRequest) request(param *Parameter, wg *sync.WaitGroup) {
 		for _, w := range witnesses.Witnesses {
 			if w.IsJobs {
 				witnessTags := map[string]string{
-					influxDBFieldListWitnessesNode:    param.Node,
-					influxDBFieldListWitnessesType:    param.Type,
-					influxDBFieldListWitnessesTagName: param.TagName,
+					influxDBFieldListWitnessesNode:    node.Node,
+					influxDBFieldListWitnessesType:    node.Type,
+					influxDBFieldListWitnessesTagName: node.TagName,
 					influxDBFieldListWitnessesUrl:     w.Url,
 				}
 
 				witnessFields := map[string]interface{}{
-					influxDBFieldListWitnessesNode:    param.Node,
-					influxDBFieldListWitnessesType:    param.Type,
-					influxDBFieldListWitnessesTagName: param.TagName,
+					influxDBFieldListWitnessesNode:    node.Node,
+					influxDBFieldListWitnessesType:    node.Type,
+					influxDBFieldListWitnessesTagName: node.TagName,
 
 					influxDBFieldListWitnessesAddress:     w.Address,
 					influxDBFieldListWitnessesTotalMissed: w.TotalMissed,

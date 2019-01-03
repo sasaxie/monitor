@@ -1,4 +1,4 @@
-package datamanger
+package collector
 
 import (
 	"encoding/json"
@@ -114,23 +114,32 @@ const (
 	influxDBTagGetNodeInfoMemoryDescInfoName = "api_memory_desc_info_name"
 )
 
-var Requests = make([]Requester, 0)
+var Collectors = make([]Collector, 0)
 
 type GetNodeInfoRequest struct {
-	RequestCommon
+	Common
 }
 
 func init() {
-	Requests = append(Requests, new(GetNodeInfoRequest))
+	Collectors = append(Collectors, new(GetNodeInfoRequest))
 }
 
-func (g *GetNodeInfoRequest) Load() {
+func (g *GetNodeInfoRequest) Collect() {
+	if !g.HasInitNodes {
+		g.initNodes()
+		g.HasInitNodes = true
+	}
+
+	g.start()
+}
+
+func (g *GetNodeInfoRequest) initNodes() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
 		panic("get node info request load() error")
 	}
 
-	if g.Parameters == nil {
-		g.Parameters = make([]*Parameter, 0)
+	if g.Nodes == nil {
+		g.Nodes = make([]*Node, 0)
 	}
 
 	for _, node := range models.NodeList.Addresses {
@@ -138,56 +147,52 @@ func (g *GetNodeInfoRequest) Load() {
 			continue
 		}
 
-		param := new(Parameter)
-		param.RequestUrl = fmt.Sprintf(
+		n := new(Node)
+		n.CollectionUrl = fmt.Sprintf(
 			urlTemplateGetNodeInfo,
 			node.Ip,
 			node.HttpPort,
 			config.NewNodeType(node.Type).GetApiPathByNodeType())
-		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
-		param.Type = node.Type
-		param.TagName = node.TagName
+		n.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
+		n.Type = node.Type
+		n.TagName = node.TagName
 
-		g.Parameters = append(g.Parameters, param)
+		g.Nodes = append(g.Nodes, n)
 	}
 
 	logs.Info(
 		"get node info request load() success, node size:",
-		len(g.Parameters),
+		len(g.Nodes),
 	)
 }
 
-func (g *GetNodeInfoRequest) Request() {
-	if g.Parameters == nil || len(g.Parameters) == 0 {
+func (g *GetNodeInfoRequest) start() {
+	if g.Nodes == nil || len(g.Nodes) == 0 {
 		return
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(g.Parameters))
-	for _, param := range g.Parameters {
-		go g.request(param, &wg)
+	wg.Add(len(g.Nodes))
+	for _, node := range g.Nodes {
+		go g.request(node, &wg)
 	}
 
 	wg.Wait()
 }
 
-func (g *GetNodeInfoRequest) Save2db() {
-
-}
-
-func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
+func (g *GetNodeInfoRequest) request(node *Node, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	response, err := http.Get(param.RequestUrl)
+	response, err := http.Get(node.CollectionUrl)
 
 	if err != nil {
-		logs.Debug("(", param.RequestUrl, ")", "[http get]", err)
+		logs.Debug("(", node.CollectionUrl, ")", "[http get]", err)
 		return
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("get node info request (", param.RequestUrl,
+		logs.Warn("get node info request (", node.CollectionUrl,
 			") response status code",
 			response.StatusCode)
 		return
@@ -195,7 +200,7 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		logs.Warn("(", param.RequestUrl, ") ", "[read body]", err)
+		logs.Warn("(", node.CollectionUrl, ") ", "[read body]", err)
 		return
 	}
 
@@ -203,7 +208,7 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	err = json.Unmarshal(body, &nodeInfoDetail)
 
 	if err != nil {
-		logs.Warn("(", param.RequestUrl, ") ", "[json unmarshal]", err)
+		logs.Warn("(", node.CollectionUrl, ") ", "[json unmarshal]", err)
 		return
 	}
 
@@ -214,17 +219,17 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	timeNow := time.Now()
 
 	nodeInfoDetailTags := map[string]string{
-		influxDBTagGetNodeInfoNode:    param.Node,
-		influxDBTagGetNodeInfoType:    param.Type,
-		influxDBTagGetNodeInfoTagName: param.TagName,
+		influxDBTagGetNodeInfoNode:    node.Node,
+		influxDBTagGetNodeInfoType:    node.Type,
+		influxDBTagGetNodeInfoTagName: node.TagName,
 	}
 
 	cheatWitnessInfo := getCheatWitnessInfoStr(nodeInfoDetail.CheatWitnessInfoMap)
 
 	nodeInfoDetailFields := map[string]interface{}{
-		influxDBFieldGetNodeInfoNode:    param.Node,
-		influxDBFieldGetNodeInfoType:    param.Type,
-		influxDBFieldGetNodeInfoTagName: param.TagName,
+		influxDBFieldGetNodeInfoNode:    node.Node,
+		influxDBFieldGetNodeInfoType:    node.Type,
+		influxDBFieldGetNodeInfoTagName: node.TagName,
 
 		influxDBFieldGetNodeInfoActiveConnectCount: nodeInfoDetail.ActiveConnectCount,
 		influxDBFieldGetNodeInfoBeginSyncNum:       nodeInfoDetail.BeginSyncNum,
@@ -282,7 +287,7 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 
 	for _, v := range nodeInfoDetail.MachineInfo.MemoryDescInfoList {
 		t := map[string]string{
-			influxDBTagGetNodeInfoNode:               param.Node,
+			influxDBTagGetNodeInfoNode:               node.Node,
 			influxDBTagGetNodeInfoMemoryDescInfoName: v.Name,
 		}
 		f := map[string]interface{}{
@@ -305,7 +310,7 @@ func (g *GetNodeInfoRequest) request(param *Parameter, wg *sync.WaitGroup) {
 		ln, li := getBlockNumAndId(p.LastSyncBlock)
 
 		t := map[string]string{
-			influxDBTagGetNodeInfoNode: param.Node,
+			influxDBTagGetNodeInfoNode: node.Node,
 			influxDBTagGetNodeInfoPeer: p.Host,
 		}
 		f := map[string]interface{}{

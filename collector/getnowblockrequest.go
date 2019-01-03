@@ -1,4 +1,4 @@
-package datamanger
+package collector
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ const (
 )
 
 type GetNowBlockRequest struct {
-	RequestCommon
+	Common
 }
 
 type Block struct {
@@ -40,47 +40,56 @@ type RawData struct {
 }
 
 func init() {
-	Requests = append(Requests, new(GetNowBlockRequest))
+	Collectors = append(Collectors, new(GetNowBlockRequest))
 }
 
-func (g *GetNowBlockRequest) Load() {
+func (g *GetNowBlockRequest) Collect() {
+	if !g.HasInitNodes {
+		g.initNodes()
+		g.HasInitNodes = true
+	}
+
+	g.start()
+}
+
+func (g *GetNowBlockRequest) initNodes() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
 		panic("get now block request load() error")
 	}
 
-	if g.Parameters == nil {
-		g.Parameters = make([]*Parameter, 0)
+	if g.Nodes == nil {
+		g.Nodes = make([]*Node, 0)
 	}
 
 	for _, node := range models.NodeList.Addresses {
-		param := new(Parameter)
-		param.RequestUrl = fmt.Sprintf(
+		n := new(Node)
+		n.CollectionUrl = fmt.Sprintf(
 			urlTemplateGetNowBlock,
 			node.Ip,
 			node.HttpPort,
 			config.NewNodeType(node.Type).GetApiPathByNodeType())
-		param.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
-		param.Type = node.Type
-		param.TagName = node.TagName
+		n.Node = fmt.Sprintf("%s:%d", node.Ip, node.HttpPort)
+		n.Type = node.Type
+		n.TagName = node.TagName
 
-		g.Parameters = append(g.Parameters, param)
+		g.Nodes = append(g.Nodes, n)
 	}
 
 	logs.Info(
 		"get now block request load() success, node size:",
-		len(g.Parameters),
+		len(g.Nodes),
 	)
 }
 
-func (g *GetNowBlockRequest) Request() {
-	if g.Parameters == nil || len(g.Parameters) == 0 {
+func (g *GetNowBlockRequest) start() {
+	if g.Nodes == nil || len(g.Nodes) == 0 {
 		return
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(g.Parameters))
-	for _, param := range g.Parameters {
-		go g.request(param, &wg)
+	wg.Add(len(g.Nodes))
+	for _, node := range g.Nodes {
+		go g.request(node, &wg)
 	}
 
 	wg.Wait()
@@ -90,19 +99,19 @@ func (g *GetNowBlockRequest) Save2db() {
 
 }
 
-func (g *GetNowBlockRequest) request(param *Parameter, wg *sync.WaitGroup) {
+func (g *GetNowBlockRequest) request(node *Node, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	response, err := http.Get(param.RequestUrl)
+	response, err := http.Get(node.CollectionUrl)
 
 	if err != nil {
-		logs.Debug("(", param.RequestUrl, ")", "[http get]", err)
+		logs.Debug("(", node.CollectionUrl, ")", "[http get]", err)
 		return
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		logs.Warn("get now block request (", param.RequestUrl,
+		logs.Warn("get now block request (", node.CollectionUrl,
 			") response status code",
 			response.StatusCode)
 		return
@@ -110,7 +119,7 @@ func (g *GetNowBlockRequest) request(param *Parameter, wg *sync.WaitGroup) {
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		logs.Warn("(", param.RequestUrl, ") ", "[read body]", err)
+		logs.Warn("(", node.CollectionUrl, ") ", "[read body]", err)
 		return
 	}
 
@@ -118,21 +127,21 @@ func (g *GetNowBlockRequest) request(param *Parameter, wg *sync.WaitGroup) {
 	err = json.Unmarshal(body, &block)
 
 	if err != nil {
-		logs.Warn("(", param.RequestUrl, ") ", "[json unmarshal]", err)
+		logs.Warn("(", node.CollectionUrl, ") ", "[json unmarshal]", err)
 		return
 	}
 
 	// Report block number
 	nowBlockTags := map[string]string{
-		influxDBFieldNowBlockNode:    param.Node,
-		influxDBFieldNowBlockType:    param.Type,
-		influxDBFieldNowBlockTagName: param.TagName,
+		influxDBFieldNowBlockNode:    node.Node,
+		influxDBFieldNowBlockType:    node.Type,
+		influxDBFieldNowBlockTagName: node.TagName,
 	}
 
 	nowBlockFields := map[string]interface{}{
-		influxDBFieldNowBlockNode:    param.Node,
-		influxDBFieldNowBlockType:    param.Type,
-		influxDBFieldNowBlockTagName: param.TagName,
+		influxDBFieldNowBlockNode:    node.Node,
+		influxDBFieldNowBlockType:    node.Type,
+		influxDBFieldNowBlockTagName: node.TagName,
 
 		influxDBFieldNowBlockNumber: block.BlockHeader.RawData.Number,
 	}
