@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
-	"github.com/sasaxie/monitor/dingding"
+	"github.com/sasaxie/monitor/common/config"
+	"github.com/sasaxie/monitor/senders/message"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -96,22 +97,13 @@ func (c *ChainParameters) Judge() {
 	for key, value := range c.ChainParameters {
 		if value.HasOldValue {
 			if value.OldValue != value.NewValue {
-				msg := fmt.Sprintf(
+				content := fmt.Sprintf(
 					"提议生效: %s: [%d] -> [%d]",
 					key,
 					value.OldValue,
 					value.NewValue)
 
-				bodyContent := fmt.Sprintf(`
-			{
-				"msgtype": "text",
-				"text": {
-					"content": "%s"
-				}
-			}
-			`, msg)
-
-				dingding.DingAlarm.Alarm([]byte(bodyContent))
+				config.Ding.Send(message.Alert, content)
 			}
 		}
 	}

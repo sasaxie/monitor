@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
-	"github.com/sasaxie/monitor/dingding"
 	"github.com/sasaxie/monitor/models"
+	"github.com/sasaxie/monitor/senders/message"
 	"strings"
 	"time"
 )
@@ -330,21 +331,12 @@ Address) FROM api_list_witnesses WHERE IsJobs=true AND time <= %s AND time
 
 func (l *ListWitnessesAlert) Alert() {
 	for _, v := range l.TotalMissedResult {
-		bodyContent := fmt.Sprintf(`
-			{
-				"msgtype": "text",
-				"text": {
-					"content": "%s"
-				}
-			}
-			`, v.TotalMissedChangeString())
-
-		dingding.DingAlarm.Alarm([]byte(bodyContent))
+		config.Ding.Send(message.Alert, v.TotalMissedChangeString())
 	}
 
 	res := l.WitnessesChangeResult.WitnessChangeString()
 	if len(res) > 0 && !strings.EqualFold(res, "") {
-		bodyContent := fmt.Sprintf(`
+		msg := fmt.Sprintf(`
 			{
 				"msgtype": "text",
 				"text": {
@@ -353,6 +345,6 @@ func (l *ListWitnessesAlert) Alert() {
 			}
 			`, res)
 
-		dingding.DingAlarm.Alarm([]byte(bodyContent))
+		config.Ding.Send(message.Alert, msg)
 	}
 }

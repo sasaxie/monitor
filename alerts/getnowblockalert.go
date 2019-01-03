@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"github.com/astaxie/beego/logs"
 	"github.com/influxdata/platform/kit/errors"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
-	"github.com/sasaxie/monitor/dingding"
 	"github.com/sasaxie/monitor/models"
+	"github.com/sasaxie/monitor/senders/message"
 	"strings"
 	"time"
 )
@@ -183,16 +184,7 @@ func (g *GetNowBlockAlert) Alert() {
 			continue
 		}
 
-		bodyContent := fmt.Sprintf(`
-			{
-				"msgtype": "text",
-				"text": {
-					"content": "%s"
-				}
-			}
-			`, msg)
-
-		dingding.DingAlarm.Alarm([]byte(bodyContent))
+		config.Ding.Send(message.Alert, msg)
 	}
 }
 

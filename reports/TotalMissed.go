@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
-	"github.com/sasaxie/monitor/dingding"
+	"github.com/sasaxie/monitor/senders/message"
 	"time"
 )
 
@@ -268,14 +269,5 @@ func (t *TotalMissed) Report() {
 		sumTotalMissed,
 		percent)
 
-	bodyContent := fmt.Sprintf(`
-			{
-				"msgtype": "text",
-				"text": {
-					"content": "%s"
-				}
-			}
-			`, msg)
-
-	dingding.DingAlarm.Alarm([]byte(bodyContent))
+	config.Ding.Send(message.Report, msg)
 }

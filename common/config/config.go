@@ -5,6 +5,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
+	"github.com/sasaxie/monitor/senders"
 	"github.com/sasaxie/monitor/util"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ const configFilePath = "conf/monitor.toml"
 const nodesFilePath = "conf/nodes.json"
 
 var MonitorConfig Config
+var Ding *senders.DingTalk
 
 type Config struct {
 	AppName  string
@@ -75,6 +77,7 @@ func init() {
 
 	initBeego()
 	initLog()
+	initSender()
 }
 
 func initBeego() {
@@ -206,4 +209,9 @@ func createDefaultNodes(filename string) {
 `
 
 	util.WriteToFile(filename, n)
+}
+
+func initSender() {
+	Ding = senders.NewDingTalk(MonitorConfig.Task.Dingding)
+	beego.Info("init ding talk, web hook:", Ding.WebHook)
 }
