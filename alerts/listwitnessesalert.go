@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-// ms: 1min
-const Internal1min int64 = 1000 * 60 * 1
-
 type ListWitnessesAlert struct {
 	Nodes                 []*Node
 	TotalMissedResult     map[string]*ListWitnessesAlertTotalMissedMsg

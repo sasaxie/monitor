@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-// ms: 5min
-const Internal5min int64 = 1000 * 60 * 5
-
 type GetNowBlockAlert struct {
 	Nodes       []*Node
 	Result      map[string]*GetNowBlockAlertMsg

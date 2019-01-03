@@ -1,5 +1,10 @@
 package alerts
 
+const (
+	Internal1min int64 = 1000 * 60 * 1
+	Internal5min int64 = 1000 * 60 * 5
+)
+
 type Alerter interface {
 	Load()
 	Start()
