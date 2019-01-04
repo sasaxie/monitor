@@ -278,11 +278,15 @@ func (g *GetNodeInfoCollector) saveNodeInfoDetail(
 		influxDBFieldGetNodeInfoTotalFlow:        nodeInfoDetail.TotalFlow,
 	}
 
-	influxdb.Client.WriteByTime(
+	err := influxdb.Client.WriteByTime(
 		influxDBPointNameGetNodeInfo,
 		nodeInfoDetailTags,
 		nodeInfoDetailFields,
 		timeNow)
+
+	if err != nil {
+		logs.Error(err)
+	}
 }
 
 func (g *GetNodeInfoCollector) saveMemoryDescInfoList(
@@ -301,11 +305,15 @@ func (g *GetNodeInfoCollector) saveMemoryDescInfoList(
 			influxDBFieldGetNodeInfoMemoryDescInfoUseSize:  v.UseSize,
 		}
 
-		influxdb.Client.WriteByTime(
+		err := influxdb.Client.WriteByTime(
 			influxDBPointNameGetNodeInfo,
 			t,
 			f,
 			timeNow)
+
+		if err != nil {
+			logs.Error(err)
+		}
 	}
 }
 
@@ -352,11 +360,15 @@ func (g *GetNodeInfoCollector) savePeerList(
 			influxDBFieldGetNodeInfoPeerUnFetchSynNum:           p.UnFetchSynNum,
 		}
 
-		influxdb.Client.WriteByTime(
+		err := influxdb.Client.WriteByTime(
 			influxDBPointNameGetNodeInfoPeerInfo,
 			t,
 			f,
 			timeNow)
+
+		if err != nil {
+			logs.Error(err)
+		}
 	}
 }
 

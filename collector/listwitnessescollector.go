@@ -144,12 +144,16 @@ func (l *ListWitnessesCollector) saveWitness(
 					influxDBFieldListWitnessesIsJobs:      w.IsJobs,
 				}
 
-				influxdb.Client.WriteByTime(
+				err := influxdb.Client.WriteByTime(
 					influxDBPointNameListWitnesses,
 					witnessTags,
 					witnessFields,
 					time.Now(),
 				)
+
+				if err != nil {
+					logs.Error(err)
+				}
 			}
 		}
 	}

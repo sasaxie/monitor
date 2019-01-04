@@ -136,10 +136,14 @@ func (g *GetNowBlockCollector) saveBlock(nodeHost, nodeType,
 		influxDBFieldNowBlockNumber: blockNum,
 	}
 
-	influxdb.Client.WriteByTime(
+	err := influxdb.Client.WriteByTime(
 		influxDBPointNameNowBlock,
 		nowBlockTags,
 		nowBlockFields,
 		time.Now(),
 	)
+
+	if err != nil {
+		logs.Error(err)
+	}
 }

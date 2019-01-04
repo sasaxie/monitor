@@ -50,34 +50,27 @@ func (i *InfluxDB) WriteByTime(
 	pointName string,
 	tags map[string]string,
 	fields map[string]interface{},
-	t time.Time) {
+	t time.Time) error {
 
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  config.MonitorConfig.InfluxDB.Database,
 		Precision: "s",
 	})
 	if err != nil {
-		logs.Error(fmt.Sprintf("[package: influxdb] [method: WriteByTime] [pointName: %s, tags"+
-			": %v, fields: %v, t: %v] [error: client.NewBatchPoints: %s]",
-			pointName, tags, fields, t, err))
-		return
+		return err
 	}
 
 	pt, err := client.NewPoint(pointName, tags, fields, t)
 	if err != nil {
-		logs.Error(fmt.Sprintf("[package: influxdb] [method: WriteByTime] [pointName: %s, tags"+
-			": %v, fields: %v, t: %v] [error: client.NewPoint: %s]",
-			pointName, tags, fields, t, err))
-		return
+		return err
 	}
 	bp.AddPoint(pt)
 
 	if err := i.C.Write(bp); err != nil {
-		logs.Error(fmt.Sprintf("[package: influxdb] [method: WriteByTime] [pointName: %s, tags"+
-			": %v, fields: %v, t: %v] [error: i.C.Write: %s]",
-			pointName, tags, fields, t, err))
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (i *InfluxDB) InitDatabase() {
