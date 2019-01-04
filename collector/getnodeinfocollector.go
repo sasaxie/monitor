@@ -7,8 +7,6 @@ import (
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
-	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -116,24 +114,29 @@ const (
 
 var Collectors = make([]Collector, 0)
 
-type GetNodeInfoRequest struct {
+type GetNodeInfoCollector struct {
 	Common
 }
 
 func init() {
-	Collectors = append(Collectors, new(GetNodeInfoRequest))
+	Collectors = append(Collectors, new(GetNodeInfoCollector))
 }
 
-func (g *GetNodeInfoRequest) Collect() {
-	if !g.HasInitNodes {
+func (g *GetNodeInfoCollector) Collect() {
+	g.init()
+
+	g.collect()
+}
+
+func (g *GetNodeInfoCollector) init() {
+	if !g.HasInit {
 		g.initNodes()
-		g.HasInitNodes = true
+		g.HasInit = true
+		logs.Info("init GetNodeInfoCollector")
 	}
-
-	g.start()
 }
 
-func (g *GetNodeInfoRequest) initNodes() {
+func (g *GetNodeInfoCollector) initNodes() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
 		panic("get node info request load() error")
 	}
@@ -166,7 +169,7 @@ func (g *GetNodeInfoRequest) initNodes() {
 	)
 }
 
-func (g *GetNodeInfoRequest) start() {
+func (g *GetNodeInfoCollector) collect() {
 	if g.Nodes == nil || len(g.Nodes) == 0 {
 		return
 	}
@@ -174,62 +177,58 @@ func (g *GetNodeInfoRequest) start() {
 	var wg sync.WaitGroup
 	wg.Add(len(g.Nodes))
 	for _, node := range g.Nodes {
-		go g.request(node, &wg)
+		go g.collectByNode(node, &wg)
 	}
 
 	wg.Wait()
 }
 
-func (g *GetNodeInfoRequest) request(node *Node, wg *sync.WaitGroup) {
+func (g *GetNodeInfoCollector) collectByNode(node *Node, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	response, err := http.Get(node.CollectionUrl)
-
+	data, err := fetch(node.CollectionUrl)
 	if err != nil {
-		logs.Debug("(", node.CollectionUrl, ")", "[http get]", err)
-		return
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		logs.Warn("get node info request (", node.CollectionUrl,
-			") response status code",
-			response.StatusCode)
-		return
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		logs.Warn("(", node.CollectionUrl, ") ", "[read body]", err)
+		logs.Debug(err)
 		return
 	}
 
 	var nodeInfoDetail models.NodeInfoDetail
-	err = json.Unmarshal(body, &nodeInfoDetail)
+	err = json.Unmarshal(data, &nodeInfoDetail)
 
 	if err != nil {
 		logs.Warn("(", node.CollectionUrl, ") ", "[json unmarshal]", err)
 		return
 	}
 
-	blockNum, blockID := getBlockNumAndId(nodeInfoDetail.Block)
-
-	solidityBlockNum, solidityBlockID := getBlockNumAndId(nodeInfoDetail.SolidityBlock)
-
 	timeNow := time.Now()
 
+	g.saveNodeInfoDetail(nodeInfoDetail, node.Node, node.Type, node.TagName, timeNow)
+	g.saveMemoryDescInfoList(nodeInfoDetail, node.Node, timeNow)
+	g.savePeerList(nodeInfoDetail, node.Node, timeNow)
+}
+
+func (g *GetNodeInfoCollector) saveNodeInfoDetail(
+	nodeInfoDetail models.NodeInfoDetail,
+	nodeHost, nodeType, nodeTagName string,
+	timeNow time.Time) {
+	blockNum, blockID := g.getBlockNumAndId(nodeInfoDetail.Block)
+
+	solidityBlockNum, solidityBlockID := g.getBlockNumAndId(nodeInfoDetail.
+		SolidityBlock)
+
 	nodeInfoDetailTags := map[string]string{
-		influxDBTagGetNodeInfoNode:    node.Node,
-		influxDBTagGetNodeInfoType:    node.Type,
-		influxDBTagGetNodeInfoTagName: node.TagName,
+		influxDBTagGetNodeInfoNode:    nodeHost,
+		influxDBTagGetNodeInfoType:    nodeType,
+		influxDBTagGetNodeInfoTagName: nodeTagName,
 	}
 
-	cheatWitnessInfo := getCheatWitnessInfoStr(nodeInfoDetail.CheatWitnessInfoMap)
+	cheatWitnessInfo := g.getCheatWitnessInfoStr(nodeInfoDetail.
+		CheatWitnessInfoMap)
 
 	nodeInfoDetailFields := map[string]interface{}{
-		influxDBFieldGetNodeInfoNode:    node.Node,
-		influxDBFieldGetNodeInfoType:    node.Type,
-		influxDBFieldGetNodeInfoTagName: node.TagName,
+		influxDBFieldGetNodeInfoNode:    nodeHost,
+		influxDBFieldGetNodeInfoType:    nodeType,
+		influxDBFieldGetNodeInfoTagName: nodeTagName,
 
 		influxDBFieldGetNodeInfoActiveConnectCount: nodeInfoDetail.ActiveConnectCount,
 		influxDBFieldGetNodeInfoBeginSyncNum:       nodeInfoDetail.BeginSyncNum,
@@ -284,10 +283,15 @@ func (g *GetNodeInfoRequest) request(node *Node, wg *sync.WaitGroup) {
 		nodeInfoDetailTags,
 		nodeInfoDetailFields,
 		timeNow)
+}
 
+func (g *GetNodeInfoCollector) saveMemoryDescInfoList(
+	nodeInfoDetail models.NodeInfoDetail,
+	nodeHost string,
+	timeNow time.Time) {
 	for _, v := range nodeInfoDetail.MachineInfo.MemoryDescInfoList {
 		t := map[string]string{
-			influxDBTagGetNodeInfoNode:               node.Node,
+			influxDBTagGetNodeInfoNode:               nodeHost,
 			influxDBTagGetNodeInfoMemoryDescInfoName: v.Name,
 		}
 		f := map[string]interface{}{
@@ -303,14 +307,19 @@ func (g *GetNodeInfoRequest) request(node *Node, wg *sync.WaitGroup) {
 			f,
 			timeNow)
 	}
+}
 
+func (g *GetNodeInfoCollector) savePeerList(
+	nodeInfoDetail models.NodeInfoDetail,
+	nodeHost string,
+	timeNow time.Time) {
 	for _, p := range nodeInfoDetail.PeerList {
-		hbn, hbi := getBlockNumAndId(p.HeadBlockWeBothHave)
+		hbn, hbi := g.getBlockNumAndId(p.HeadBlockWeBothHave)
 
-		ln, li := getBlockNumAndId(p.LastSyncBlock)
+		ln, li := g.getBlockNumAndId(p.LastSyncBlock)
 
 		t := map[string]string{
-			influxDBTagGetNodeInfoNode: node.Node,
+			influxDBTagGetNodeInfoNode: nodeHost,
 			influxDBTagGetNodeInfoPeer: p.Host,
 		}
 		f := map[string]interface{}{
@@ -351,7 +360,7 @@ func (g *GetNodeInfoRequest) request(node *Node, wg *sync.WaitGroup) {
 	}
 }
 
-func getBlockNumAndId(blockStr string) (int64, string) {
+func (g *GetNodeInfoCollector) getBlockNumAndId(blockStr string) (int64, string) {
 	var num int64 = 0
 	var id = ""
 	var err error
@@ -376,7 +385,8 @@ func getBlockNumAndId(blockStr string) (int64, string) {
 	return num, id
 }
 
-func getCheatWitnessInfoStr(cheatWitnessInfoMap map[string]string) string {
+func (g *GetNodeInfoCollector) getCheatWitnessInfoStr(
+	cheatWitnessInfoMap map[string]string) string {
 	cheatWitnessInfo := ""
 	for k, v := range cheatWitnessInfoMap {
 		cheatWitnessInfo += k + ":" + v + " "

@@ -7,8 +7,6 @@ import (
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
-	"io/ioutil"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -23,7 +21,7 @@ const (
 	influxDBPointNameNowBlock    = "api_get_now_block"
 )
 
-type GetNowBlockRequest struct {
+type GetNowBlockCollector struct {
 	Common
 }
 
@@ -40,19 +38,24 @@ type RawData struct {
 }
 
 func init() {
-	Collectors = append(Collectors, new(GetNowBlockRequest))
+	Collectors = append(Collectors, new(GetNowBlockCollector))
 }
 
-func (g *GetNowBlockRequest) Collect() {
-	if !g.HasInitNodes {
+func (g *GetNowBlockCollector) Collect() {
+	g.init()
+
+	g.collect()
+}
+
+func (g *GetNowBlockCollector) init() {
+	if !g.HasInit {
 		g.initNodes()
-		g.HasInitNodes = true
+		g.HasInit = true
+		logs.Info("init GetNowBlockCollector")
 	}
-
-	g.start()
 }
 
-func (g *GetNowBlockRequest) initNodes() {
+func (g *GetNowBlockCollector) initNodes() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
 		panic("get now block request load() error")
 	}
@@ -81,7 +84,7 @@ func (g *GetNowBlockRequest) initNodes() {
 	)
 }
 
-func (g *GetNowBlockRequest) start() {
+func (g *GetNowBlockCollector) collect() {
 	if g.Nodes == nil || len(g.Nodes) == 0 {
 		return
 	}
@@ -89,61 +92,48 @@ func (g *GetNowBlockRequest) start() {
 	var wg sync.WaitGroup
 	wg.Add(len(g.Nodes))
 	for _, node := range g.Nodes {
-		go g.request(node, &wg)
+		go g.collectByNode(node, &wg)
 	}
 
 	wg.Wait()
 }
 
-func (g *GetNowBlockRequest) Save2db() {
-
-}
-
-func (g *GetNowBlockRequest) request(node *Node, wg *sync.WaitGroup) {
+func (g *GetNowBlockCollector) collectByNode(node *Node, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	response, err := http.Get(node.CollectionUrl)
-
+	data, err := fetch(node.CollectionUrl)
 	if err != nil {
-		logs.Debug("(", node.CollectionUrl, ")", "[http get]", err)
-		return
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		logs.Warn("get now block request (", node.CollectionUrl,
-			") response status code",
-			response.StatusCode)
-		return
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		logs.Warn("(", node.CollectionUrl, ") ", "[read body]", err)
+		logs.Debug(err)
 		return
 	}
 
 	var block Block
-	err = json.Unmarshal(body, &block)
+	err = json.Unmarshal(data, &block)
 
 	if err != nil {
 		logs.Warn("(", node.CollectionUrl, ") ", "[json unmarshal]", err)
 		return
 	}
 
-	// Report block number
+	g.saveBlock(node.Node, node.Type, node.TagName, block.BlockHeader.RawData.Number)
+
+}
+
+func (g *GetNowBlockCollector) saveBlock(nodeHost, nodeType,
+	nodeTagName string, blockNum int64) {
+
 	nowBlockTags := map[string]string{
-		influxDBFieldNowBlockNode:    node.Node,
-		influxDBFieldNowBlockType:    node.Type,
-		influxDBFieldNowBlockTagName: node.TagName,
+		influxDBFieldNowBlockNode:    nodeHost,
+		influxDBFieldNowBlockType:    nodeType,
+		influxDBFieldNowBlockTagName: nodeTagName,
 	}
 
 	nowBlockFields := map[string]interface{}{
-		influxDBFieldNowBlockNode:    node.Node,
-		influxDBFieldNowBlockType:    node.Type,
-		influxDBFieldNowBlockTagName: node.TagName,
+		influxDBFieldNowBlockNode:    nodeHost,
+		influxDBFieldNowBlockType:    nodeType,
+		influxDBFieldNowBlockTagName: nodeTagName,
 
-		influxDBFieldNowBlockNumber: block.BlockHeader.RawData.Number,
+		influxDBFieldNowBlockNumber: blockNum,
 	}
 
 	influxdb.Client.WriteByTime(

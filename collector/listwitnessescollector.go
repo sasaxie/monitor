@@ -7,8 +7,6 @@ import (
 	"github.com/sasaxie/monitor/common/config"
 	"github.com/sasaxie/monitor/common/database/influxdb"
 	"github.com/sasaxie/monitor/models"
-	"io/ioutil"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -26,7 +24,7 @@ const (
 	influxDBPointNameListWitnesses        = "api_list_witnesses"
 )
 
-type ListWitnessesRequest struct {
+type ListWitnessesCollector struct {
 	Common
 }
 
@@ -42,19 +40,24 @@ type Witness struct {
 }
 
 func init() {
-	Collectors = append(Collectors, new(ListWitnessesRequest))
+	Collectors = append(Collectors, new(ListWitnessesCollector))
 }
 
-func (g *ListWitnessesRequest) Collect() {
-	if !g.HasInitNodes {
-		g.initNodes()
-		g.HasInitNodes = true
+func (l *ListWitnessesCollector) Collect() {
+	l.init()
+
+	l.collect()
+}
+
+func (l *ListWitnessesCollector) init() {
+	if !l.HasInit {
+		l.initNodes()
+		l.HasInit = true
+		logs.Info("init ListWitnessesCollector")
 	}
-
-	g.start()
 }
 
-func (l *ListWitnessesRequest) initNodes() {
+func (l *ListWitnessesCollector) initNodes() {
 	if models.NodeList == nil && models.NodeList.Addresses == nil {
 		panic("list witnesses request load() error")
 	}
@@ -83,7 +86,7 @@ func (l *ListWitnessesRequest) initNodes() {
 	)
 }
 
-func (l *ListWitnessesRequest) start() {
+func (l *ListWitnessesCollector) collect() {
 	if l.Nodes == nil || len(l.Nodes) == 0 {
 		return
 	}
@@ -91,64 +94,49 @@ func (l *ListWitnessesRequest) start() {
 	var wg sync.WaitGroup
 	wg.Add(len(l.Nodes))
 	for _, node := range l.Nodes {
-		go l.request(node, &wg)
+		go l.collectByNode(node, &wg)
 	}
 
 	wg.Wait()
 }
 
-func (l *ListWitnessesRequest) Save2db() {
-
-}
-
-func (l *ListWitnessesRequest) request(node *Node, wg *sync.WaitGroup) {
+func (l *ListWitnessesCollector) collectByNode(node *Node, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	response, err := http.Get(node.CollectionUrl)
-
+	data, err := fetch(node.CollectionUrl)
 	if err != nil {
-		logs.Debug("(", node.CollectionUrl, ")", "[http get]", err)
-		return
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		logs.Warn("list witnesses request (", node.CollectionUrl,
-			") response status code",
-			response.StatusCode)
-		return
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		logs.Warn("(", node.CollectionUrl, ") ", "[read body]", err)
+		logs.Debug(err)
 		return
 	}
 
 	var witnesses WitnessList
-	err = json.Unmarshal(body, &witnesses)
+	err = json.Unmarshal(data, &witnesses)
 
 	if err != nil {
 		logs.Warn("(", node.CollectionUrl, ") ", "[json unmarshal]", err)
 		return
 	}
 
-	// Report witness
-	t := time.Now()
+	l.saveWitness(witnesses, node.Node, node.Type, node.TagName)
+}
+
+func (l *ListWitnessesCollector) saveWitness(
+	witnesses WitnessList,
+	nodeHost, nodeType, nodeTagName string) {
 	if witnesses.Witnesses != nil {
 		for _, w := range witnesses.Witnesses {
 			if w.IsJobs {
 				witnessTags := map[string]string{
-					influxDBFieldListWitnessesNode:    node.Node,
-					influxDBFieldListWitnessesType:    node.Type,
-					influxDBFieldListWitnessesTagName: node.TagName,
+					influxDBFieldListWitnessesNode:    nodeHost,
+					influxDBFieldListWitnessesType:    nodeType,
+					influxDBFieldListWitnessesTagName: nodeTagName,
 					influxDBFieldListWitnessesUrl:     w.Url,
 				}
 
 				witnessFields := map[string]interface{}{
-					influxDBFieldListWitnessesNode:    node.Node,
-					influxDBFieldListWitnessesType:    node.Type,
-					influxDBFieldListWitnessesTagName: node.TagName,
+					influxDBFieldListWitnessesNode:    nodeHost,
+					influxDBFieldListWitnessesType:    nodeType,
+					influxDBFieldListWitnessesTagName: nodeTagName,
 
 					influxDBFieldListWitnessesAddress:     w.Address,
 					influxDBFieldListWitnessesTotalMissed: w.TotalMissed,
@@ -160,7 +148,7 @@ func (l *ListWitnessesRequest) request(node *Node, wg *sync.WaitGroup) {
 					influxDBPointNameListWitnesses,
 					witnessTags,
 					witnessFields,
-					t,
+					time.Now(),
 				)
 			}
 		}
