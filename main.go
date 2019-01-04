@@ -1,29 +1,107 @@
 package main
 
 import (
-	"github.com/astaxie/beego"
+	"fmt"
 	"github.com/astaxie/beego/logs"
 	"github.com/robfig/cron"
 	"github.com/sasaxie/monitor/alerts"
 	"github.com/sasaxie/monitor/collector"
 	"github.com/sasaxie/monitor/common/config"
-	"github.com/sasaxie/monitor/common/database/influxdb"
+	"github.com/sasaxie/monitor/engine"
+	"github.com/sasaxie/monitor/fetcher"
+	"github.com/sasaxie/monitor/javatron/parser"
+	"github.com/sasaxie/monitor/javatron/ruler"
+	"github.com/sasaxie/monitor/models"
 	"github.com/sasaxie/monitor/reports"
+	"github.com/sasaxie/monitor/result"
 	_ "github.com/sasaxie/monitor/routers"
+	"github.com/sasaxie/monitor/sender"
+	"github.com/sasaxie/monitor/storage"
+	"github.com/sasaxie/monitor/storage/influxdb"
+	"strings"
 	"time"
 )
 
+const urlTemplateGetNowBlock = "http://%s:%d/%s/getnowblock"
+
+var e = engine.NewEngine()
+
 func main() {
 
-	logs.Info("start monitor")
+	initMonitors()
 
-	go start()
-	go report()
-	go change()
+	var err error
+	e.DB, err = influxdb.NewInfluxDB(
+		config.MonitorConfig.InfluxDB.Address,
+		config.MonitorConfig.InfluxDB.Username,
+		config.MonitorConfig.InfluxDB.Password)
+	if err != nil {
+		panic(err)
+	}
 
-	defer influxdb.Client.C.Close()
+	e.Run()
+}
 
-	beego.Run()
+func initMonitors() {
+	for _, node := range models.NodeList.Addresses {
+		if strings.Contains(node.Monitor, "NowBlock") {
+			monitor := &engine.Monitor{
+				Url: fmt.Sprintf(
+					urlTemplateGetNowBlock,
+					node.Ip,
+					node.HttpPort,
+					config.NewNodeType(node.Type).GetApiPathByNodeType()),
+				Node: &engine.Node{
+					IP:   node.Ip,
+					Port: node.HttpPort,
+					Tag:  node.TagName,
+					Type: node.Type,
+				},
+				Fetcher: fetcher.NilFetcher,
+				Parser:  parser.NilParser,
+				Storage: storage.NilStorage,
+				Rulers: []func(db *influxdb.InfluxDB) (result.Result,
+					error){
+					ruler.NilRule,
+				},
+				Senders: []func(res ...result.Result) error{
+					sender.NilSend,
+				},
+			}
+
+			e.AddMonitor(monitor)
+		}
+	}
+
+	e.AddMonitor(&engine.Monitor{
+		Url:     "http://54.236.37.243:8090/wallet/getchainparameters",
+		Fetcher: fetcher.NilFetcher,
+		Parser:  parser.NilParser,
+		Storage: storage.NilStorage,
+		Rulers: []func(db *influxdb.InfluxDB) (result.Result,
+			error){
+			ruler.NilRule,
+		},
+		Senders: []func(res ...result.Result) error{
+			sender.NilSend,
+		},
+	})
+
+	e.AddMonitor(&engine.Monitor{
+		Url:     "http://54.236.37.243:8090/wallet/listwitnesses",
+		Fetcher: fetcher.DefaultFetcher,
+		Parser:  parser.ListWitnessesParser,
+		Storage: storage.ListWitnessesStorage,
+		Rulers: []func(db *influxdb.InfluxDB) (result.Result,
+			error){
+			ruler.NilRule,
+		},
+		Senders: []func(res ...result.Result) error{
+			sender.NilSend,
+		},
+	})
+
+	logs.Debug(fmt.Sprintf("init monitors count: %d", len(e.Monitors)))
 }
 
 func report() {
