@@ -365,19 +365,19 @@ func (g *GetNodeInfoCollector) getBlockNumAndId(blockStr string) (int64, string)
 	var id = ""
 	var err error
 	if len(blockStr) > 0 && !strings.EqualFold(blockStr, "") {
-		strs := strings.Split(blockStr, ",")
-		if len(strs) > 0 {
-			numStrs := strings.Split(strs[0], ":")
-			if len(numStrs) > 0 {
-				num, err = strconv.ParseInt(numStrs[1], 10, 64)
+		blockSlice := strings.Split(blockStr, ",")
+		if len(blockSlice) > 0 {
+			numSlice := strings.Split(blockSlice[0], ":")
+			if len(numSlice) > 0 {
+				num, err = strconv.ParseInt(numSlice[1], 10, 64)
 				if err != nil {
 					logs.Warn(err)
 				}
 			}
 
-			idStrs := strings.Split(strs[1], ":")
-			if len(idStrs) > 0 {
-				id = idStrs[1]
+			idSlice := strings.Split(blockSlice[1], ":")
+			if len(idSlice) > 0 {
+				id = idSlice[1]
 			}
 		}
 	}
