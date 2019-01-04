@@ -112,8 +112,6 @@ const (
 	influxDBTagGetNodeInfoMemoryDescInfoName = "api_memory_desc_info_name"
 )
 
-var Collectors = make([]Collector, 0)
-
 type GetNodeInfoCollector struct {
 	Common
 }

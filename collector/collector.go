@@ -7,6 +7,8 @@ import (
 	"net/http"
 )
 
+var Collectors = make([]Collector, 0)
+
 type Collector interface {
 	Collect()
 }
