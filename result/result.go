@@ -21,7 +21,6 @@ type TotalMissedData struct {
 	MaxTotalMissed int64
 	StartTime      time.Time
 	EndTime        time.Time
-	Duration       time.Duration
 }
 
 func (t TotalMissedData) ToMsg() string {
@@ -30,15 +29,13 @@ address: %s
 url: %s
 totalMissed: [%d] -> [%d]
 timeRange: [%s] ~ [%s]
-duration: %s
 `,
 		t.WitnessAddress,
 		t.WitnessUrl,
 		t.MinTotalMissed,
 		t.MaxTotalMissed,
 		t.StartTime.Format("15:04:05"),
-		t.EndTime.Format("15:04:05"),
-		t.Duration.String())
+		t.EndTime.Format("15:04:05"))
 }
 
 type RecoveryData struct {

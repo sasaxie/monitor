@@ -177,7 +177,7 @@ func createDefaultNodes(filename string) {
       "grpcPort": 50051,
       "httpPort": 8090,
       "type": "full_node",
-      "tag": "本地",
+      "tagName": "本地",
       "monitor": "NowBlock,BlockMissed"
     },
     {
@@ -185,7 +185,7 @@ func createDefaultNodes(filename string) {
       "grpcPort": 50052,
       "httpPort": 8092,
       "type": "full_node",
-      "tag": "本地",
+      "tagName": "本地",
       "monitor": "NowBlock,BlockMissed"
     },
     {
@@ -193,7 +193,7 @@ func createDefaultNodes(filename string) {
       "grpcPort": 50053,
       "httpPort": 8094,
       "type": "full_node",
-      "tag": "本地",
+      "tagName": "本地",
       "monitor": "NowBlock,BlockMissed"
     },
     {
@@ -201,7 +201,7 @@ func createDefaultNodes(filename string) {
       "grpcPort": 50054,
       "httpPort": 8097,
       "type": "solidity_node",
-      "tag": "本地",
+      "tagName": "本地",
       "monitor": "NowBlock,BlockMissed"
     }
   ]

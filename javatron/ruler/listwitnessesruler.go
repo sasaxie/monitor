@@ -19,9 +19,6 @@ const (
 var totalMissedRuleMark = make(map[string]*totalMissedRuleMarkInfo)
 
 type totalMissedRuleMarkInfo struct {
-	IsRecover bool
-	IsFresh   bool
-	FreshTime time.Time
 	StartTime time.Time
 }
 
@@ -55,23 +52,14 @@ func TotalMissedRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result,
 		}
 
 		if max-min > totalMissedThreshold {
-			if markInfo, ok := totalMissedRuleMark[witnessAddress]; ok {
-				// 如果有值，看看是否刷新了
-				if time.Now().Sub(markInfo.FreshTime) >= time.Hour {
-					markInfo.FreshTime = time.Now()
-					markInfo.IsFresh = true
-				}
-			} else {
-				// 如果没值，是新增的值
-				totalMissedRuleMark[witnessAddress] = &totalMissedRuleMarkInfo{
-					IsRecover: false,
-					IsFresh:   true,
-					FreshTime: endTime,
-					StartTime: endTime,
-				}
+			if _, ok := totalMissedRuleMark[witnessAddress]; ok {
+				continue
 			}
 
-			markInfo := totalMissedRuleMark[witnessAddress]
+			// 如果没值，是新增的值
+			totalMissedRuleMark[witnessAddress] = &totalMissedRuleMarkInfo{
+				StartTime: endTime,
+			}
 
 			u, _ := getWitnessUrlByAddress(db, witnessAddress, endTime)
 
@@ -82,13 +70,9 @@ func TotalMissedRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result,
 				MaxTotalMissed: max,
 				StartTime:      startTime,
 				EndTime:        endTime,
-				Duration:       endTime.Sub(markInfo.StartTime),
 			}
 
-			if markInfo.IsFresh {
-				markInfo.IsFresh = false
-				res.Data = append(res.Data, r)
-			}
+			res.Data = append(res.Data, r)
 		} else {
 			if markInfo, ok := totalMissedRuleMark[witnessAddress]; ok {
 				// 如果有值，说明之前存在异常，现在恢复了

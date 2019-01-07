@@ -2,8 +2,14 @@ package parser
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/astaxie/beego/logs"
 )
+
+func NilParser(data []byte) (interface{}, error) {
+	logs.Debug("nil parsing")
+	return nil, nil
+}
 
 type Block struct {
 	BlockHeader *BlockHeader `json:"block_header"`
@@ -17,15 +23,15 @@ type RawData struct {
 	Number int64 `json:"number"`
 }
 
-func NilParser(data []byte) (interface{}, error) {
-	logs.Debug("nil parsing")
-	return nil, nil
-}
-
 func GetNowBlockParser(data []byte) (interface{}, error) {
 	logs.Debug("GetNowBlockParser parsing")
 	var block Block
 	err := json.Unmarshal(data, &block)
+
+	if block.BlockHeader != nil && block.BlockHeader.RawData != nil {
+		logs.Debug(fmt.Sprintf("GetNowBlockParser got block: #%d",
+			block.BlockHeader.RawData.Number))
+	}
 
 	return block, err
 }

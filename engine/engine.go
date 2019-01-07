@@ -1,11 +1,14 @@
 package engine
 
 import (
+	"fmt"
 	"github.com/astaxie/beego/logs"
 	"github.com/sasaxie/monitor/result"
 	"github.com/sasaxie/monitor/storage/influxdb"
 	"time"
 )
+
+var monitorUrlMark = make(map[string]int)
 
 type Engine struct {
 	Monitors []*Monitor
@@ -50,11 +53,18 @@ func (e *Engine) AddMonitor(monitor *Monitor) {
 }
 
 func (e *Engine) Run() {
+
 	for _, monitor := range e.Monitors {
 		data, err := monitor.Fetcher(monitor.Url)
 		if err != nil {
-			logs.Error(err)
+			if _, ok := monitorUrlMark[monitor.Url]; !ok {
+				monitorUrlMark[monitor.Url] = 1
+			}
 			continue
+		}
+
+		if _, ok := monitorUrlMark[monitor.Url]; ok {
+			monitorUrlMark[monitor.Url] = 3
 		}
 
 		parseData, err := monitor.Parser(data)
@@ -66,7 +76,9 @@ func (e *Engine) Run() {
 		err = monitor.Storage(
 			e.DB,
 			parseData,
-			"", "", "")
+			fmt.Sprintf("%s:%d", monitor.Node.IP, monitor.Node.Port),
+			monitor.Node.Tag,
+			monitor.Node.Type)
 
 		if err != nil {
 			logs.Error(err)
@@ -94,6 +106,18 @@ func (e *Engine) Run() {
 			for _, d := range res.Data {
 				logs.Debug(d.ToMsg())
 			}
+		}
+	}
+
+	for k, v := range monitorUrlMark {
+		if v == 1 {
+			// 待发送
+			logs.Debug("获取接口数据失败：", k)
+			monitorUrlMark[k] = 2
+		} else if v == 3 {
+			// 待发送
+			logs.Debug("获取接口数据恢复：", k)
+			delete(monitorUrlMark, k)
 		}
 	}
 }

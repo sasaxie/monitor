@@ -64,9 +64,9 @@ func initMonitors() {
 					Tag:  node.TagName,
 					Type: node.Type,
 				},
-				Fetcher: fetcher.NilFetcher,
-				Parser:  parser.NilParser,
-				Storage: storage.NilStorage,
+				Fetcher: fetcher.DefaultFetcher,
+				Parser:  parser.GetNowBlockParser,
+				Storage: storage.GetNowBlockStorage,
 				Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
 					ruler.NilRule,
 				},
@@ -80,7 +80,13 @@ func initMonitors() {
 	}
 
 	e.AddMonitor(&engine.Monitor{
-		Url:     "http://54.236.37.243:8090/wallet/getchainparameters",
+		Url: "http://54.236.37.243:8090/wallet/getchainparameters",
+		Node: &engine.Node{
+			IP:   "",
+			Port: 0,
+			Tag:  "",
+			Type: "",
+		},
 		Fetcher: fetcher.NilFetcher,
 		Parser:  parser.NilParser,
 		Storage: storage.NilStorage,
@@ -93,7 +99,13 @@ func initMonitors() {
 	})
 
 	e.AddMonitor(&engine.Monitor{
-		Url:     "http://127.0.0.1:8090/wallet/listwitnesses",
+		Url: "http://127.0.0.1:8090/wallet/listwitnesses",
+		Node: &engine.Node{
+			IP:   "",
+			Port: 0,
+			Tag:  "",
+			Type: "",
+		},
 		Fetcher: fetcher.DefaultFetcher,
 		Parser:  parser.ListWitnessesParser,
 		Storage: storage.ListWitnessesStorage,
