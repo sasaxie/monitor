@@ -50,7 +50,6 @@ func (e *Engine) AddMonitor(monitor *Monitor) {
 }
 
 func (e *Engine) Run() {
-	t := time.Now()
 	for _, monitor := range e.Monitors {
 		data, err := monitor.Fetcher(monitor.Url)
 		if err != nil {
@@ -73,6 +72,8 @@ func (e *Engine) Run() {
 			logs.Error(err)
 			continue
 		}
+
+		t := time.Now()
 
 		results := make([]*result.Result, 0)
 		for _, r := range monitor.Rulers {

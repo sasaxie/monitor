@@ -28,6 +28,7 @@ func ListWitnessesStorage(
 		return errors.New("ListWitnessesStorage convert error")
 	}
 
+	saveCount := 0
 	if witnesses.Witnesses != nil {
 		for _, w := range witnesses.Witnesses {
 			if w.IsJobs {
@@ -42,15 +43,22 @@ func ListWitnessesStorage(
 					influxDBFieldListWitnessesIsJobs:      w.IsJobs,
 				}
 
-				return db.Write(
+				err := db.Write(
 					influxDBPointNameListWitnesses,
 					witnessTags,
 					witnessFields,
 					time.Now(),
 				)
+
+				if err != nil {
+					logs.Error(err)
+				}
+				saveCount++
 			}
 		}
 	}
+
+	logs.Debug("ListWitnessesStorage save", saveCount, "witness")
 
 	return nil
 }

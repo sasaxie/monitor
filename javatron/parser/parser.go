@@ -46,5 +46,9 @@ func ListWitnessesParser(data []byte) (interface{}, error) {
 	var witnesses WitnessList
 	err := json.Unmarshal(data, &witnesses)
 
+	if witnesses.Witnesses != nil {
+		logs.Debug("ListWitnessesParser got", len(witnesses.Witnesses), "witness")
+	}
+
 	return witnesses, err
 }

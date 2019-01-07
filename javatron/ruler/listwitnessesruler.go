@@ -29,7 +29,8 @@ type totalMissedRuleMarkInfo struct {
 // 1.获取最近10分钟的所有Witness
 // 2.获取这些Witness的最近10分钟内的最小TotalMissed和最大TotalMissed
 // 3.如果最小值和最大值相差太大就报警
-func TotalMissedRule(db *influxdb.InfluxDB, t time.Time) (*result.Result, error) {
+func TotalMissedRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result,
+	error) {
 	logs.Debug("TotalMissedRule ruling")
 
 	res := new(result.Result)
@@ -216,4 +217,86 @@ Address='%s' AND time <= %s AND time > %s ORDER BY time DESC LIMIT 1`, address,
 	val := res[0].Series[0].Values[0][1].(string)
 
 	return val, nil
+}
+
+type WitnessMark struct {
+	CurrentContain  bool
+	PreviousContain bool
+}
+
+// Witness改变报警
+// 这个是实时报警，出现就立即提醒
+// 获取当前时间范围内的所有信息
+// 获取1分钟前时间范围内的所有信息
+// 进行比较
+func WitnessChangeRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result, error) {
+	logs.Debug("WitnessChangeRuler ruling")
+
+	res := new(result.Result)
+	res.Type = 2
+	res.Data = make([]result.Data, 0)
+
+	currentWitnessAddresses, err := getAllWitnessAddresses(
+		db,
+		t.Add(-10*time.Minute),
+		t)
+
+	if err != nil {
+		return nil, err
+	}
+
+	logs.Debug(fmt.Sprintf("WitnessChangeRuler got %d current witness",
+		len(currentWitnessAddresses)))
+
+	previousWitnessAddresses, err := getAllWitnessAddresses(
+		db,
+		t.Add(-11*time.Minute),
+		t.Add(-time.Minute))
+
+	if err != nil {
+		return nil, err
+	}
+
+	logs.Debug(fmt.Sprintf("WitnessChangeRuler got %d previous witness",
+		len(previousWitnessAddresses)))
+
+	allWitnessesAddresses := make(map[string]*WitnessMark)
+
+	for _, currentWitnessAddress := range currentWitnessAddresses {
+		allWitnessesAddresses[currentWitnessAddress] = &WitnessMark{
+			CurrentContain:  true,
+			PreviousContain: false,
+		}
+	}
+
+	for _, previousWitnessAddress := range previousWitnessAddresses {
+		if mark, ok := allWitnessesAddresses[previousWitnessAddress]; ok {
+			mark.PreviousContain = true
+		} else {
+			allWitnessesAddresses[previousWitnessAddress] = &WitnessMark{
+				CurrentContain:  false,
+				PreviousContain: true,
+			}
+		}
+	}
+
+	for k, mark := range allWitnessesAddresses {
+		if mark.PreviousContain && !mark.CurrentContain {
+			res.Data = append(res.Data, &result.WitnessChangeData{
+				WitnessAddress: k,
+				IsNew:          false,
+			})
+		} else if mark.CurrentContain && !mark.PreviousContain {
+			res.Data = append(res.Data, &result.WitnessChangeData{
+				WitnessAddress: k,
+				IsNew:          true,
+			})
+		}
+	}
+
+	if len(res.Data) == 0 {
+		return nil, nil
+	}
+
+	return res, nil
 }

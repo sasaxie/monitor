@@ -98,7 +98,8 @@ func initMonitors() {
 		Parser:  parser.ListWitnessesParser,
 		Storage: storage.ListWitnessesStorage,
 		Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
-			ruler.TotalMissedRule,
+			ruler.TotalMissedRuler,
+			ruler.WitnessChangeRuler,
 		},
 		Senders: []func(res ...result.Result) error{
 			sender.NilSend,
