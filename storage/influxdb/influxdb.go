@@ -49,3 +49,20 @@ func (i *InfluxDB) Write(
 
 	return nil
 }
+
+func (i *InfluxDB) QueryDB(cmd string) (res []client.Result, err error) {
+	q := client.Query{
+		Command:  cmd,
+		Database: config.MonitorConfig.InfluxDB.Database,
+	}
+	if response, err := i.Client.Query(q); err == nil {
+		if response.Error() != nil {
+			return res, response.Error()
+		}
+		res = response.Results
+	} else {
+		return res, err
+	}
+
+	return res, nil
+}

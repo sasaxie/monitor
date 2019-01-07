@@ -4,6 +4,7 @@ import (
 	"github.com/astaxie/beego/logs"
 	"github.com/sasaxie/monitor/result"
 	"github.com/sasaxie/monitor/storage/influxdb"
+	"time"
 )
 
 type Engine struct {
@@ -24,7 +25,7 @@ type Monitor struct {
 		data interface{},
 		nodeHost, nodeTagName, nodeType string) error
 
-	Rulers []func(db *influxdb.InfluxDB) (result.Result, error)
+	Rulers []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error)
 
 	Senders []func(results ...result.Result) error
 }
@@ -49,6 +50,7 @@ func (e *Engine) AddMonitor(monitor *Monitor) {
 }
 
 func (e *Engine) Run() {
+	t := time.Now()
 	for _, monitor := range e.Monitors {
 		data, err := monitor.Fetcher(monitor.Url)
 		if err != nil {
@@ -72,22 +74,24 @@ func (e *Engine) Run() {
 			continue
 		}
 
-		results := make([]result.Result, 0)
+		results := make([]*result.Result, 0)
 		for _, r := range monitor.Rulers {
-			res, err := r(e.DB)
+			res, err := r(e.DB, t)
 			if err != nil {
 				logs.Error(err)
 				continue
 			}
 
-			results = append(results, res)
+			if res != nil {
+				results = append(results, res)
+			}
 		}
 
-		for _, s := range monitor.Senders {
-			err = s(results...)
-			if err != nil {
-				logs.Error(err)
-				continue
+		// 将结果字符串放到队列，待发送
+		for _, res := range results {
+			logs.Debug("结果类型：", res.Type, len(res.Data))
+			for _, d := range res.Data {
+				logs.Debug(d.ToMsg())
 			}
 		}
 	}

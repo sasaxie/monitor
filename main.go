@@ -39,7 +39,14 @@ func main() {
 		panic(err)
 	}
 
-	e.Run()
+	t := time.Tick(time.Minute)
+
+	for {
+		select {
+		case <-t:
+			e.Run()
+		}
+	}
 }
 
 func initMonitors() {
@@ -60,8 +67,7 @@ func initMonitors() {
 				Fetcher: fetcher.NilFetcher,
 				Parser:  parser.NilParser,
 				Storage: storage.NilStorage,
-				Rulers: []func(db *influxdb.InfluxDB) (result.Result,
-					error){
+				Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
 					ruler.NilRule,
 				},
 				Senders: []func(res ...result.Result) error{
@@ -78,8 +84,7 @@ func initMonitors() {
 		Fetcher: fetcher.NilFetcher,
 		Parser:  parser.NilParser,
 		Storage: storage.NilStorage,
-		Rulers: []func(db *influxdb.InfluxDB) (result.Result,
-			error){
+		Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
 			ruler.NilRule,
 		},
 		Senders: []func(res ...result.Result) error{
@@ -88,13 +93,12 @@ func initMonitors() {
 	})
 
 	e.AddMonitor(&engine.Monitor{
-		Url:     "http://54.236.37.243:8090/wallet/listwitnesses",
+		Url:     "http://127.0.0.1:8090/wallet/listwitnesses",
 		Fetcher: fetcher.DefaultFetcher,
 		Parser:  parser.ListWitnessesParser,
 		Storage: storage.ListWitnessesStorage,
-		Rulers: []func(db *influxdb.InfluxDB) (result.Result,
-			error){
-			ruler.NilRule,
+		Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
+			ruler.TotalMissedRule,
 		},
 		Senders: []func(res ...result.Result) error{
 			sender.NilSend,
