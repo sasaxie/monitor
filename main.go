@@ -22,7 +22,10 @@ import (
 	"time"
 )
 
-const urlTemplateGetNowBlock = "http://%s:%d/%s/getnowblock"
+const (
+	urlTemplateGetNowBlock = "http://%s:%d/%s/getnowblock"
+	urlTemplateGetNodeInfo = "http://%s:%d/%s/getnodeinfo"
+)
 
 var e = engine.NewEngine()
 
@@ -74,6 +77,38 @@ func initMonitors() {
 					nodePort int,
 					tagName, nodeType string) (*result.Result, error){
 					ruler.NowBlockUpdateRuler,
+				},
+				Senders: []func(res ...result.Result) error{
+					sender.NilSend,
+				},
+			}
+
+			e.AddMonitor(monitor)
+		}
+
+		if strings.Contains(node.Monitor, "NodeInfo") {
+			monitor := &engine.Monitor{
+				Url: fmt.Sprintf(
+					urlTemplateGetNodeInfo,
+					node.Ip,
+					node.HttpPort,
+					config.NewNodeType(node.Type).GetApiPathByNodeType()),
+				Node: &engine.Node{
+					IP:   node.Ip,
+					Port: node.HttpPort,
+					Tag:  node.TagName,
+					Type: node.Type,
+				},
+				Fetcher: fetcher.DefaultFetcher,
+				Parser:  parser.GetNodeInfoParser,
+				Storage: storage.GetNodeInfoStorage,
+				Rulers: []func(
+					db *influxdb.InfluxDB,
+					t time.Time,
+					nodeIp string,
+					nodePort int,
+					tagName, nodeType string) (*result.Result, error){
+					ruler.NilRule,
 				},
 				Senders: []func(res ...result.Result) error{
 					sender.NilSend,

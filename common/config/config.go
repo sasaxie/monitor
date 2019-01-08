@@ -178,7 +178,7 @@ func createDefaultNodes(filename string) {
       "httpPort": 8090,
       "type": "full_node",
       "tagName": "本地",
-      "monitor": "NowBlock,BlockMissed"
+      "monitor": "NowBlock,NodeInfo"
     },
     {
       "ip": "127.0.0.1",
@@ -186,7 +186,7 @@ func createDefaultNodes(filename string) {
       "httpPort": 8092,
       "type": "full_node",
       "tagName": "本地",
-      "monitor": "NowBlock,BlockMissed"
+      "monitor": "NowBlock,NodeInfo"
     },
     {
       "ip": "127.0.0.1",
@@ -194,7 +194,7 @@ func createDefaultNodes(filename string) {
       "httpPort": 8094,
       "type": "full_node",
       "tagName": "本地",
-      "monitor": "NowBlock,BlockMissed"
+      "monitor": "NowBlock,NodeInfo"
     },
     {
       "ip": "127.0.0.1",
@@ -202,7 +202,7 @@ func createDefaultNodes(filename string) {
       "httpPort": 8097,
       "type": "solidity_node",
       "tagName": "本地",
-      "monitor": "NowBlock,BlockMissed"
+      "monitor": "NowBlock,NodeInfo"
     }
   ]
 }
