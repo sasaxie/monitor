@@ -28,7 +28,12 @@ type Monitor struct {
 		data interface{},
 		nodeHost, nodeTagName, nodeType string) error
 
-	Rulers []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error)
+	Rulers []func(
+		db *influxdb.InfluxDB,
+		t time.Time,
+		nodeIp string,
+		nodePort int,
+		tagName, nodeType string) (*result.Result, error)
 
 	Senders []func(results ...result.Result) error
 }
@@ -89,7 +94,13 @@ func (e *Engine) Run() {
 
 		results := make([]*result.Result, 0)
 		for _, r := range monitor.Rulers {
-			res, err := r(e.DB, t)
+			res, err := r(
+				e.DB,
+				t,
+				monitor.Node.IP,
+				monitor.Node.Port,
+				monitor.Node.Tag,
+				monitor.Node.Type)
 			if err != nil {
 				logs.Error(err)
 				continue

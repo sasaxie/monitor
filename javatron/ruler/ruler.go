@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
-func NilRule(db *influxdb.InfluxDB, t time.Time) (*result.Result, error) {
+func NilRule(
+	db *influxdb.InfluxDB,
+	t time.Time,
+	nodeIp string,
+	nodePort int,
+	tagName, nodeType string) (*result.Result, error) {
 	logs.Debug("nil ruling")
 	return nil, nil
 }

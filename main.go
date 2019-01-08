@@ -67,8 +67,13 @@ func initMonitors() {
 				Fetcher: fetcher.DefaultFetcher,
 				Parser:  parser.GetNowBlockParser,
 				Storage: storage.GetNowBlockStorage,
-				Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
-					ruler.NilRule,
+				Rulers: []func(
+					db *influxdb.InfluxDB,
+					t time.Time,
+					nodeIp string,
+					nodePort int,
+					tagName, nodeType string) (*result.Result, error){
+					ruler.NowBlockUpdateRuler,
 				},
 				Senders: []func(res ...result.Result) error{
 					sender.NilSend,
@@ -90,7 +95,13 @@ func initMonitors() {
 		Fetcher: fetcher.NilFetcher,
 		Parser:  parser.NilParser,
 		Storage: storage.NilStorage,
-		Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
+		Rulers: []func(
+			db *influxdb.InfluxDB,
+			t time.Time,
+			nodeIp string,
+			nodePort int,
+			tagName, nodeType string) (*result.Result,
+			error){
 			ruler.NilRule,
 		},
 		Senders: []func(res ...result.Result) error{
@@ -109,7 +120,13 @@ func initMonitors() {
 		Fetcher: fetcher.DefaultFetcher,
 		Parser:  parser.ListWitnessesParser,
 		Storage: storage.ListWitnessesStorage,
-		Rulers: []func(db *influxdb.InfluxDB, t time.Time) (*result.Result, error){
+		Rulers: []func(
+			db *influxdb.InfluxDB,
+			t time.Time,
+			nodeIp string,
+			nodePort int,
+			tagName, nodeType string) (*result.Result,
+			error){
 			ruler.TotalMissedRuler,
 			ruler.WitnessChangeRuler,
 		},

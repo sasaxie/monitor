@@ -16,7 +16,7 @@ const (
 	internal10min        = 10 * 60 * 1000
 )
 
-var totalMissedRuleMark = make(map[string]*totalMissedRuleMarkInfo)
+var totalMissedRulerMark = make(map[string]*totalMissedRuleMarkInfo)
 
 type totalMissedRuleMarkInfo struct {
 	StartTime time.Time
@@ -26,7 +26,12 @@ type totalMissedRuleMarkInfo struct {
 // 1.获取最近10分钟的所有Witness
 // 2.获取这些Witness的最近10分钟内的最小TotalMissed和最大TotalMissed
 // 3.如果最小值和最大值相差太大就报警
-func TotalMissedRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result,
+func TotalMissedRuler(
+	db *influxdb.InfluxDB,
+	t time.Time,
+	nodeIp string,
+	nodePort int,
+	tagName, nodeType string) (*result.Result,
 	error) {
 	logs.Debug("TotalMissedRule ruling")
 
@@ -52,12 +57,12 @@ func TotalMissedRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result,
 		}
 
 		if max-min > totalMissedThreshold {
-			if _, ok := totalMissedRuleMark[witnessAddress]; ok {
+			if _, ok := totalMissedRulerMark[witnessAddress]; ok {
 				continue
 			}
 
 			// 如果没值，是新增的值
-			totalMissedRuleMark[witnessAddress] = &totalMissedRuleMarkInfo{
+			totalMissedRulerMark[witnessAddress] = &totalMissedRuleMarkInfo{
 				StartTime: endTime,
 			}
 
@@ -74,14 +79,14 @@ func TotalMissedRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result,
 
 			res.Data = append(res.Data, r)
 		} else {
-			if markInfo, ok := totalMissedRuleMark[witnessAddress]; ok {
+			if markInfo, ok := totalMissedRulerMark[witnessAddress]; ok {
 				// 如果有值，说明之前存在异常，现在恢复了
 				r := &result.RecoveryData{
 					Msg:      fmt.Sprintf("%s出块超时恢复正常", witnessAddress),
 					Duration: time.Now().Sub(markInfo.StartTime),
 				}
 
-				delete(totalMissedRuleMark, witnessAddress)
+				delete(totalMissedRulerMark, witnessAddress)
 
 				res.Data = append(res.Data, r)
 			}
@@ -213,7 +218,13 @@ type WitnessMark struct {
 // 获取当前时间范围内的所有信息
 // 获取1分钟前时间范围内的所有信息
 // 进行比较
-func WitnessChangeRuler(db *influxdb.InfluxDB, t time.Time) (*result.Result, error) {
+func WitnessChangeRuler(
+	db *influxdb.InfluxDB,
+	t time.Time,
+	nodeIp string,
+	nodePort int,
+	tagName, nodeType string) (*result.Result,
+	error) {
 	logs.Debug("WitnessChangeRuler ruling")
 
 	res := new(result.Result)

@@ -71,3 +71,22 @@ address: %s
 	}
 
 }
+
+type NowBlockData struct {
+	Ip               string
+	Port             int
+	Type             string
+	TagName          string
+	BlockNum         int64
+	ExpectedBlockNum int64
+}
+
+func (n NowBlockData) ToMsg() string {
+	return fmt.Sprintf(`块更新异常：
+ip: %s
+port: %d
+type: %s
+tagName: %s
+blockNum: %d
+expectedBlockNum: %d`, n.Ip, n.Port, n.Type, n.TagName, n.BlockNum, n.ExpectedBlockNum)
+}
