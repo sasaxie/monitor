@@ -127,9 +127,9 @@ func initMonitors() {
 			Tag:  "",
 			Type: "",
 		},
-		Fetcher: fetcher.NilFetcher,
-		Parser:  parser.NilParser,
-		Storage: storage.NilStorage,
+		Fetcher: fetcher.DefaultFetcher,
+		Parser:  parser.GetChainParametersParser,
+		Storage: storage.GetChainParametersStorage,
 		Rulers: []func(
 			db *influxdb.InfluxDB,
 			t time.Time,

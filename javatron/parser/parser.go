@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/logs"
+	"strings"
 )
 
 func NilParser(data []byte) (interface{}, error) {
@@ -153,4 +154,43 @@ func GetNodeInfoParser(data []byte) (interface{}, error) {
 	err := json.Unmarshal(data, &nodeInfoDetail)
 
 	return nodeInfoDetail, err
+}
+
+type ChainParameters map[string]interface{}
+
+func GetChainParametersParser(data []byte) (interface{}, error) {
+	logs.Debug("GetChainParametersParser parsing")
+
+	var origin interface{}
+	var chainParameters ChainParameters
+	chainParameters = make(map[string]interface{})
+
+	err := json.Unmarshal(data, &origin)
+	if err != nil {
+		return origin, err
+	}
+
+	v := origin.(map[string]interface{})
+	for k, vv := range v {
+		logs.Info(k, vv)
+		vvv := vv.([]interface{})
+
+		for _, vvvv := range vvv {
+			vvvvv := vvvv.(map[string]interface{})
+
+			key := ""
+			var value int64 = 0
+			for kkkkkk, vvvvvv := range vvvvv {
+				if strings.EqualFold(kkkkkk, "key") {
+					key = vvvvvv.(string)
+				} else if strings.EqualFold(kkkkkk, "value") {
+					value = int64(vvvvvv.(float64))
+				}
+			}
+
+			chainParameters[key] = value
+		}
+	}
+
+	return chainParameters, nil
 }
