@@ -14,6 +14,8 @@ type Engine struct {
 	Monitors []*Monitor
 
 	DB *influxdb.InfluxDB
+
+	MsgQueue []string
 }
 
 type Monitor struct {
@@ -34,8 +36,6 @@ type Monitor struct {
 		nodeIp string,
 		nodePort int,
 		tagName, nodeType string) (*result.Result, error)
-
-	Senders []func(results ...result.Result) error
 }
 
 type Node struct {
@@ -113,9 +113,8 @@ func (e *Engine) Run() {
 
 		// 将结果字符串放到队列，待发送
 		for _, res := range results {
-			logs.Debug("结果类型：", res.Type, len(res.Data))
 			for _, d := range res.Data {
-				logs.Debug(d.ToMsg())
+				e.MsgQueue = append(e.MsgQueue, d.ToMsg())
 			}
 		}
 	}
@@ -123,11 +122,11 @@ func (e *Engine) Run() {
 	for k, v := range monitorUrlMark {
 		if v == 1 {
 			// 待发送
-			logs.Debug("获取接口数据失败：", k)
+			e.MsgQueue = append(e.MsgQueue, fmt.Sprintf("获取接口数据失败：%s", k))
 			monitorUrlMark[k] = 2
 		} else if v == 3 {
 			// 待发送
-			logs.Debug("获取接口数据恢复：", k)
+			e.MsgQueue = append(e.MsgQueue, fmt.Sprintf("获取接口数据恢复：%s", k))
 			delete(monitorUrlMark, k)
 		}
 	}

@@ -37,8 +37,7 @@ func (t TotalMissedData) ToMsg() string {
 address: %s
 url: %s
 totalMissed: [%d] -> [%d]
-timeRange: [%s] ~ [%s]
-`,
+timeRange: [%s] ~ [%s]`,
 		t.WitnessAddress,
 		t.WitnessUrl,
 		t.MinTotalMissed,
@@ -55,8 +54,7 @@ type RecoveryData struct {
 func (r RecoveryData) ToMsg() string {
 	return fmt.Sprintf(`恢复正常：
 msg: %s
-duration: %s
-`,
+duration: %s`,
 		r.Msg,
 		r.Duration.String())
 }
@@ -69,13 +67,11 @@ type WitnessChangeData struct {
 func (w WitnessChangeData) ToMsg() string {
 	if w.IsNew {
 		return fmt.Sprintf(`新的出块Witness：
-address: %s
-`,
+address: %s`,
 			w.WitnessAddress)
 	} else {
 		return fmt.Sprintf(`旧的出块Witness：
-address: %s
-`,
+address: %s`,
 			w.WitnessAddress)
 	}
 
@@ -109,6 +105,5 @@ type ChainParametersChangeData struct {
 func (c ChainParametersChangeData) ToMsg() string {
 	return fmt.Sprintf(`提议值更新：
 key: %s
-value: [%d] -> [%d]
-`, c.Key, c.OldValue, c.NewValue)
+value: [%d] -> [%d]`, c.Key, c.OldValue, c.NewValue)
 }

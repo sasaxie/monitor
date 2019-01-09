@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
 	"github.com/robfig/cron"
 	"github.com/sasaxie/monitor/alerts"
@@ -15,7 +16,6 @@ import (
 	"github.com/sasaxie/monitor/reports"
 	"github.com/sasaxie/monitor/result"
 	_ "github.com/sasaxie/monitor/routers"
-	"github.com/sasaxie/monitor/sender"
 	"github.com/sasaxie/monitor/storage"
 	"github.com/sasaxie/monitor/storage/influxdb"
 	"strings"
@@ -42,6 +42,30 @@ func main() {
 		panic(err)
 	}
 
+	go startMonitor()
+
+	go func() {
+		t := time.Tick(10 * time.Second)
+
+		for {
+			select {
+			case <-t:
+				msg := ""
+				for _, m := range e.MsgQueue {
+					msg += fmt.Sprintf("%s\n", m)
+				}
+
+				if !strings.EqualFold(msg, "") {
+					fmt.Println(msg)
+				}
+			}
+		}
+	}()
+
+	beego.Run()
+}
+
+func startMonitor() {
 	t := time.Tick(time.Minute)
 
 	for {
@@ -78,9 +102,6 @@ func initMonitors() {
 					tagName, nodeType string) (*result.Result, error){
 					ruler.NowBlockUpdateRuler,
 				},
-				Senders: []func(res ...result.Result) error{
-					sender.NilSend,
-				},
 			}
 
 			e.AddMonitor(monitor)
@@ -110,9 +131,6 @@ func initMonitors() {
 					tagName, nodeType string) (*result.Result, error){
 					ruler.NilRule,
 				},
-				Senders: []func(res ...result.Result) error{
-					sender.NilSend,
-				},
 			}
 
 			e.AddMonitor(monitor)
@@ -139,9 +157,6 @@ func initMonitors() {
 			error){
 			ruler.ChainParametersChangeRuler,
 		},
-		Senders: []func(res ...result.Result) error{
-			sender.NilSend,
-		},
 	})
 
 	e.AddMonitor(&engine.Monitor{
@@ -164,9 +179,6 @@ func initMonitors() {
 			error){
 			ruler.TotalMissedRuler,
 			ruler.WitnessChangeRuler,
-		},
-		Senders: []func(res ...result.Result) error{
-			sender.NilSend,
 		},
 	})
 
