@@ -137,7 +137,7 @@ func initMonitors() {
 			nodePort int,
 			tagName, nodeType string) (*result.Result,
 			error){
-			ruler.NilRule,
+			ruler.ChainParametersChangeRuler,
 		},
 		Senders: []func(res ...result.Result) error{
 			sender.NilSend,

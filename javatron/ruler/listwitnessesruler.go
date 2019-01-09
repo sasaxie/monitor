@@ -36,7 +36,7 @@ func TotalMissedRuler(
 	logs.Debug("TotalMissedRule ruling")
 
 	res := new(result.Result)
-	res.Type = 1
+	res.Type = result.TotalMissed
 	res.Data = make([]result.Data, 0)
 
 	startTime := t.Add(totalMissedDuration)
@@ -228,7 +228,7 @@ func WitnessChangeRuler(
 	logs.Debug("WitnessChangeRuler ruling")
 
 	res := new(result.Result)
-	res.Type = 2
+	res.Type = result.WitnessChange
 	res.Data = make([]result.Data, 0)
 
 	currentWitnessAddresses, err := getAllWitnessAddresses(

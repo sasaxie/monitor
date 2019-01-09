@@ -5,8 +5,17 @@ import (
 	"time"
 )
 
+type ResType int
+
+const (
+	TotalMissed ResType = iota
+	WitnessChange
+	NowBlockUpdate
+	ChainParametersChange
+)
+
 type Result struct {
-	Type int
+	Type ResType
 	Data []Data
 }
 
@@ -89,4 +98,17 @@ type: %s
 tagName: %s
 blockNum: %d
 expectedBlockNum: %d`, n.Ip, n.Port, n.Type, n.TagName, n.BlockNum, n.ExpectedBlockNum)
+}
+
+type ChainParametersChangeData struct {
+	Key      string
+	OldValue int64
+	NewValue int64
+}
+
+func (c ChainParametersChangeData) ToMsg() string {
+	return fmt.Sprintf(`提议值更新：
+key: %s
+value: [%d] -> [%d]
+`, c.Key, c.OldValue, c.NewValue)
 }

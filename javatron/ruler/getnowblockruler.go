@@ -29,7 +29,7 @@ func NowBlockUpdateRuler(db *influxdb.InfluxDB,
 	logs.Debug("TotalMissedRule ruling")
 
 	res := new(result.Result)
-	res.Type = 1
+	res.Type = result.NowBlockUpdate
 	res.Data = make([]result.Data, 0)
 
 	maxBlockNum, err := getMaxBlockNumByTag(db, tagName, t)
