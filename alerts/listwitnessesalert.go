@@ -14,9 +14,9 @@ import (
 
 // ms: 1min
 const Internal1min int64 = 1000 * 60 * 1
-const Internal649Sec int64 = 1000 * 324
+const Internal649Sec int64 = 1000 * 648
 
-const totalMissedThreshold int64 = 3
+const totalMissedThreshold int64 = 7
 
 type ListWitnessesAlert struct {
 	Nodes                 []*Node

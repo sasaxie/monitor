@@ -1,7 +1,7 @@
 package config
 
 //=========== Monitor Info ===========//
-const MonitorVersion = "v3.0.1"
+const MonitorVersion = "v3.0.2"
 
 //=========== Node type ===========//
 type NodeType int
