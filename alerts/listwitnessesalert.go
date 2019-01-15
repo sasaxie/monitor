@@ -14,6 +14,9 @@ import (
 
 // ms: 1min
 const Internal1min int64 = 1000 * 60 * 1
+const Internal649Sec int64 = 1000 * 324
+
+const totalMissedThreshold int64 = 3
 
 type ListWitnessesAlert struct {
 	Nodes                 []*Node
@@ -177,7 +180,7 @@ func (l *ListWitnessesAlert) Start() {
 	for k, v := range l.TotalMissed1 {
 		vv := l.TotalMissed2[k]
 
-		if v.TotalMissed != vv.TotalMissed {
+		if vv.TotalMissed-v.TotalMissed >= totalMissedThreshold {
 			l.TotalMissedResult[k] = &ListWitnessesAlertTotalMissedMsg{
 				Address:      k,
 				Url:          v.Url,
@@ -193,7 +196,7 @@ func (l *ListWitnessesAlert) Start() {
 func (l *ListWitnessesAlert) updateTotalMissed(t int64) {
 	for a, isWitness := range l.Witnesses2 {
 		if isWitness {
-			totalMissed, u := l.getTotalMissedInfo(a, t-Internal1min)
+			totalMissed, u := l.getTotalMissedInfo(a, t-Internal649Sec)
 			l.TotalMissed1[a] = &TotalMissedInfo{
 				TotalMissed: totalMissed,
 				Url:         u,
