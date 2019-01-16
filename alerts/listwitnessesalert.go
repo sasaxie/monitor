@@ -18,6 +18,8 @@ const Internal649Sec int64 = 1000 * 648
 
 const totalMissedThreshold int64 = 7
 
+var totalMissedMark = make(map[string]int)
+
 type ListWitnessesAlert struct {
 	Nodes                 []*Node
 	TotalMissedResult     map[string]*ListWitnessesAlertTotalMissedMsg
@@ -181,6 +183,13 @@ func (l *ListWitnessesAlert) Start() {
 		vv := l.TotalMissed2[k]
 
 		if vv.TotalMissed-v.TotalMissed >= totalMissedThreshold {
+			if _, ok := totalMissedMark[k]; ok {
+				totalMissedMark[k] = 2
+				continue
+			}
+
+			totalMissedMark[k] = 1
+
 			l.TotalMissedResult[k] = &ListWitnessesAlertTotalMissedMsg{
 				Address:      k,
 				Url:          v.Url,
@@ -188,6 +197,10 @@ func (l *ListWitnessesAlert) Start() {
 				TotalMissed1: v.TotalMissed,
 				TotalMissed2: vv.TotalMissed,
 				Msg:          "出块超时",
+			}
+		} else {
+			if _, ok := totalMissedMark[k]; ok {
+				totalMissedMark[k] = 3
 			}
 		}
 	}
@@ -357,5 +370,21 @@ func (l *ListWitnessesAlert) Alert() {
 			`, res)
 
 		dingding.DingAlarm.Alarm([]byte(bodyContent))
+	}
+
+	for k, v := range totalMissedMark {
+		if v == 3 {
+			bodyContent := fmt.Sprintf(`
+			{
+				"msgtype": "text",
+				"text": {
+					"content": "%s"
+				}
+			}
+			`, fmt.Sprintf("%s恢复出块", k))
+
+			dingding.DingAlarm.Alarm([]byte(bodyContent))
+			delete(totalMissedMark, k)
+		}
 	}
 }
